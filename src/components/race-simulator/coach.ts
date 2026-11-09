@@ -5,9 +5,10 @@ import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
 import { accelTau, bestSheet, noGoAngle, polarSpeed, vmgAngles } from '@/sim/classes';
 import { bearing, dir, dist, n180, n360 } from '@/sim/math';
-import { bow, hullGap, lineSide } from '@/sim/physics';
+import { bankAhead, bow, hullGap, lineSide } from '@/sim/physics';
 import { keepClear } from '@/sim/referee';
 import { lineHit, timeToCover } from '@/sim/ai';
+import { windwardBoat } from '@/sim/scene';
 
 export type CoachMode = 'full' | 'hints' | 'off';
 
@@ -103,9 +104,19 @@ export function ruleWatch(race: Race, p: Boat): string | null {
     const g = hullGap(p, o);
     if (g < bestG) { best = o; bestG = g; bestJ = j; }
   });
+  const pi = race.boats.indexOf(p);
+  // Rule 20: a boat has hailed us for room to tack, or we're running out of water at the bank.
+  const r2t = race.referee.pendingRoomToTack(pi);
+  if (r2t) return `${race.boats[r2t.from].sail} hailed "Room to tack". Tack as soon as you can (T), or reply "You tack" (H) and then give her room to tack and keep clear (Rule 20.2).`;
+  const upA = vmgAngles(p.cls, p.tws).up;
+  if (p.started && Math.abs(p.twa) <= upA + 12 && bankAhead(p, race.course) < 3.5 * L) {
+    const w = windwardBoat(race, p, 2.2 * L);
+    if (w) return `You're running out of water at the bank with ${w.sail} to windward. Hail "Room to tack" (H): she must tack or reply "You tack" (Rule 20.1).`;
+  }
   if (!best) return null;
   const o = best as Boat;
-  const pi = race.boats.indexOf(p);
+  if (o.disabled) return `${o.sail} is out of control. Steer well clear of her: if possible you must avoid a disabled boat, whatever the right of way (Rule 22).`;
+  if (race.referee.restricted17(pi, bestJ)) return `You overlapped ${o.sail} to leeward from clear astern, within two lengths: you have right of way, but you may not luff above your proper course (Rule 17).`;
   const mr = race.referee.markRoom(pi, bestJ);
   if (mr?.iEntitled) return `You're inside ${o.sail} at the zone, so she must give you mark-room (Rule 18.2). Take only the room you need to round.`;
   if (mr?.iOwes) return `${o.sail} is inside you at the zone: give her room to round the mark (Rule 18.2), even if you have right of way.`;

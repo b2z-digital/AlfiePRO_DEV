@@ -3,7 +3,7 @@
 // One-Turn Penalty for Part 2 and Rule 31. It finds contacts, boats forced to change course,
 // mark-room breaches, tacks in the zone and mark touches, and tracks penalties.
 
-import { upAngle } from './classes';
+import { upAngle, vmgAngles } from './classes';
 import { Course, Leg } from './course';
 import { V2, bearing, dir, dist, dot, n180 } from './math';
 import { ContactPair, hullGap, stern, bow } from './physics';
@@ -35,11 +35,17 @@ interface PairMem {
   keeper: 0 | 1 | -1;
   rule: string;
   keeperSince: number;
-  threat: { t: number; rHdg: number; rSpd: number; keeper: number; row: number; rule: string } | null;
+  threat: { t: number; rHdg: number; rSpd: number; keeper: number; row: number; rule: string; would?: number; turnedAt?: number } | null;
   lastIncident: number;
   zones: Record<string, ZoneState>;
   lastRelOverlap: boolean;
   overlapSince: number;
+  /** Which boat was clear astern of the other last step (-1: neither). */
+  lastAstern: number;
+  /** Rule 17: the leeward boat that became overlapped from clear astern within two lengths (-1: none). */
+  r17: number;
+  /** When that boat started sailing above her proper course. */
+  r17Above: number | null;
 }
 
 export interface RefereeHost {
@@ -49,7 +55,7 @@ export interface RefereeHost {
   gunT: number;
   events: SimEvent[];
   incidents: Incident[];
-  hist: { hdg: number[]; spd: number[] }[]; // per boat, newest last, one entry per step
+  hist: { x: number[]; y: number[]; hdg: number[]; spd: number[] }[]; // per boat, newest last, one entry per step
   forgot: Set<string>;
   hail(boat: Boat, text: string): void;
   markRoundingFor(boat: Boat, markId: string): { progress: number; sweep: number } | null;
@@ -77,6 +83,10 @@ const keepingClearForPenalty = (b: Boat) => b.penalty.active && Math.abs(b.penal
 
 /** Section A plus rules 13 and 21: who must keep clear. */
 export function keepClear(a: Boat, b: Boat, _t: number): KeepClear {
+  // Rule 22 (as changed by Appendix E): if possible, avoid a boat that is disabled.
+  if (a.disabled && !b.disabled) return { keeper: 1, rule: '22', why: 'must avoid a disabled boat' };
+  if (b.disabled && !a.disabled) return { keeper: 0, rule: '22', why: 'must avoid a disabled boat' };
+  if (a.disabled && b.disabled) return { keeper: -1, rule: '', why: '' };
   // Rule 21: a boat returning to start or taking a penalty keeps clear.
   const aR = (a.ocs && !a.started) || keepingClearForPenalty(a);
   const bR = (b.ocs && !b.started) || keepingClearForPenalty(b);
@@ -114,8 +124,11 @@ export function ruleTitle(rule: string): string {
     case '13': return 'While tacking';
     case '15': return 'Acquiring right of way';
     case '16.1': return 'Changing course';
+    case '17': return 'Above a proper course';
     case '18.2(a)': case '18.2(c)': return 'Mark-room';
     case '18.3': return 'Passing head to wind in the zone';
+    case '20.2(c)': return 'Room to tack at an obstruction';
+    case '22': return 'Avoiding a disabled boat';
     case '21': return 'Returning or taking a penalty';
     case '31': return 'Touching a mark';
     case '29.1': return 'Over the line at the start';
@@ -134,26 +147,77 @@ export function currentMark(leg: Leg | undefined, b: Boat, course: Course): { id
   return null;
 }
 
+/** Rule 17: is she clearly above her proper course (the course she'd sail to finish soonest with no other boats about)? */
+export function aboveProperCourse(b: Boat, course: Course): boolean {
+  const leg = course.legs[b.legIndex];
+  if (!leg || !b.started || b.finished) return false;
+  const cm = currentMark(leg, b, course);
+  // Rounding a mark is part of her proper course: Rule 18 governs there.
+  if (cm && dist(cm.p, b) < 4.5 * b.cls.loa) return false;
+  const a = Math.abs(b.twa);
+  if (leg.upwind) return a < upAngle(b.tws) - 8 && b.tackingSince === null;
+  const dn = vmgAngles(b.cls, b.tws).down;
+  const toMark = cm ? Math.abs(n180(b.twd - bearing(b, cm.p))) : dn;
+  return a < Math.min(dn, toMark) - 20;
+}
+
 let incidentSeq = 1;
 
 export class Referee {
   private mem = new Map<string, PairMem>();
   private zoneTack = new Map<number, { markId: string; t: number }>(); // boat index -> tacked from port to starboard in a zone
+  /** Rule 20 hails: who hailed whom, when, and whether the hailed boat replied "You tack". */
+  private r2t: { from: number; to: number; t: number; repliedAt: number | null; done: boolean }[] = [];
+
+  roomToTack(from: number, to: number) { this.r2t.push({ from, to, t: this.h.t, repliedAt: null, done: false }); }
+  /** The open room-to-tack hail made to boat j, if any. */
+  pendingRoomToTack(j: number) { return this.r2t.find(r => r.to === j && !r.done && r.repliedAt === null) ?? null; }
+  youTack(j: number) { const r = this.pendingRoomToTack(j); if (r) r.repliedAt = this.h.t; }
+
+  private checkRoomToTack() {
+    const { boats, t } = this.h;
+    for (const r of this.r2t) {
+      if (r.done) continue;
+      const H = boats[r.from], X = boats[r.to];
+      if (X.lastHtwT > r.t) { r.done = true; continue; }                 // she tacked: done
+      if (r.repliedAt !== null) { if (t - r.repliedAt > 8) r.done = true; continue; }
+      const L = X.cls.loa;
+      // Rule 20.2(c): tack as soon as possible, or reply "You tack". Four seconds is generous at the pond.
+      if (t - r.t > 4) {
+        r.done = true;
+        if (isRacing(H) && isRacing(X) && hullGap(H, X) < 3 * L) this.addIncident('room-to-tack', '20.2(c)', r.to, r.from, this.memFor(r.from, r.to));
+      }
+    }
+    if (this.r2t.length > 40) this.r2t = this.r2t.filter(r => !r.done);
+  }
   private stbdSinceZone = new Map<string, boolean>(); // `${boat}:${mark}` -> on starboard since entering the zone
   private lastMarkTouch = new Map<string, number>();
 
   constructor(private h: RefereeHost) {}
+
+  /** Start judging boats already in their places (a scene): their right of way isn't new, so no Rule 15 grace. */
+  prime() {
+    const { boats, t } = this.h;
+    for (let i = 0; i < boats.length; i++) for (let j = i + 1; j < boats.length; j++) {
+      const m = this.memFor(i, j), kc = keepClear(boats[i], boats[j], t), rel = relation(boats[i], boats[j]);
+      m.keeper = kc.keeper; m.rule = kc.rule; m.keeperSince = -99;
+      m.lastRelOverlap = rel.overlap; m.overlapSince = -99; m.lastAstern = rel.aAstern ? i : rel.bAstern ? j : -1;
+    }
+  }
 
   private key(i: number, j: number) { return i < j ? `${i}-${j}` : `${j}-${i}`; }
   memFor(i: number, j: number): PairMem {
     const k = this.key(i, j);
     let m = this.mem.get(k);
     if (!m) {
-      m = { keeper: -1, rule: '', keeperSince: 0, threat: null, lastIncident: -99, zones: {}, lastRelOverlap: false, overlapSince: 0 };
+      m = { keeper: -1, rule: '', keeperSince: 0, threat: null, lastIncident: -99, zones: {}, lastRelOverlap: false, overlapSince: 0, lastAstern: -1, r17: -1, r17Above: null };
       this.mem.set(k, m);
     }
     return m;
   }
+
+  /** Rule 17: is boat i the leeward boat that came from clear astern within two lengths of boat j? */
+  restricted17(i: number, j: number): boolean { const m = this.mem.get(this.key(i, j)); return !!m && m.r17 === i; }
 
   /** Mark-room state between two boats, as seen from boat i: entitled, owes or none. */
   markRoom(i: number, j: number): { iEntitled: boolean; iOwes: boolean; markId: string; rule: string } | null {
@@ -180,7 +244,7 @@ export class Referee {
     // Zones: starboard-since-entering and tacks in the zone (Rule 18.3).
     for (let i = 0; i < n; i++) {
       const b = boats[i];
-      if (!isRacing(b) || !b.started) continue;
+      if (!isRacing(b) || !b.started || b.disabled) continue;
       const cm = currentMark(course.legs[b.legIndex], b, course);
       if (!cm) continue;
       const inZone = dist(cm.p, b) <= 4 * b.cls.loa;
@@ -211,10 +275,13 @@ export class Referee {
         if (kc.keeper !== m.keeper) { m.keeper = kc.keeper; m.keeperSince = t; }
         m.rule = kc.rule;
         const rel = relation(A, B);
-        if (rel.overlap && !m.lastRelOverlap) m.overlapSince = t;
+        const wasOverlap = m.lastRelOverlap, wasAstern = m.lastAstern;
+        if (rel.overlap && !wasOverlap) m.overlapSince = t;
         m.lastRelOverlap = rel.overlap;
+        m.lastAstern = rel.aAstern ? i : rel.bAstern ? j : -1;
+        this.track17(i, j, m, rel, wasOverlap, wasAstern);
 
-        this.updateZones(i, j, m, rel);
+        if (!A.disabled && !B.disabled) this.updateZones(i, j, m, rel);
 
         // New contact?
         const k = this.key(i, j);
@@ -231,7 +298,8 @@ export class Referee {
         }
 
         // Forced to change course (no contact).
-        if (kc.keeper !== -1 && d < 4 * L) this.watchThreat(i, j, m, kc);
+        if (kc.keeper !== -1 && kc.rule !== '22' && d < 4 * L) this.watchThreat(i, j, m, kc);
+        if (m.r17 >= 0) this.watch17(i, j, m);
       }
     }
 
@@ -244,7 +312,7 @@ export class Referee {
       for (let y = 0; y < n; y++) {
         if (y === x) continue;
         const Y = boats[y];
-        if (!isRacing(Y) || Y.tack !== 'stbd') continue;
+        if (!isRacing(Y) || Y.tack !== 'stbd' || Y.disabled) continue;
         if (!this.stbdSinceZone.get(`${y}:${zt.markId}`)) continue;
         const near = hullGap(X, Y) < 1.2 * Y.cls.loa;
         const above = Math.abs(Y.twa) < upAngle(Y.tws) - 7 && Y.tackingSince === null;
@@ -261,6 +329,7 @@ export class Referee {
     // Rule 31: touching a mark.
     for (const mt of markTouches) {
       const b = boats[mt.boat];
+      if (b.disabled) continue;
       const k = `${mt.boat}:${mt.mark}`;
       if ((this.lastMarkTouch.get(k) ?? -99) > t - 5) continue;
       this.lastMarkTouch.set(k, t);
@@ -270,6 +339,7 @@ export class Referee {
       this.addIncident('mark-touch', '31', mt.boat, null, null, mt.mark);
     }
 
+    this.checkRoomToTack();
     this.trackPenalties(passed);
   }
 
@@ -327,6 +397,11 @@ export class Referee {
     const { boats, t } = this.h;
     // Boats still tangled from the last incident: one incident, one penalty.
     if (t - m.lastIncident < 8) return;
+    // After replying "You tack", the hailed boat must give the hailing boat room to tack and avoid her.
+    const rep = this.r2t.find(r => r.repliedAt !== null && t - r.repliedAt < 8 && ((r.from === i && r.to === j) || (r.from === j && r.to === i)));
+    if (rep) { this.addIncident('room-to-tack', '20.2(c)', rep.to, rep.from, m); return; }
+    // Rule 22: hitting a disabled boat.
+    if (kc.rule === '22') { this.addIncident('contact', '22', kc.keeper === 0 ? i : j, kc.keeper === 0 ? j : i, m); return; }
     // Mark-room first: the outside boat that squeezed breaks 18.2.
     const mr = Object.entries(m.zones).find(([, z]) => z.state === 'on');
     if (mr) {
@@ -351,6 +426,14 @@ export class Referee {
     }
     if (kc.keeper === -1) return;
     const K = kc.keeper === 0 ? i : j, R = kc.keeper === 0 ? j : i;
+    // Rule 17: a leeward boat that overlapped from clear astern within two lengths sailed above her proper course into her.
+    if (kc.rule === '11' && m.r17 === R && aboveProperCourse(boats[R], this.h.course)) { this.addIncident('contact', '17', R, K, m); return; }
+    // Rule 15: she acquired right of way by her own tack or gybe moments ago and gave no room to keep clear.
+    const Rb0 = boats[R];
+    if (t - m.keeperSince < 3 && (Rb0.lastHtwT > m.keeperSince - 3 || Rb0.lastGybeT > m.keeperSince - 3) && kc.rule !== '13' && kc.rule !== '21') {
+      this.addIncident('contact', '15', R, K, m);
+      return;
+    }
     // Rule 16.1: the right-of-way boat changed course towards her without giving room.
     const turn = this.headingChange(R, 1.2);
     const rMark = currentMark(this.h.course.legs[boats[R].legIndex], boats[R], this.h.course);
@@ -358,24 +441,22 @@ export class Referee {
     if (Math.abs(turn) > 14 && kc.rule !== '13' && kc.rule !== '21' && !nearMark) {
       const Rb = boats[R], Kb = boats[K];
       const towards = dot(dir(Rb.hdg), { x: Kb.x - Rb.x, y: Kb.y - Rb.y }) > 0;
-      const before = this.h.hist[R].hdg[Math.max(0, this.h.hist[R].hdg.length - 1 - 24)];
-      const wasClear = hullGap(Rb, Kb, Rb.x, Rb.y, before) > 0.15 * Rb.cls.loa;
+      // Had she held her course from 1.2 s ago, would she be clear of the other boat now?
+      const H = this.h.hist[R], k = Math.max(0, H.hdg.length - 1 - 24);
+      const oh = H.hdg[k], v = dir(oh), back = (H.hdg.length - 1 - k) * 0.05;
+      const px = H.x[k] + v.x * H.spd[k] * back, py = H.y[k] + v.y * H.spd[k] * back;
+      const wasClear = hullGap(Rb, Kb, px, py, oh) > 0.1 * Rb.cls.loa;
       if (towards && wasClear) { this.addIncident('contact', '16.1', R, K, m); return; }
-    }
-    // Rule 15: she acquired right of way by her own action moments ago.
-    if (t - m.keeperSince < 1.2 && boats[R].lastHtwT > t - 4 && kc.rule !== '13') {
-      this.addIncident('contact', '15', R, K, m);
-      return;
     }
     this.addIncident('contact', kc.rule, K, R, m);
   }
 
   private watchThreat(i: number, j: number, m: PairMem, kc: KeepClear) {
     const { boats, t } = this.h;
-    const K = kc.keeper === 0 ? i : j, R = kc.keeper === 0 ? j : i;
-    const Kb = boats[K], Rb = boats[R];
-    const L = Rb.cls.loa;
-    const predict = (rh: number, rs: number, horizon = 2.5) => {
+    // Closest approach over the next few seconds: the keep-clear boat on her course (with her turn
+    // easing off), the right-of-way boat from where she is now on heading rh at speed rs.
+    let tMin = 99;
+    const predict = (Kb: Boat, Rb: Boat, rh: number, rs: number, horizon = 2.5) => {
       let min = 99;
       const rv = dir(rh);
       let kx = Kb.x, ky = Kb.y, kh = Kb.hdg;
@@ -384,33 +465,73 @@ export class Referee {
         const kv = dir(kh);
         kx += kv.x * Kb.spd * 0.25; ky += kv.y * Kb.spd * 0.25;
         const g = hullGap(Kb, Rb, kx, ky, kh, Rb.x + rv.x * rs * s, Rb.y + rv.y * rs * s, rh);
-        if (g < min) min = g;
+        if (g < min) { min = g; tMin = s; }
       }
       return min;
     };
     if (!m.threat) {
+      const K = kc.keeper === 0 ? i : j, R = kc.keeper === 0 ? j : i;
+      const Kb = boats[K], Rb = boats[R];
       if (t - m.lastIncident < 6) return;
       // Rule 15: a boat that has just become the one keeping clear gets time to respond.
       if (t - m.keeperSince < 2.5) return;
       // Mark-room owed by the right-of-way boat: not a keep-clear breach.
       const mr = this.markRoom(K, R);
       if (mr && mr.iEntitled) return;
-      if (predict(Rb.hdg, Rb.spd, 1.8) < 0.02 * L) m.threat = { t, rHdg: Rb.hdg, rSpd: Rb.spd, keeper: K, row: R, rule: kc.rule };
+      if (predict(Kb, Rb, Rb.hdg, Rb.spd, 2.6) < 0.02 * Rb.cls.loa) m.threat = { t, rHdg: Rb.hdg, rSpd: Rb.spd, keeper: K, row: R, rule: kc.rule };
       return;
     }
     const th = m.threat;
-    if (th.keeper !== K || t - th.t > 3) { m.threat = null; return; }
+    if (t - th.t > 4) { m.threat = null; return; }
+    const Kb = boats[th.keeper], Rb = boats[th.row];
+    const L = Rb.cls.loa;
+    // The roles changed: fine if it's the right-of-way boat tacking or gybing to get out of the way.
+    const nowKeeper = kc.keeper === 0 ? i : j;
+    if (nowKeeper !== th.keeper && !(Rb.lastHtwT > th.t || Rb.lastGybeT > th.t)) { m.threat = null; return; }
     // Only a change of course made to avoid her counts, not one the right-of-way boat made for her own reasons.
-    const turned = (Math.abs(n180(Rb.hdg - th.rHdg)) > 15 || Rb.spd < th.rSpd * 0.6) && this.h.avoidingSince(R, th.t - 0.3);
-    if (turned) {
-      const nowGap = predict(Rb.hdg, Rb.spd);
-      const wouldHave = predict(th.rHdg, th.rSpd);
-      const kTurn = Math.abs(n180(Kb.hdg - this.h.hist[K].hdg[Math.max(0, this.h.hist[K].hdg.length - 1 - Math.round((t - th.t) / 0.05))]));
-      if (nowGap > 0.08 * L && wouldHave < 0.02 * L && hullGap(Kb, Rb) < 1.2 * L && kTurn < 25) {
-        this.addIncident('forced', th.rule, K, R, m);
-        m.threat = null;
-      }
+    // A boat tacking close ahead often only makes the other luff or slow a little: that counts too.
+    const tackingK = th.rule === '13';
+    const turned = (Math.abs(n180(Rb.hdg - th.rHdg)) > (tackingK ? 8 : 15) || Rb.spd < th.rSpd * (tackingK ? 0.75 : 0.6)) && this.h.avoidingSince(th.row, th.t - 0.3);
+    if (!turned) return;
+    // Judge the "what if she had held her course" when she first turned, while it still means something.
+    // A right-of-way boat that gave way early, with contact still well off, wasn't forced to.
+    if (th.would === undefined) { th.would = predict(Kb, Rb, th.rHdg, th.rSpd); th.turnedAt = t; if (tMin > 2.4) th.would = 99; }
+    if (t - (th.turnedAt ?? t) > 1.5) return;
+    const nowGap = predict(Kb, Rb, Rb.hdg, Rb.spd);
+    const H = this.h.hist[th.keeper].hdg;
+    const kTurn = Math.abs(n180(Kb.hdg - H[Math.max(0, H.length - 1 - Math.round((t - th.t) / 0.05))]));
+    if (nowGap > 0.03 * L && th.would < 0.02 * L && hullGap(Kb, Rb) < 2 * L && kTurn < 25) {
+      this.addIncident('forced', th.rule, th.keeper, th.row, m);
+      m.threat = null;
     }
+  }
+
+  /** Rule 17: a boat that becomes overlapped from clear astern within two hull lengths to leeward of a boat on the
+   *  same tack must not sail above her proper course while they stay that way (RRS 2025–2028: no Rule 13 exception). */
+  private track17(i: number, j: number, m: PairMem, rel: Relation, wasOverlap: boolean, wasAstern: number) {
+    const { boats, t, gunT } = this.h;
+    const A = boats[i], B = boats[j];
+    const L = Math.max(A.cls.loa, B.cls.loa);
+    const lee = rel.aLeeward ? i : j;
+    if (rel.sameTack && rel.overlap && !wasOverlap && wasAstern === lee && t > gunT && A.started && B.started && hullGap(A, B) < 2 * L) {
+      m.r17 = lee; m.r17Above = null;
+    }
+    if (m.r17 >= 0 && (!rel.sameTack || !rel.overlap || lee !== m.r17 || hullGap(A, B) > 2 * L)) { m.r17 = -1; m.r17Above = null; }
+  }
+
+  /** The restricted leeward boat sails above her proper course and the windward boat has to luff to keep clear. */
+  private watch17(i: number, j: number, m: PairMem) {
+    const { boats, t, course } = this.h;
+    const Ri = m.r17, Wi = Ri === i ? j : i;
+    const R = boats[Ri], W = boats[Wi];
+    const above = aboveProperCourse(R, course) && (R.isPlayer || !this.h.avoidingSince(Ri, t - 1));
+    if (!above) { m.r17Above = null; return; }
+    if (m.r17Above === null) m.r17Above = t;
+    if (t - m.r17Above < 1.2 || t - m.lastIncident < 6 || hullGap(R, W) > 1.5 * W.cls.loa) return;
+    const H = this.h.hist[Wi].hdg;
+    const k = Math.max(0, H.length - 1 - 40);
+    const luffed = Math.abs(n180(W.twd - H[k])) - Math.abs(W.twa);
+    if (luffed > 10) this.addIncident('forced', '17', Ri, Wi, m);
   }
 
   addIncident(kind: Incident['kind'], rule: string, offender: number, victim: number | null, m: PairMem | null, markId?: string) {
@@ -434,7 +555,7 @@ export class Referee {
       O.penalty.since = t;
       O.penalty.reason = rule;
     }
-    if (V && !V.isPlayer && kind !== 'mark-touch') this.h.hail(V, `Protest, ${spellSail(O.sail)}`);
+    if (V && !V.isPlayer && kind !== 'mark-touch') this.h.hail(V, `${spellSail(V.sail)} protest ${spellSail(O.sail)}`);
   }
 
   private trackPenalties(passed: ('tack' | 'gybe' | null)[]) {
@@ -503,6 +624,14 @@ export function explain(inc: Incident, O: Boat, V: Boat | null, course: Course) 
       inc.explanation = `${O_} had right of way but changed course into ${v} without giving room to keep clear.`;
       inc.nextTime = `You may luff or bear away with right of way, but only slowly enough that the other boat can keep clear.`;
       break;
+    case '17':
+      inc.explanation = `${O_} became overlapped to leeward of ${v} from clear astern, within two lengths, and then sailed above ${O.isPlayer ? 'your' : 'her'} proper course. A boat that gets her overlap that way may not luff above her proper course while the overlap lasts.`;
+      inc.nextTime = `When you overtake to leeward from behind, sail your proper course to the mark: you can pass, but you can't luff the windward boat. Overlap from further than two lengths away if you want to be free to luff.`;
+      break;
+    case '22':
+      inc.explanation = `${V_} ${V?.isPlayer ? 'were' : 'was'} disabled: out of control and unable to carry on. Appendix E changes Rule 22 so that, if possible, every boat avoids a disabled boat, whatever the right of way.`;
+      inc.nextTime = `Give a drifting boat a wide berth: she can't steer out of your way, and she may drift into your path.`;
+      break;
     case '18.2(a)':
     case '18.2(c)':
       inc.explanation = `${V_} ${V?.isPlayer ? 'were' : 'was'} entitled to mark-room at ${markName}. ${O_} ${verbO} the outside boat and didn't give room to sail to the mark and round it. In radio sailing the zone is 4 hull lengths.`;
@@ -511,6 +640,10 @@ export function explain(inc: Incident, O: Boat, V: Boat | null, course: Course) 
     case '18.3':
       inc.explanation = `${O_} passed head to wind from port to starboard inside the zone of ${markName}. That gives no mark-room, and ${v}, on starboard since entering the zone, had to sail above close-hauled to avoid ${o}.`;
       inc.nextTime = `Tack onto the starboard layline before you reach the zone, or duck the starboard boat and tack once she has passed.`;
+      break;
+    case '20.2(c)':
+      inc.explanation = `${V_} ${V?.isPlayer ? 'were' : 'was'} close-hauled at the bank and hailed for room to tack. ${O_} had to respond: tack as soon as possible, or reply "You tack" and then give ${v} room to tack and keep clear.`;
+      inc.nextTime = `When a boat to leeward hails "Room to tack" with her sail number, tack straight away (press T), or reply "You tack" (press H) and keep clear while she tacks.`;
       break;
     case '21':
       inc.explanation = `${O_} ${verbO} ${O.ocs ? 'returning to start' : 'taking a penalty'}, and a boat doing that must keep clear of boats that are not.`;

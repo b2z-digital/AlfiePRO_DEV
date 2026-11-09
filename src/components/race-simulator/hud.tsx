@@ -63,7 +63,7 @@ export function ClockCard({ preStart, T, seq, raceT, sub, compact }: { preStart:
 }
 
 // ───────────────────────── Start line ─────────────────────────
-export function LineCard({ line }: { line: LineInfo }) {
+export function LineCard({ line, map }: { line: LineInfo; map?: React.ReactNode }) {
   const fav = line.favoured;
   const tilt = fav === 'pin' ? -7 : fav === 'starboard' ? 7 : 0;
   return (
@@ -95,12 +95,13 @@ export function LineCard({ line }: { line: LineInfo }) {
           <p className="m-0 mt-1 text-[15px] font-semibold">{line.ttl === null ? '–' : `${line.ttl.toFixed(1)} s`}</p>
         </div>
       </div>
+      {map}
     </Hud>
   );
 }
 
 // ───────────────────────── Course ─────────────────────────
-export function CourseCard({ leg, legNo, legs, next, distL, place, of, status }: { leg: string; legNo: number; legs: number; next: string; distL: number | null; place: number; of: number; status: string | null }) {
+export function CourseCard({ leg, legNo, legs, next, distL, place, of, status, map }: { leg: string; legNo: number; legs: number; next: string; distL: number | null; place: number; of: number; status: string | null; map?: React.ReactNode }) {
   return (
     <Hud className="flex w-[276px] flex-col gap-3 px-[18px] py-4">
       <div className="flex items-center justify-between"><Cap>Course</Cap><span className="text-xs" style={{ color: C.mute }}>Leg {Math.min(legNo, legs)} of {legs}</span></div>
@@ -113,6 +114,7 @@ export function CourseCard({ leg, legNo, legs, next, distL, place, of, status }:
         <p className="m-0 text-[13.5px] font-semibold">{leg}</p>
         <p className="m-0 mt-0.5 text-[12.5px]" style={{ color: C.mute }}>{distL === null ? next : `${next} · ${distL} lengths`}</p>
       </div>
+      {map}
     </Hud>
   );
 }
@@ -402,6 +404,71 @@ export function ResultsOverlay({ rows, title, onDebrief, onAgain, onHome, live }
         <Btn primary onClick={onDebrief}>See the debrief</Btn>
         <Btn onClick={onAgain}>Race again</Btn>
         <Btn quiet onClick={onHome}>Simulator home</Btn>
+      </div>
+    </Hud>
+  );
+}
+
+// ───────────────────────── Drills, lessons and lab moments ─────────────────────────
+export function GoalCard({ group, title, goal, progress, timeLeft, watching, compact }: {
+  group: string; title: string; goal: string; progress: string | null; timeLeft: number | null; watching: boolean; compact?: boolean;
+}) {
+  return (
+    <Hud className={cx('flex flex-col gap-1.5', compact ? 'px-3.5 py-2.5' : 'px-[18px] py-3.5')} style={{ width: compact ? '100%' : 300 }}>
+      <div className="flex items-center gap-2">
+        <Cap>{group}</Cap>
+        {watching && <Chip tone="blue" className="ml-auto !h-[22px]">Watching the right way</Chip>}
+      </div>
+      <p className="m-0 text-[15px] font-semibold leading-snug">{title}</p>
+      <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{goal}</p>
+      {(progress || timeLeft !== null) && (
+        <div className="mt-1 flex items-center gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-[13px]">
+          {progress && <span className="font-semibold">{progress}</span>}
+          {timeLeft !== null && <span className="ml-auto tabular-nums" style={{ color: C.mute }}>{Math.max(0, Math.ceil(timeLeft))} s left</span>}
+        </div>
+      )}
+    </Hud>
+  );
+}
+
+function Stars({ n }: { n: number }) {
+  return (
+    <span className="inline-flex gap-1" role="img" aria-label={`${n} of 3 stars`}>
+      {[0, 1, 2].map(i => (
+        <svg key={i} width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4L2.8 9.5l6.4-.8z" fill={i < n ? '#FFC94A' : 'rgba(255,255,255,0.12)'} stroke={i < n ? '#FFDD87' : 'rgba(255,255,255,0.2)'} strokeWidth={1} strokeLinejoin="round" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+export function SceneResult({ pass, title, text, stars, best, watching, onAgain, onWatch, onNext, nextLabel, onBack, backLabel, onRule, rule }: {
+  pass: boolean; title: string; text: string; stars?: number; best?: string | null; watching: boolean;
+  onAgain: () => void; onWatch?: () => void; onNext?: () => void; nextLabel?: string; onBack: () => void; backLabel: string;
+  onRule?: () => void; rule?: string;
+}) {
+  return (
+    <Hud className="flex flex-col gap-4 px-6 py-5" style={{ width: 'min(480px, calc(100vw - 32px))', maxHeight: 'calc(100% - 48px)' }} role="dialog" aria-label={title}>
+      <div className="flex items-center gap-3">
+        <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', pass ? 'bg-[rgba(52,211,153,0.16)] text-[#6EE7B7]' : 'bg-[rgba(255,159,67,0.16)] text-[#FFCB96]')}>
+          {pass
+            ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" aria-hidden="true"><path d="M12 7v6M12 16.5v.01" /></svg>}
+        </span>
+        <div className="min-w-0">
+          <Cap>{watching ? 'The right way' : pass ? 'Done' : 'Not this time'}</Cap>
+          <h2 className="m-0 mt-0.5 font-display text-[22px] font-bold leading-tight">{title}</h2>
+        </div>
+      </div>
+      {stars !== undefined && stars > 0 && <div className="flex items-center gap-3"><Stars n={stars} />{best && <span className="text-[13px]" style={{ color: C.mute }}>Your best: {best}</span>}</div>}
+      <p className="m-0 text-[14.5px] leading-[1.55]">{text}</p>
+      <div className="flex flex-wrap gap-2.5">
+        <Btn primary onClick={onAgain}>{watching ? 'Now you try' : 'Try again'}</Btn>
+        {onWatch && !watching && <Btn onClick={onWatch}>Watch the right way</Btn>}
+        {onNext && <Btn onClick={onNext}>{nextLabel ?? 'Next'}</Btn>}
+        {onRule && rule && <Btn quiet onClick={onRule}>Rule {rule} in brief</Btn>}
+        <Btn quiet onClick={onBack}>{backLabel}</Btn>
       </div>
     </Hud>
   );

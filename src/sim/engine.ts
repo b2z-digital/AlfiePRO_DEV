@@ -2,7 +2,7 @@
 // step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
 // collisions → start/rounding/finish progress → referee → recording.
 
-import { AiHost, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
+import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
 import { CLASSES, bestSheet, vmgAngles } from './classes';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
 import { Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
@@ -10,6 +10,7 @@ import { DT, bank, bow, collide, integrate, lineSide, localWind, markContacts, s
 import { Referee, isRacing, spellSail } from './referee';
 import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
 import { WindField } from './wind';
+import { Sea, makeSea } from './sea';
 
 export const BOAT_COLORS = ['#2A93FF', '#F472B6', '#2DD4BF', '#94A3B8', '#A78BFA', '#34D399', '#FBBF24', '#FB923C', '#F87171', '#60A5FA', '#E879F9', '#4ADE80', '#FCD34D', '#38BDF8', '#C084FC', '#FDA4AF'];
 
@@ -28,8 +29,10 @@ export class Race implements AiHost {
   rng: Rng;
   course: Course;
   wind: WindField;
+  /** Waves, or null for flat water. */
+  sea: Sea | null;
   boats: Boat[] = [];
-  skippers: (Skipper | null)[] = [];
+  skippers: (Helm | null)[] = [];
   referee: Referee;
   t = 0;
   gunT: number;
@@ -55,15 +58,17 @@ export class Race implements AiHost {
     this.rng = new Rng(settings.seed);
     const cls = CLASSES[settings.classId];
     const axis = settings.windFrom ?? 0;
-    const bias = this.rng.range(-3.5, 3.5);
+    const rb = this.rng.range(-3.5, 3.5);
+    const bias = settings.lineBias ?? rb;
     this.course = buildCourse(axis, cls.loa, { laps: settings.laps, length: settings.length, fleetSize: settings.fleetSize, lineBias: bias });
     const c = this.course;
     const mid = (c.bounds.alongMin + c.bounds.alongMax) / 2;
     this.wind = new WindField(
-      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots },
+      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts },
       settings.seed,
       { cx: c.origin.x + c.up.x * mid, cy: c.origin.y + c.up.y * mid, halfAlong: (c.bounds.alongMax - c.bounds.alongMin) / 2, halfAcross: c.bounds.across },
     );
+    this.sea = makeSea(settings.seaState, axis);
     this.gunT = settings.sequenceSeconds;
     this.referee = new Referee(this);
     this.makeFleet();
@@ -129,6 +134,28 @@ export class Race implements AiHost {
     this.events.push({ type: 'hail', t: this.t, boat: b.id, text });
   }
 
+  /** Rule 20: hail for room to tack. Appendix E1.3(b): the hail includes "room", "tack" and the hailing boat's sail number. */
+  hailRoomToTack(from: Boat, to: Boat) {
+    this.hail(from, `Room to tack, ${spellSail(from.sail)}`);
+    const i = this.boats.indexOf(from), j = this.boats.indexOf(to);
+    this.referee.roomToTack(i, j);
+    this.events.push({ type: 'room-to-tack', t: this.t, from: from.id, to: to.id });
+    this.skippers[j]?.onHail?.(this, from, 'room-to-tack');
+  }
+
+  /** Rule 20.2(c): the hailed boat replies "You tack" instead of tacking, then must give the hailer room. */
+  replyYouTack(by: Boat): boolean {
+    const j = this.boats.indexOf(by);
+    const r = this.referee.pendingRoomToTack(j);
+    if (!r) return false;
+    const from = this.boats[r.from];
+    this.hail(by, 'You tack');
+    this.referee.youTack(j);
+    this.events.push({ type: 'you-tack', t: this.t, from: by.id, to: from.id });
+    this.skippers[r.from]?.onHail?.(this, by, 'you-tack');
+    return true;
+  }
+
   markRoundingFor(b: Boat, markId: string) {
     const leg = this.course.legs[b.legIndex];
     if (!leg) return null;
@@ -189,7 +216,7 @@ export class Race implements AiHost {
     }
 
     // Physics.
-    this.passed = this.boats.map(b => (b.finished || b.retired ? null : integrate(b, dt, t)));
+    this.passed = this.boats.map(b => (b.finished || b.retired ? null : integrate(b, dt, t, this.sea)));
     const contacts = collide(this.boats);
     const touches = markContacts(this.boats, this.course);
     for (const b of this.boats) if (!b.finished && bank(b, this.course) && b.isPlayer) this.events.push({ type: 'bank', t, boat: b.id });
@@ -259,7 +286,7 @@ export class Race implements AiHost {
     const c = this.course;
     const P = c.start.pin, S = c.start.stbd;
     this.boats.forEach((b, i) => {
-      if (b.finished || b.retired) return;
+      if (b.finished || b.retired || b.disabled) return;
       const H = this.hist[i];
       const prevX = H.x.length ? H.x[H.x.length - 1] : b.x, prevY = H.y.length ? H.y[H.y.length - 1] : b.y;
       const prevBow = { x: prevX + dir(H.hdg.length ? H.hdg[H.hdg.length - 1] : b.hdg).x * b.cls.loa / 2, y: prevY + dir(H.hdg.length ? H.hdg[H.hdg.length - 1] : b.hdg).y * b.cls.loa / 2 };
@@ -324,7 +351,7 @@ export class Race implements AiHost {
     this.events.push({ type: 'rounded', t, boat: b.id, leg: b.legIndex, place });
     this.beginLeg(b, next);
     const sk = this.skippers[this.boats.indexOf(b)];
-    if (sk) sk.gate = null;
+    if (sk && 'gate' in sk) sk.gate = null;
   }
 
   private beginLeg(b: Boat, idx: number) {
@@ -343,7 +370,7 @@ export class Race implements AiHost {
   }
 
   private checkEnd() {
-    const all = this.boats.every(b => b.finished || b.retired);
+    const all = this.boats.every(b => b.finished || b.retired || b.disabled);
     const p = this.player;
     const leaderDone = this.boats.some(b => b.finished);
     const firstFinish = leaderDone ? Math.min(...this.boats.filter(b => b.finished).map(b => b.finishTime + this.gunT)) : Infinity;
@@ -367,7 +394,7 @@ export class Race implements AiHost {
 
   results(): ResultRow[] {
     const rows: ResultRow[] = this.boats.map(b => {
-      let status: ResultRow['status'] = b.finished ? 'finished' : this.ended ? 'dnf' : 'racing';
+      let status: ResultRow['status'] = b.finished ? 'finished' : this.ended || b.disabled ? 'dnf' : 'racing';
       if (b.dsq) status = 'dsq';
       if (!b.started && this.t > this.gunT) status = b.ocs ? 'ocs' : status;
       return { boat: b, place: 0, time: b.finished ? b.finishTime : null, status };

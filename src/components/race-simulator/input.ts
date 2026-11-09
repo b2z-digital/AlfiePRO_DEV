@@ -1,12 +1,29 @@
 // Controls: keyboard, a USB transmitter or gamepad, and the on-screen sticks all feed one
 // rudder (-1..1, + = turn to starboard) and one sheet (0 = eased right out, 1 = sheeted in).
 
+export interface AxisCal { centre: number; min: number; max: number }
+
 export interface GamepadMapping {
   rudderAxis: number;
   sheetAxis: number;
   rudderInverted: boolean;
   sheetInverted: boolean;
   deadzone: number;
+  /** From the calibration step: where each stick rests and how far it really goes. */
+  cal?: { rudder: AxisCal; sheet: AxisCal };
+}
+
+/** A raw axis reading scaled by its calibration to -1..1 (centre 0). */
+export function calibrated(v: number, c: AxisCal | undefined): number {
+  if (!c) return v;
+  const span = v >= c.centre ? c.max - c.centre : c.centre - c.min;
+  return Math.max(-1, Math.min(1, span > 0.05 ? (v - c.centre) / span : v - c.centre));
+}
+
+/** A raw sail-stick reading scaled by its calibrated range to 0..1. */
+export function calibratedRange(v: number, c: AxisCal | undefined): number {
+  if (!c || c.max - c.min < 0.1) return Math.max(0, Math.min(1, (v + 1) / 2));
+  return Math.max(0, Math.min(1, (v - c.min) / (c.max - c.min)));
 }
 
 export const DEFAULT_MAPPING: GamepadMapping = { rudderAxis: 0, sheetAxis: 3, rudderInverted: false, sheetInverted: false, deadzone: 0.08 };
@@ -52,14 +69,13 @@ export class Controls {
     const gp = firstGamepad();
     if (gp) {
       if (map.rudderAxis < gp.axes.length) {
-        let r = gp.axes[map.rudderAxis] ?? 0;
+        let r = calibrated(gp.axes[map.rudderAxis] ?? 0, map.cal?.rudder);
         if (map.rudderInverted) r = -r;
         if (Math.abs(r) > map.deadzone && want === 0 && this.touchRudder === null) this.rudder = Math.max(-1, Math.min(1, r));
       }
       if (map.sheetAxis < gp.axes.length) {
-        let sv = gp.axes[map.sheetAxis] ?? 0;
-        if (map.sheetInverted) sv = -sv;
-        const sh = Math.max(0, Math.min(1, (sv + 1) / 2));
+        let sh = calibratedRange(gp.axes[map.sheetAxis] ?? 0, map.cal?.sheet);
+        if (map.sheetInverted) sh = 1 - sh;
         if (this.padSheet === null || Math.abs(sh - this.padSheet) > 0.02) { this.sheet = sh; this.padSheet = sh; }
       }
     }
