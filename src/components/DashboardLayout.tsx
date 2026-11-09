@@ -712,6 +712,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   };
 
   const handleSectionChange = (path: string) => {
+    // Going to the Dashboard closes any open menu groups
+    if (path === '/') {
+      setExpandedGroups({});
+      localStorage.setItem('navExpandedGroups', '{}');
+    }
     // Navigate immediately without showing loading overlay
     navigate(path);
     setIsMobileMenuOpen(false);
