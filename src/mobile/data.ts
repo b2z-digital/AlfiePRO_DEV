@@ -10,6 +10,7 @@ import { getCalendarMeetings } from '../utils/calendarMeetingStorage';
 import { computeEventResults } from '../utils/eventResultsEngine';
 import { seriesRoundToEvent } from '../utils/scoringStart';
 import type { RaceEvent } from '../types/race';
+import { getBoatClassImage } from '../utils/boatClassImages';
 
 export type AttendanceStatus = 'yes' | 'no' | 'maybe';
 
@@ -36,6 +37,29 @@ export interface MCalendarItem {
   startTime?: string | null;
   meetingId?: string;
   event?: RaceEvent;
+  /** Imported from the association's website (ARYA): opens that event page, no RSVP here */
+  external?: boolean;
+  externalUrl?: string | null;
+  registrationUrl?: string | null;
+}
+
+/** Class names compared loosely: "Ten Rater" = "10R", "DragonFlite 95" = "DF95", "RC Laser" = "Laser" */
+export function classKey(name?: string | null): string {
+  const k = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const alias: Record<string, string> = {
+    '10rater': '10r', tenrater: '10r', '10raters': '10r',
+    internationalonemetre: 'iom', onemetre: 'iom', iomclass: 'iom',
+    laser: 'rclaser', rclasers: 'rclaser', mclass: 'marblehead', marbleheads: 'marblehead',
+    a: 'aclass', aclassyacht: 'aclass', dragonflite65: 'df65', dragonforce65: 'df65', dragonflite95: 'df95',
+  };
+  return alias[k] || k;
+}
+
+/** True when any class in a "10R, IOM" style list is one of mine. */
+export function isMyClass(raceClass: string | undefined, myClasses: string[]): boolean {
+  if (!raceClass || !myClasses.length) return false;
+  const mine = new Set(myClasses.map(classKey));
+  return raceClass.split(/\s*(?:[,/&;]|\band\b)\s*/i).some(part => mine.has(classKey(part)) || mine.has(classKey(part.replace(/\(.*?\)/g, ''))) || [...part.matchAll(/\(([^)]+)\)/g)].some(m => mine.has(classKey(m[1]))));
 }
 
 /** Strip the round/day suffix the app adds to series and multi-day ids (same as EventDetails). */
@@ -59,9 +83,37 @@ export function daysUntil(date: string): number {
   return Math.round(ms / 86400000);
 }
 
+/**
+ * State / national events imported from the association website (Events Scraping), filtered the
+ * way the desktop calendar's "All events" does: the club's own state, plus national and world
+ * events. A state association sees its own state; a national association sees everything.
+ */
+async function loadExternalEvents(clubId: string | undefined, org: { type: string; id: string } | null) {
+  let myState: string | null = null;
+  if (org?.type === 'state') myState = org.id;
+  else if (clubId && org?.type !== 'national') {
+    const { data } = await supabase.from('clubs').select('state_association_id').eq('id', clubId).maybeSingle();
+    myState = (data as any)?.state_association_id || null;
+  }
+  const from = new Date(); from.setMonth(from.getMonth() - 1);
+  const { data } = await supabase
+    .from('external_events')
+    .select('id, event_name, event_date, event_end_date, venue, location, boat_class_raw, boat_class_mapped, event_type, display_category, source_url, registration_url')
+    .eq('is_visible', true)
+    .eq('event_status', 'active')
+    .gte('event_date', `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-01`)
+    .order('event_date', { ascending: true })
+    .limit(400);
+  return ((data as any[]) || []).filter(x => {
+    if (org?.type === 'national') return true;
+    const national = x.event_type === 'national' || x.event_type === 'world' || x.display_category === 'national';
+    return national || (!!myState && x.display_category === `state_${myState}`);
+  });
+}
+
 export async function loadCalendar(clubId: string | undefined, org: { type: string; id: string } | null): Promise<MCalendarItem[]> {
   const isAssoc = org?.type === 'state' || org?.type === 'national';
-  const [raceEvents, series, publicEvents, meetings] = await Promise.all([
+  const [raceEvents, series, publicEvents, meetings, external] = await Promise.all([
     isAssoc ? Promise.resolve([] as RaceEvent[]) : getStoredRaceEvents().catch(() => []),
     isAssoc ? Promise.resolve([]) : getStoredRaceSeries().catch(() => []),
     getPublicEvents(false, org?.type as any, org?.id).catch(() => []),
@@ -70,6 +122,7 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
       org?.type === 'state' ? org.id : null,
       org?.type === 'national' ? org.id : null,
     ).catch(() => []),
+    loadExternalEvents(clubId, org).catch(() => [] as any[]),
   ]);
 
   const items: MCalendarItem[] = [];
@@ -146,6 +199,34 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
     });
   }
 
+  // Imported state / national events (ARYA), unless the same event is already in AlfiePRO
+  const sameEvent = (date: string, level: string, cls?: string) =>
+    items.some(i => i.kind === 'race' && i.level === level && i.date === date && !!cls && classKey(i.raceClass) === classKey(cls));
+  for (const x of external) {
+    const date = String(x.event_date || '').slice(0, 10);
+    if (!date) continue;
+    const level: MCalendarItem['level'] = (x.event_type === 'national' || x.event_type === 'world' || x.display_category === 'national') ? 'national' : 'state';
+    const raceClass = x.boat_class_mapped || x.boat_class_raw || undefined;
+    if (sameEvent(date, level, raceClass)) continue;
+    const end = String(x.event_end_date || '').slice(0, 10);
+    items.push({
+      key: `x-${x.id}`,
+      kind: 'race',
+      title: x.event_name || 'Event',
+      date,
+      endDate: end && end > date ? end : undefined,
+      venue: x.location || x.venue || '',
+      venueImage: getBoatClassImage(raceClass),
+      raceClass,
+      level,
+      completed: false,
+      cancelled: false,
+      external: true,
+      externalUrl: x.source_url || null,
+      registrationUrl: x.registration_url || null,
+    });
+  }
+
   for (const m of meetings) {
     if (!m.date) continue;
     items.push({
@@ -168,7 +249,7 @@ export async function loadCalendar(clubId: string | undefined, org: { type: stri
   if (names.length) {
     const { data: venues } = await supabase.from('venues').select('name, image').in('name', names).not('image', 'is', null);
     const photo = new Map((venues || []).map((v: any) => [v.name as string, v.image as string]));
-    for (const i of items) if (i.kind === 'race') i.venueImage = photo.get(i.venue) || null;
+    for (const i of items) if (i.kind === 'race') i.venueImage = photo.get(i.venue) || i.venueImage || null;
   }
   return items;
 }

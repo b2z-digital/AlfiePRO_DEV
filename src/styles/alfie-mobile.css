@@ -714,3 +714,8 @@ button.m-sail.m-sail-off, button.m-sail.m-sail-ocs { color: var(--m-red-ink); }
 .m-app.m-light .m-shp-in .m-shp-lg { box-shadow: 0 0 0 4px var(--m-sheet), 0 14px 30px rgba(15, 23, 42, .16); }
 .m-app.m-light .m-shp-lg { box-shadow: 0 0 0 1px rgba(15, 23, 42, .08); }
 .m-app.m-light .m-shp-cl { background: rgba(15, 23, 42, .06); color: #475569; }
+
+/* Home: venue photo across the top of the Next up card */
+.m-next-photo { display: block; position: relative; margin: -14px -14px 0; height: 150px; border: 0; padding: 0; border-radius: 19px 19px 10px 10px; background: #10233F center / cover no-repeat; text-align: left; overflow: hidden; }
+.m-next-photo-tx { position: absolute; left: 14px; right: 14px; bottom: 10px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.45); }
+.m-next-photo-tx .m-lb { color: rgba(255,255,255,.92); letter-spacing: .08em; }

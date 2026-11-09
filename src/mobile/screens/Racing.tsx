@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useMobile } from '../MobileContext';
-import { MCalendarItem, daysUntil, myResultFor, parseDay, podium, todayISO } from '../data';
+import { MCalendarItem, daysUntil, isMyClass, myResultFor, parseDay, podium, todayISO } from '../data';
 import { Icon } from '../icons';
-import { LevelPill, MyStatusPill, RootHeader, Skeleton, fmtDay } from '../ui';
+import { EntriesPill, LevelPill, MyStatusPill, RootHeader, Skeleton, fmtDay, openCalendarItem } from '../ui';
 import { ordinal } from './Home';
 
 export const RacingNav: React.FC = () => {
@@ -29,8 +29,7 @@ export const RacingNav: React.FC = () => {
   );
 };
 
-const openItem = (navigate: ReturnType<typeof useNavigate>, i: MCalendarItem) =>
-  navigate(i.kind === 'meeting' ? `/calendar/meeting/${i.meetingId}` : `/calendar/event/${encodeURIComponent(i.key)}`);
+const openItem = (navigate: ReturnType<typeof useNavigate>, i: MCalendarItem) => openCalendarItem(navigate, i);
 
 /* ─────────────── Calendar ─────────────── */
 
@@ -56,6 +55,7 @@ const AgendaRow: React.FC<{ item: MCalendarItem }> = ({ item }) => {
           <LevelPill level={item.level} />
           {item.cancelled ? <span className="m-pill" style={{ background: 'rgba(255,59,48,.14)', color: '#FF8C82' }}>Cancelled</span>
             : item.completed ? <span className="m-pill" style={{ background: 'var(--m-fill)', color: 'var(--m-mut)' }}>Results</span>
+            : item.external ? <EntriesPill item={item} />
             : next ? <MyStatusPill item={item} /> : null}
         </div>
       </div>
@@ -70,7 +70,7 @@ export const CalendarScreen: React.FC = () => {
   const navigate = useNavigate();
   const { calendar, calendarLoading, myClasses } = useMobile();
   const [filter, setFilter] = useState<CalFilter>('all');
-  const sameClass = (a?: string) => !!a && myClasses.some(c => c.toLowerCase() === a.toLowerCase());
+  const sameClass = (a?: string) => isMyClass(a, myClasses);
   const touched = useRef(false);
   const today = todayISO();
   const [weekStart, setWeekStart] = useState(() => {

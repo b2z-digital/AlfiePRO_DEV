@@ -172,6 +172,29 @@ export const DateBadge: React.FC<{ date: string; spec?: boolean }> = ({ date, sp
   </div>
 );
 
+/** Opens a web page in the in-app browser on the phone app, a new tab elsewhere. */
+export async function openExternalUrl(url?: string | null) {
+  if (!url) return;
+  if (isNative) {
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+      return;
+    } catch { /* fall back */ }
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/** Calendar item → its event page; imported association events open the association's page. */
+export function openCalendarItem(navigate: (to: string) => void, i: MCalendarItem) {
+  if (i.external) { openExternalUrl(i.externalUrl || i.registrationUrl); return; }
+  navigate(i.kind === 'meeting' ? `/calendar/meeting/${i.meetingId}` : `/calendar/event/${encodeURIComponent(i.key)}`);
+}
+
+/** Imported events can't be answered here; show whether entries are open instead. */
+export const EntriesPill: React.FC<{ item: MCalendarItem }> = ({ item }) =>
+  item.registrationUrl ? <span className="m-pill" style={{ background: 'rgba(10,132,255,.16)', color: '#7DBBFF' }}>Entries open</span> : null;
+
 export const LevelPill: React.FC<{ level: string }> = ({ level }) =>
   level === 'state' ? <span className="m-pill" style={{ background: 'rgba(138,77,255,.18)', color: '#C3A2FF' }}>State</span>
   : level === 'national' ? <span className="m-pill" style={{ background: 'rgba(255,138,43,.16)', color: '#FFB27A' }}>National</span>

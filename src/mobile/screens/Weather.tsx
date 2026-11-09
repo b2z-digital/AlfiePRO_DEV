@@ -43,7 +43,7 @@ export const WeatherScreen: React.FC = () => {
   const [wx, setWx] = useState<Wx | null | undefined>(undefined);
   const [picking, setPicking] = useState(false);
 
-  const nextRace = useMemo(() => calendar.filter(i => i.kind === 'race' && !i.cancelled && i.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date))[0], [calendar]);
+  const nextRace = useMemo(() => calendar.filter(i => i.kind === 'race' && !i.external && !i.cancelled && i.date >= todayISO()).sort((a, b) => a.date.localeCompare(b.date))[0], [calendar]);
 
   useEffect(() => { getStoredVenues().then(v => setVenues((v || []).filter(x => x.latitude && x.longitude))).catch(() => setVenues([])); }, [currentClub?.clubId]);
 
