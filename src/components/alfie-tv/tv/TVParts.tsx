@@ -518,14 +518,25 @@ export const TVEventTile: React.FC<{
   kind: 'live' | 'soon' | 'replay';
   badge?: string;
   duration?: string;
+  /** Text drawn over the picture (race replays: race + event over the venue photo) */
+  poster?: { race?: string; title?: string; club?: string };
   onClick?: () => void;
-}> = ({ image, title, sub, kind, badge, duration, onClick }) => {
+}> = ({ image, title, sub, kind, badge, duration, poster, onClick }) => {
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag type={onClick ? 'button' : undefined} className={`atv-card atv-ev is-${kind}`} onClick={onClick}>
       <span className="atv-card-inner">
         <span className="atv-card-media">
           {image ? <img src={image} alt="" loading="lazy" className="atv-thumb-img" /> : <span className={`atv-ev-ph is-${kind}`}><AlfieIcon glyph={kind === 'replay' ? 'video' : 'radio'} size={30} /></span>}
+          {poster && (
+            <span className="atv-poster" aria-hidden="true">
+              {poster.club && <span className="club">{poster.club}</span>}
+              <span className="foot">
+                {poster.race && <span className="race">{poster.race}</span>}
+                {poster.title && <span className="t">{poster.title}</span>}
+              </span>
+            </span>
+          )}
           <span className="atv-card-shade" aria-hidden="true" />
           {onClick && <span className="atv-card-play" aria-hidden="true"><Play size={22} /></span>}
           {kind === 'live' && <span className="atv-badge atv-badge-live atv-ev-tag"><i />Live</span>}

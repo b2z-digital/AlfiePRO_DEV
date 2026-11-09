@@ -189,6 +189,50 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 .alv-ov-hold .h { font-family: 'Bricolage Grotesque', sans-serif; font-size: 2.6cqw; font-weight: 700; line-height: 1.1; }
 .alv-ov-hold .sub { font-size: 1.1cqw; color: rgba(235, 240, 255, 0.72); }
 
+/* Full-screen broadcast cards (intro, on hold, racing complete). cqw = 1% of the program width. */
+.alv-ov-screen { position: absolute; inset: 0; z-index: 50; overflow: hidden; transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1); background: #060B16; }
+.alv-ov-screen .bg { position: absolute; inset: 0; background: radial-gradient(120% 90% at 80% 20%, #12305C 0%, #0A1428 45%, #04070F 100%); background-size: cover; background-position: center; }
+.alv-ov-screen .scrim { position: absolute; inset: 0; background:
+  linear-gradient(90deg, rgba(4, 8, 18, 0.92) 0%, rgba(4, 8, 18, 0.74) 38%, rgba(4, 8, 18, 0.28) 70%, rgba(4, 8, 18, 0.12) 100%),
+  linear-gradient(0deg, rgba(4, 8, 18, 0.85) 0%, rgba(4, 8, 18, 0) 38%),
+  linear-gradient(180deg, rgba(4, 8, 18, 0.6) 0%, rgba(4, 8, 18, 0) 22%); }
+.alv-ov-screen.is-hold .scrim, .alv-ov-screen.is-done .scrim { background:
+  linear-gradient(90deg, rgba(4, 8, 18, 0.94) 0%, rgba(4, 8, 18, 0.82) 45%, rgba(4, 8, 18, 0.55) 100%),
+  linear-gradient(0deg, rgba(4, 8, 18, 0.85) 0%, rgba(4, 8, 18, 0) 40%); }
+.alv-ov-screen .top { position: absolute; top: 3.2cqw; left: 4.2cqw; right: 4.2cqw; display: flex; align-items: center; justify-content: space-between; }
+.alv-ov-screen .host { display: flex; align-items: center; gap: 1cqw; }
+.alv-ov-screen .host .logo { width: 3.6cqw; height: 3.6cqw; border-radius: 0.9cqw; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; box-shadow: 0 0.3cqw 1.2cqw rgba(0, 0, 0, 0.35); }
+.alv-ov-screen .host .name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.45cqw; font-weight: 700; letter-spacing: -0.01em; color: #fff; text-shadow: 0 0.1cqw 0.6cqw rgba(0, 0, 0, 0.5); }
+.alv-ov-screen .chip { display: inline-flex; align-items: center; gap: 0.6cqw; height: 2.4cqw; padding: 0 1.1cqw; border-radius: 99cqw; font-size: 1cqw; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: rgba(255, 255, 255, 0.12); border: 0.08cqw solid rgba(255, 255, 255, 0.22); }
+.alv-ov-screen .chip .dot { width: 0.6cqw; height: 0.6cqw; border-radius: 50%; background: currentColor; }
+.alv-ov-screen .chip.is-intro { background: #E5243B; border-color: #E5243B; }
+.alv-ov-screen .chip.is-hold { color: #FFC864; background: rgba(255, 179, 64, 0.14); border-color: rgba(255, 179, 64, 0.5); }
+.alv-ov-screen .chip.is-done { color: #7BEA9C; background: rgba(48, 209, 88, 0.12); border-color: rgba(48, 209, 88, 0.45); }
+.alv-ov-screen .body { position: absolute; left: 4.2cqw; bottom: 8.6cqw; max-width: 58cqw; display: flex; flex-direction: column; align-items: flex-start; }
+.alv-ov-screen .eyebrow { font-size: 1.1cqw; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(235, 240, 255, 0.82); }
+.alv-ov-screen .rule { display: block; width: 6cqw; height: 0.32cqw; margin: 1.2cqw 0 1.3cqw; border-radius: 1cqw; background: linear-gradient(90deg, #2E7BFF, #8A4DFF 40%, #FF3E9A 75%, #FF8A2B); }
+.alv-ov-screen h1 { margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 4.4cqw; font-weight: 700; line-height: 1.04; letter-spacing: -0.025em; color: #fff; text-shadow: 0 0.2cqw 1.6cqw rgba(0, 0, 0, 0.45); }
+.alv-ov-screen.is-hold h1, .alv-ov-screen.is-done h1 { font-size: 3.8cqw; }
+.alv-ov-screen .meta { display: flex; align-items: center; gap: 1.2cqw; margin-top: 1.8cqw; flex-wrap: wrap; }
+.alv-ov-screen .meta .race { display: inline-flex; align-items: center; height: 2.8cqw; padding: 0 1.3cqw; border-radius: 0.6cqw; background: #2A93FF; color: #fff; font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.45cqw; font-weight: 700; }
+.alv-ov-screen .meta .first { font-size: 1.4cqw; font-weight: 700; color: #fff; }
+.alv-ov-screen .meta .m { font-size: 1.3cqw; color: rgba(235, 240, 255, 0.78); }
+.alv-ov-screen .meta .m::before { content: '·'; margin-right: 1.2cqw; color: rgba(235, 240, 255, 0.45); }
+.alv-ov-screen .meta .race + .m::before { content: none; margin: 0; }
+.alv-ov-screen .results { position: absolute; right: 4.2cqw; bottom: 8.6cqw; width: 28cqw; padding: 1.4cqw 1.6cqw; border-radius: 1.1cqw; background: rgba(6, 11, 22, 0.72); border: 0.08cqw solid rgba(255, 255, 255, 0.12); }
+.alv-ov-screen .results .h { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.5cqw; font-weight: 700; margin-bottom: 0.8cqw; color: #fff; }
+.alv-ov-screen .results .r { display: grid; grid-template-columns: 2.2cqw 4cqw 1fr; align-items: center; height: 2.4cqw; font-size: 1.15cqw; }
+.alv-ov-screen .results .r + .r { border-top: 0.06cqw solid rgba(255, 255, 255, 0.08); }
+.alv-ov-screen .results .p { color: #7BEA9C; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; }
+.alv-ov-screen .results .s { color: #8CC4FF; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.alv-ov-screen .results .n { color: #fff; font-weight: 600; white-space: nowrap; overflow: hidden; }
+.alv-ov-screen .brand { position: absolute; right: 4.2cqw; bottom: 3cqw; display: flex; align-items: center; gap: 0.5cqw; opacity: 0.9; }
+.alv-ov-screen .brand svg { width: 1.1cqw; height: 1.7cqw; }
+.alv-ov-screen .brand .w { font-size: 1.05cqw; font-weight: 700; color: #fff; }
+.alv-ov-screen .brand .w b { color: #2A93FF; }
+.alv-ov-screen .brand .t { margin-left: 0.5cqw; padding-left: 0.7cqw; border-left: 0.08cqw solid rgba(255, 255, 255, 0.3); font-size: 0.8cqw; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(235, 240, 255, 0.7); }
+.alv-h2c .alv-ov-screen .chip, .alv-h2c .alv-ov-screen .meta .race { line-height: 1; }
+
 .alv-ov-results {
   left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46cqw; padding: 1.8cqw 2.2cqw; border-radius: 1.2cqw;
   display: flex; flex-direction: column; gap: 0.2cqw;
@@ -441,6 +485,11 @@ body.light-mode .alv .text-white { color: #fff !important; }
 .alv-mk.is-up { border-color: rgba(42, 147, 255, 0.4); background: rgba(42, 147, 255, 0.08); }
 a.alv-mk:hover { background: rgba(255, 255, 255, 0.09); }
 .alv-cr-hint { margin: 8px 0 0; font-size: 13px; color: var(--alv-mute); line-height: 1.45; }
+/* Race number control (Race videos): set which race the recording is filed under */
+.alv-cr-racectl { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+.alv-cr-racectl .lbl { font-size: 12.5px; color: var(--alv-mute); margin-right: 2px; }
+.alv-cr-racectl .num { min-width: 64px; text-align: center; font-size: 13px; font-weight: 700; color: var(--alv-ink, #F4F6FB); }
+.alv-cr-racectl .alv-btn.is-xs:last-child { margin-left: auto; }
 .alv-link { padding: 0; border: 0; background: none; color: #8CC4FF; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
 /* Right column: Overlays · Output · Details */

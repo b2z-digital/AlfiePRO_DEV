@@ -25,6 +25,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import { useCanvasCompositor } from '../../hooks/useCanvasCompositor';
 import { subscribeToRaceStatus } from '../../utils/liveTrackingStorage';
 import { getRaceStatusEventId } from '../../utils/livestreamEventIds';
+import { resolveLiveEvent, fetchScoringRace, stripBroadcastSuffix, raceNumberFromLabel } from '../../utils/liveEventInfo';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 
 /** Auto director: how long each camera stays on program while racing */
@@ -47,6 +48,8 @@ interface LivestreamControlPanelProps {
 interface SessionWithVenue extends LivestreamSession {
   venueImage?: string;
   venueName?: string;
+  hostClubName?: string;
+  hostClubLogo?: string;
 }
 
 export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, onSnapshot, controlsRef }: LivestreamControlPanelProps) {
@@ -90,12 +93,20 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const [autoSegmentEnabled, setAutoSegmentEnabled] = useState(true);
   const [currentSegment, setCurrentSegment] = useState<LivestreamRaceSegment | null>(null);
   const [segmentCount, setSegmentCount] = useState(0);
+  // A race number the officer set by hand (no live scoring) wins until scoring moves on
+  const manualRaceRef = useRef<number | null>(null);
+  const [manualRace, setManualRace] = useState<number | null>(null);
+  const scoringRef = useRef<OverlayScoringSummary | null>(null);
+  // Venue photo + host club for the linked event. Kept apart from activeSession, which is
+  // replaced by plain database rows in many places (going live, pausing…).
+  const [venueInfo, setVenueInfo] = useState<{ venueImage?: string; venueName?: string; hostClubName?: string; hostClubLogo?: string }>({});
   const [segmentProcessing, setSegmentProcessing] = useState(false);
   const segmentTransitionRef = useRef(false);
   const pendingSegmentStartRef = useRef(false);
   const lastCompletedRaceRef = useRef<number | null>(null);
   const [showTitleCard, setShowTitleCard] = useState(false);
   const [titleCardTrigger, setTitleCardTrigger] = useState(0);
+  const [titleCardInstant, setTitleCardInstant] = useState(false);
   const whipHealthRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [sendMbps, setSendMbps] = useState<number | null>(null);
   const lastBytesSentRef = useRef<number>(0);
@@ -475,6 +486,27 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     const isSeriesRound = eventId.includes('-') && eventId.split('-').length > 5;
     if (isSeriesRound) return;
 
+    // Single events score into quick_races, series rounds into race_series_rounds
+    const onScored = async (payload: any) => {
+      const newCompleted = (payload.new as any)?.last_completed_race;
+      if (typeof newCompleted !== 'number' || newCompleted < 1) return;
+      const prev = lastCompletedRaceRef.current;
+      if (prev !== null && newCompleted > prev && !segmentTransitionRef.current) {
+        console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Stopping segment recording.`);
+        lastCompletedRaceRef.current = newCompleted;
+        manualRaceRef.current = null;
+        await handleSegmentStop('race_scored', false);
+      } else if (prev === null) {
+        lastCompletedRaceRef.current = newCompleted;
+      }
+    };
+    const roundChannel = supabase
+      .channel(`segment-round-${eventId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'race_series_rounds', filter: `id=eq.${eventId}` }, onScored)
+      .subscribe();
+    supabase.from('race_series_rounds').select('last_completed_race').eq('id', eventId).maybeSingle()
+      .then(({ data }) => { if (data?.last_completed_race != null) lastCompletedRaceRef.current = data.last_completed_race; });
+
     const channel = supabase
       .channel(`race_scoring_${eventId}`)
       .on(
@@ -494,6 +526,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
           if (prev !== null && newCompleted > prev && !segmentTransitionRef.current) {
             console.log(`[Segment] Race ${newCompleted} scored (was ${prev}). Stopping segment recording.`);
             lastCompletedRaceRef.current = newCompleted;
+            manualRaceRef.current = null;
             await handleSegmentStop('race_scored', false);
             // Do NOT auto-start next segment -- wait for 'live' status from subscribeToRaceStatus
           } else if (prev === null) {
@@ -511,21 +544,71 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       .then(({ data }) => {
         if (data?.last_completed_race != null) {
           lastCompletedRaceRef.current = data.last_completed_race;
-        } else {
+        } else if (lastCompletedRaceRef.current === null) {
           lastCompletedRaceRef.current = 0;
         }
       });
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(roundChannel); };
   }, [activeSession?.event_id, streamStatus, autoSegmentEnabled]);
 
-  const buildSegmentTitle = (raceNumber: number) => {
-    const eventTitle = activeSession?.title || 'Race';
+  /** "<event> | Race 5" — the event title without "Live Coverage", then the race being sailed */
+  const buildSegmentTitle = (raceLabel: string) => {
+    const eventTitle = stripBroadcastSuffix(activeSession?.title || '') || 'Race';
     const heatNum = activeSession?.heat_number;
-    if (heatNum) {
-      return `Heat ${heatNum} - Race ${raceNumber} | ${eventTitle}`;
+    return heatNum && !/heat/i.test(raceLabel)
+      ? `${eventTitle} | Heat ${heatNum} · ${raceLabel}`
+      : `${eventTitle} | ${raceLabel}`;
+  };
+
+  /**
+   * Which race a new recording is: a race number the officer set by hand wins, then what scoring
+   * says (same as the overlay), then the event's last scored race + 1, then simply the next number.
+   */
+  const resolveSegmentRace = async (): Promise<{ raceNumber: number; label: string }> => {
+    if (manualRaceRef.current) return { raceNumber: manualRaceRef.current, label: `Race ${manualRaceRef.current}` };
+    if (activeSession?.event_id) {
+      const fromScoring = await fetchScoringRace(activeSession.event_id);
+      if (fromScoring) return fromScoring;
     }
-    return `Race ${raceNumber} | ${eventTitle}`;
+    const fromOverlay = scoringRef.current?.race;
+    const overlayNumber = fromOverlay ? raceNumberFromLabel(fromOverlay) : null;
+    if (fromOverlay && overlayNumber) return { raceNumber: overlayNumber, label: fromOverlay };
+    const n = segmentCount + 1;
+    return { raceNumber: n, label: `Race ${n}` };
+  };
+
+  /** Changes the race the current recording is filed under (and the next one, until scoring moves on) */
+  const setRecordingRace = async (raceNumber: number) => {
+    if (raceNumber < 1) return;
+    manualRaceRef.current = raceNumber;
+    setManualRace(raceNumber);
+    if (currentSegment) {
+      const segment_title = buildSegmentTitle(`Race ${raceNumber}`);
+      try {
+        await livestreamStorage.updateSegment(currentSegment.id, { race_number: raceNumber, segment_title });
+        setCurrentSegment({ ...currentSegment, race_number: raceNumber, segment_title });
+        if (activeSession) await livestreamStorage.updateSession(activeSession.id, { current_race_number: raceNumber });
+      } catch (err) {
+        console.error('[Segment] Could not rename recording:', err);
+        addNotification('error', 'Could not change the race number. Try again.', 5000);
+      }
+    }
+  };
+
+  /** Ends this race's video and starts the next race's (for when races aren't scored in AlfiePRO) */
+  const startNextRaceManually = async () => {
+    if (!activeSession || segmentTransitionRef.current) return;
+    const next = (currentSegment?.race_number || manualRaceRef.current || 0) + 1;
+    manualRaceRef.current = next;
+    setManualRace(next);
+    pendingSegmentStartRef.current = true;
+    if (currentSegment) {
+      await handleSegmentStop('manual', false);
+    } else {
+      pendingSegmentStartRef.current = false;
+      await handleSegmentStart();
+    }
   };
 
   const handleSegmentStop = async (triggerType: 'race_scored' | 'on_hold' | 'manual' | 'stream_end', isFinalSegment = false) => {
@@ -649,8 +732,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
       setTitleCardTrigger(prev => prev + 1);
 
-      const nextRaceNumber = segmentCount + 1;
-      const segmentTitle = buildSegmentTitle(nextRaceNumber);
+      const race = await resolveSegmentRace();
+      const nextRaceNumber = race.raceNumber;
+      const segmentTitle = buildSegmentTitle(race.label);
 
       const newSegment = await livestreamStorage.createSegment({
         session_id: activeSession.id,
@@ -666,7 +750,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       });
 
       setCurrentSegment(newSegment);
-      setSegmentCount(nextRaceNumber);
+      setSegmentCount(c => c + 1);
 
       await livestreamStorage.updateSession(activeSession.id, {
         current_race_number: nextRaceNumber,
@@ -686,14 +770,15 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const startFirstSegment = async () => {
     if (!activeSession || !autoSegmentEnabled) return;
 
-    const segmentTitle = buildSegmentTitle(1);
+    const race = await resolveSegmentRace();
+    const segmentTitle = buildSegmentTitle(race.label);
 
     try {
       const newSegment = await livestreamStorage.createSegment({
         session_id: activeSession.id,
         club_id: activeSession.club_id,
         event_id: activeSession.event_id || undefined,
-        race_number: 1,
+        race_number: race.raceNumber,
         heat_number: activeSession.heat_number || undefined,
         segment_title: segmentTitle,
         cloudflare_input_id: activeSession.cloudflare_live_input_id || undefined,
@@ -707,7 +792,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
       await livestreamStorage.updateSession(activeSession.id, {
         auto_segment_enabled: true,
-        current_race_number: 1,
+        current_race_number: race.raceNumber,
         current_segment_start: new Date().toISOString(),
       });
     } catch (error) {
@@ -1031,7 +1116,28 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     finally { setLoading(false); }
   };
 
+  // Venue photo + host club for the title card, hold screen and race videos. State/national events
+  // carry a venue_id (below); club events and series rounds name their venue, so those are looked up by name.
   const enrichSessionsWithVenueData = async (sessionList: LivestreamSession[]): Promise<SessionWithVenue[]> => {
+    const withPublic = await enrichPublicEventVenues(sessionList);
+    const { resolveLiveEvents } = await import('../../utils/liveEventInfo');
+    const ids = withPublic.map(s => s.event_id).filter((id): id is string => !!id);
+    if (ids.length === 0) return withPublic;
+    const meta = await resolveLiveEvents(ids, clubId);
+    return withPublic.map(s => {
+      const m = s.event_id ? meta.get(s.event_id) : undefined;
+      if (!m) return s;
+      return {
+        ...s,
+        venueImage: s.venueImage || m.venueImage || undefined,
+        venueName: s.venueName || m.venueName || undefined,
+        hostClubName: m.clubName || undefined,
+        hostClubLogo: m.clubLogo || undefined,
+      };
+    });
+  };
+
+  const enrichPublicEventVenues = async (sessionList: LivestreamSession[]): Promise<SessionWithVenue[]> => {
     const eventIds = sessionList
       .map(s => s.event_id)
       .filter((id): id is string => !!id && !id.includes('-round-') && !id.includes('-day-'));
@@ -1288,6 +1394,14 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         return;
       }
 
+      // Browser/WHIP mode: put the intro screen up first, so the very first frame viewers see is the
+      // intro (not the camera), and give the compositor a moment to capture it
+      if (activeSession.enable_overlays) {
+        setTitleCardInstant(true);
+        setShowTitleCard(true);
+        await new Promise(r => setTimeout(r, 1200));
+      }
+
       // Browser/WHIP mode: use local camera
       let rawStream = activePreviewStream || mediaStream;
       if (!rawStream) { addNotification('error', 'No video source available.', 5000); setStreamStatus('testing'); return; }
@@ -1338,11 +1452,11 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       setActiveSession(updatedSession); setStreamStatus('live');
       addNotification('success', 'Stream is now live!', 5000);
       setShowTitleCard(true);
-      setTimeout(() => setShowTitleCard(false), 12000);
+      setTimeout(() => { setShowTitleCard(false); setTitleCardInstant(false); }, 10000);
       if (autoSegmentEnabled && updatedSession.event_id) {
         setTimeout(() => startFirstSegment(), 1000);
       }
-    } catch (error) { console.error('Error going live:', error); setStreamStatus('testing'); await stopWhipStreaming(); alert('Failed to go live.'); }
+    } catch (error) { console.error('Error going live:', error); setShowTitleCard(false); setTitleCardInstant(false); setStreamStatus('testing'); await stopWhipStreaming(); alert('Failed to go live.'); }
   };
 
   const pauseResumeInProgressRef = useRef(false);
@@ -1652,6 +1766,18 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
   // ── Control room (livestream board "Control room") ──
   const [scoring, setScoring] = useState<OverlayScoringSummary | null>(null);
+  useEffect(() => { scoringRef.current = scoring; }, [scoring]);
+
+  useEffect(() => {
+    if (!activeSession?.id) { setVenueInfo({}); return; }
+    let cancelled = false;
+    enrichSessionsWithVenueData([activeSession]).then(([s]) => {
+      if (cancelled || !s) return;
+      setVenueInfo({ venueImage: s.venueImage, venueName: s.venueName, hostClubName: s.hostClubName, hostClubLogo: s.hostClubLogo });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession?.id, activeSession?.event_id]);
   const [resultsTrigger, setResultsTrigger] = useState(0);
   const [autoDirector, setAutoDirector] = useState(false);
   const [nextCutAt, setNextCutAt] = useState<number | null>(null);
@@ -1867,8 +1993,8 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const venueName = (activeSession as SessionWithVenue).venueName;
-  const venueImage = (activeSession as SessionWithVenue).venueImage;
+  const venueName = venueInfo.venueName || (activeSession as SessionWithVenue).venueName;
+  const venueImage = venueInfo.venueImage || (activeSession as SessionWithVenue).venueImage;
   const isEnded = activeSession.status === 'ended';
   const isOn = streamStatus === 'live' || streamStatus === 'testing';
   const phoneCount = cameras.filter(c => c.camera_type === 'mobile').length;
@@ -2124,6 +2250,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
                   onScoring={setScoring}
                   venueImage={venueImage}
                   venueName={venueName}
+                  hostClubName={venueInfo.hostClubName}
+                  hostClubLogo={venueInfo.hostClubLogo}
+                  titleCardInstant={titleCardInstant}
                 />
               )}
 
@@ -2252,6 +2381,21 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
                 <a className="alv-btn is-xs" href={`https://www.youtube.com/playlist?list=${playlistId}`} target="_blank" rel="noopener noreferrer">Open playlist</a>
               )}
             </div>
+            {streamStatus === 'live' && autoSegmentEnabled && (
+              <div className="alv-cr-racectl" role="group" aria-label="Race being recorded">
+                <span className="lbl">{currentSegment ? 'Recording' : 'Next video'}</span>
+                <button type="button" className="alv-btn is-xs" aria-label="Previous race number"
+                  disabled={segmentProcessing || (currentSegment?.race_number ?? manualRace ?? 1) <= 1}
+                  onClick={() => setRecordingRace((currentSegment?.race_number ?? manualRace ?? 1) - 1)}>−</button>
+                <span className="num alv-mono">Race {currentSegment?.race_number ?? manualRace ?? '–'}</span>
+                <button type="button" className="alv-btn is-xs" aria-label="Next race number"
+                  disabled={segmentProcessing}
+                  onClick={() => setRecordingRace((currentSegment?.race_number ?? manualRace ?? 0) + 1)}>+</button>
+                <button type="button" className="alv-btn is-xs" disabled={segmentProcessing}
+                  title="Save this race's video and start recording the next race (use when races aren't scored in AlfiePRO)"
+                  onClick={startNextRaceManually}>Start next race</button>
+              </div>
+            )}
             {raceVideos.length > 0 ? (
               <div className="alv-cr-vlist">
                 {raceVideos.map(video => <RaceVideoChip key={video.id} video={video} />)}

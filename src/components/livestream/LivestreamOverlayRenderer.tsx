@@ -13,6 +13,11 @@ interface LivestreamOverlayRendererProps {
   titleCardTrigger?: number;
   venueImage?: string;
   venueName?: string;
+  /** Host club shown on the intro and hold screens (AlfiePRO sits small in the corner) */
+  hostClubName?: string;
+  hostClubLogo?: string;
+  /** Show the intro at full strength straight away (going live), instead of fading it in */
+  titleCardInstant?: boolean;
   /** Show the last scored race's results card again (Results scene in the control room) */
   resultsTrigger?: number;
   /** Tells the control room what scoring is doing (race, status, whether results exist) */
@@ -55,7 +60,7 @@ export function describeScoring(data: any, sessionHeat?: number | null) {
   return { race, raw, label, tone };
 }
 
-export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0, venueImage, venueName, resultsTrigger = 0, onScoring, loadSource, timeZone }, ref) {
+export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, LivestreamOverlayRendererProps>(function LivestreamOverlayRenderer({ session, raceData, weatherData, showTitleCard, titleCardTrigger = 0, venueImage, venueName, hostClubName, hostClubLogo, titleCardInstant = false, resultsTrigger = 0, onScoring, loadSource, timeZone }, ref) {
   const [overlays, setOverlays] = useState<LivestreamOverlay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [liveTrackingData, setLiveTrackingData] = useState<any>(null);
@@ -108,11 +113,34 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
     }
   }, [session.event_id]);
 
+  // Going live: the intro is held for as long as the control room shows it, then fades out
+  const heldIntroRef = useRef(false);
   useEffect(() => {
-    if (showTitleCard || titleCardTrigger > 0) {
+    if (showTitleCard && titleCardInstant) {
+      heldIntroRef.current = true;
       if (titleCardTimerRef.current) clearTimeout(titleCardTimerRef.current);
       setTitleCardVisible(true);
-      setTitleCardPhase('entering');
+      setTitleCardPhase('visible');
+      return;
+    }
+    if (!showTitleCard && heldIntroRef.current) {
+      heldIntroRef.current = false;
+      setTitleCardPhase('exiting');
+      const hideTimer = setTimeout(() => { setTitleCardPhase('hidden'); setTitleCardVisible(false); }, 1000);
+      return () => clearTimeout(hideTimer);
+    }
+  }, [showTitleCard, titleCardInstant]);
+
+  const lastTriggerRef = useRef(titleCardTrigger);
+  useEffect(() => {
+    if (showTitleCard && titleCardInstant) return;
+    // Only a new trigger or the card being switched on shows it (not the card being switched off)
+    const triggered = titleCardTrigger !== lastTriggerRef.current && titleCardTrigger > 0;
+    lastTriggerRef.current = titleCardTrigger;
+    if (showTitleCard || triggered) {
+      if (titleCardTimerRef.current) clearTimeout(titleCardTimerRef.current);
+      setTitleCardVisible(true);
+      setTitleCardPhase(titleCardInstant ? 'visible' : 'entering');
 
       const enterTimer = setTimeout(() => setTitleCardPhase('visible'), 100);
       const holdTimer = setTimeout(() => setTitleCardPhase('exiting'), 8000);
@@ -592,6 +620,17 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
   const showResults = resultsUntil > currentTime.getTime();
   // The stream capture can't ellipsize, so long names are shortened up front
   const clip = (text: string, max: number) => (text && text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+  const isDone = rawStatus === 'completed_for_day' || rawStatus === 'event_complete';
+  const eventTitle = String(displayData?.event_name || session.title || '')
+    .replace(/\s*[-–|·]\s*live coverage\s*$/i, '').trim();
+  // "Series - 2026 - Round 9" → title "Series - 2026", "Round 9" beside the race
+  const roundMatch = eventTitle.match(/^(.*?)\s*[-–|·]\s*((?:round|rd|day|regatta day)\s*\d+)\s*$/i);
+  const eventMain = roundMatch ? roundMatch[1] : eventTitle;
+  const eventRound = roundMatch ? roundMatch[2].replace(/^rd\b/i, 'Round') : null;
+  const clockLabel = (() => {
+    try { return currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', ...(timeZone ? { timeZone } : {}) }); }
+    catch { return currentTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  })();
 
   return (
     <div ref={ref} className="alv-ov absolute inset-0 pointer-events-none z-10">
@@ -616,13 +655,24 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
         </div>
       )}
 
-      {/* Hold card */}
-      {isOnHold && !titleCardVisible && (
-        <div className="alv-ov-glass alv-ov-hold" style={{ background: `rgba(6,11,22,${Math.min(0.85, fleetOpacity + 0.15)})` }}>
-          <span className="chip">ON HOLD</span>
-          <div className="h">{displayData?.status_notes || 'Racing will resume shortly'}</div>
-          {displayData?.event_name && <div className="sub">{displayData.event_name}</div>}
-        </div>
+      {/* Hold and end-of-day screens: full screen over the venue photo */}
+      {(isOnHold || isDone) && !titleCardVisible && (
+        <BroadcastScreen
+          variant={isOnHold ? 'hold' : 'done'}
+          venueImage={venueImage}
+          hostClubName={hostClubName}
+          hostClubLogo={hostClubLogo}
+          chip={isOnHold ? 'Racing on hold' : 'Racing complete'}
+          eyebrow={[eventTitle, venueName].filter(Boolean).join(' · ')}
+          title={isOnHold
+            ? (displayData?.status_notes || 'Racing will resume shortly')
+            : (rawStatus === 'completed_for_day' ? "That's racing for today" : 'Thanks for watching')}
+          meta={isOnHold
+            ? [`Up next: ${scoringNow.race}`, clockLabel].filter(Boolean)
+            : ['Race videos are on AlfieTV and YouTube', clockLabel].filter(Boolean)}
+          results={lastRaceResultsRef.current && lastRaceResultsRef.current.rows.length > 0 ? lastRaceResultsRef.current : null}
+          clip={clip}
+        />
       )}
 
       {/* Results card: shown for 20 seconds when a race is scored */}
@@ -706,113 +756,18 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
       </div>
 
       {titleCardVisible && (
-        <div
-          className="absolute inset-0 z-50 flex items-center justify-center"
-          style={{
-            opacity: titleCardPhase === 'entering' ? 0 : titleCardPhase === 'exiting' ? 0 : 1,
-            transition: 'opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
-        >
-          {venueImage ? (
-            <>
-              <img
-                src={venueImage}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,10,30,0.80) 50%, rgba(0,0,0,0.75) 100%)' }} />
-            </>
-          ) : (
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(10,15,30,0.97) 40%, rgba(5,10,25,0.97) 60%, rgba(0,0,0,0.95) 100%)' }} />
-          )}
-
-          <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at center, rgba(0,102,180,0.10) 0%, transparent 70%)' }} />
-
-          <div
-            className="absolute top-0 left-0 right-0 h-1"
-            style={{ background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.6) 30%, rgba(0,120,211,0.8) 50%, rgba(0,102,180,0.6) 70%, transparent 90%)' }}
-          />
-
-          <div className="relative text-center px-8" style={{
-            transform: titleCardPhase === 'entering' ? 'scale(0.95)' :
-                       titleCardPhase === 'exiting' ? 'scale(1.02)' : 'scale(1)',
-            transition: 'transform 1.5s cubic-bezier(0.4, 0, 0.2, 1)',
-          }}>
-            <div
-              className="flex items-center justify-center gap-3 mb-8"
-              style={{
-                opacity: titleCardPhase === 'visible' ? 1 : 0,
-                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(-10px)',
-                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s',
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" className="w-12 h-12" style={{ filter: 'drop-shadow(0 2px 8px rgba(0,102,180,0.4))' }}>
-                <path fill="#0078d3" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
-                <path fill="#0066b4" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
-              </svg>
-              <div className="flex flex-col items-start">
-                <span className="text-2xl font-extrabold tracking-[0.15em] text-white" style={{ textShadow: '0 2px 12px rgba(0,120,211,0.5)' }}>
-                  Alfie<span style={{ color: '#0078d3' }}>PRO</span>
-                </span>
-                <span className="text-[10px] font-medium tracking-[0.3em] uppercase text-slate-400">Live Race Broadcast</span>
-              </div>
-            </div>
-
-            <h1
-              className="text-5xl font-bold text-white mb-3 leading-tight"
-              style={{
-                opacity: titleCardPhase === 'visible' ? 1 : 0,
-                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
-                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s',
-                textShadow: '0 2px 20px rgba(0,0,0,0.7)',
-              }}
-            >
-              {displayData?.event_name || session.title || 'Live Race'}
-            </h1>
-
-            {venueName && (
-              <p
-                className="text-lg text-slate-300 mb-4 font-medium"
-                style={{
-                  opacity: titleCardPhase === 'visible' ? 1 : 0,
-                  transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
-                  transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.75s',
-                  textShadow: '0 1px 8px rgba(0,0,0,0.5)',
-                }}
-              >
-                {venueName}
-              </p>
-            )}
-
-            <div
-              className="flex items-center justify-center gap-4 text-base"
-              style={{
-                opacity: titleCardPhase === 'visible' ? 1 : 0,
-                transform: titleCardPhase === 'visible' ? 'translateY(0)' : 'translateY(15px)',
-                transition: 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s',
-              }}
-            >
-              <span className="text-slate-300 font-medium" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-                {new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-              </span>
-              {(displayData?.heat_label || displayData?.heat_number || displayData?.race_number || session.heat_number) && (
-                <>
-                  <span className="text-slate-500">|</span>
-                  <span className="text-yellow-400 font-semibold" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>
-                    {displayData?.heat_label || (
-                      `${displayData?.race_type === 'heat' ? 'Heat' : 'Race'} ${displayData?.heat_number || displayData?.race_number || session.heat_number || 1}`
-                    )}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div
-            className="absolute bottom-0 left-0 right-0 h-1"
-            style={{ background: 'linear-gradient(90deg, transparent 10%, rgba(0,102,180,0.4) 30%, rgba(0,120,211,0.6) 50%, rgba(0,102,180,0.4) 70%, transparent 90%)' }}
-          />
-        </div>
+        <BroadcastScreen
+          variant="intro"
+          opacity={titleCardPhase === 'visible' ? 1 : 0}
+          venueImage={venueImage}
+          hostClubName={hostClubName}
+          hostClubLogo={hostClubLogo}
+          chip="Live"
+          eyebrow={[new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), venueName].filter(Boolean).join(' · ')}
+          title={eventMain || 'Live race broadcast'}
+          meta={[scoringNow.race, eventRound, displayData?.status === 'on_hold' ? 'On hold' : null].filter(Boolean) as string[]}
+          clip={clip}
+        />
       )}
 
       {overlays.map((overlay) => (
@@ -941,4 +896,78 @@ function formatElapsedTime(startTime: string): string {
   }
 
   return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Full-screen broadcast card: intro (going live / new race), racing on hold, racing complete.
+ * The venue photo fills the frame under a left-weighted scrim; the host club leads (top left),
+ * the event sits lower left, AlfiePRO is a small mark bottom right. Sized in cqw so it scales
+ * with the program frame and is captured into the stream as drawn.
+ */
+export function BroadcastScreen({
+  variant, opacity = 1, venueImage, hostClubName, hostClubLogo, chip, eyebrow, title, meta, results, clip,
+}: {
+  variant: 'intro' | 'hold' | 'done';
+  opacity?: number;
+  venueImage?: string;
+  hostClubName?: string;
+  hostClubLogo?: string;
+  chip: string;
+  eyebrow?: string;
+  title: string;
+  meta: string[];
+  results?: { race: number; rows: Array<{ position: number; sail: string; name: string; hull: string }> } | null;
+  clip: (text: string, max: number) => string;
+}) {
+  const [race, ...rest] = meta;
+  return (
+    <div className={`alv-ov-screen is-${variant}`} style={{ opacity }}>
+      <div className="bg" style={venueImage ? { backgroundImage: `url("${venueImage}")` } : undefined} />
+      <div className="scrim" />
+
+      <div className="top">
+        {(hostClubName || hostClubLogo) && (
+          <span className="host">
+            {hostClubLogo && <span className="logo" style={{ backgroundImage: `url("${hostClubLogo}")` }} />}
+            {hostClubName && <span className="name">{clip(hostClubName, 44)}</span>}
+          </span>
+        )}
+        <span className={`chip is-${variant}`}><span className="dot" />{chip}</span>
+      </div>
+
+      <div className="body">
+        {eyebrow && <span className="eyebrow">{clip(eyebrow, 90)}</span>}
+        <span className="rule" />
+        <h1>{clip(title, 80)}</h1>
+        {meta.length > 0 && (
+          <div className="meta">
+            {race && <span className={variant === 'intro' ? 'race' : 'first'}>{race}</span>}
+            {rest.map((m, i) => <span key={i} className="m">{m}</span>)}
+          </div>
+        )}
+      </div>
+
+      {variant === 'hold' && results && (
+        <div className="results">
+          <div className="h">Race {results.race} results</div>
+          {results.rows.slice(0, 6).map(r => (
+            <div key={`${r.position}-${r.sail}`} className="r">
+              <span className="p">{r.position}</span>
+              <span className="s">{r.sail}</span>
+              <span className="n">{clip(r.name, 22)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="brand">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 129.43 201.4" aria-hidden="true">
+          <path fill="#2A93FF" d="M92.63.1s-33.4,35.9-46.9,76.9-18,123-18,123c53.9-26.1,87.1-5.1,101.7,1.4C76.03,145.2,92.63,0,92.63,0v.1Z"/>
+          <path fill="#0A78F0" d="M45.43,35.4s-23.9,31.1-37.4,61.2-5.9,88.2-5.9,88.2c22.2-23.9,68.8-19.1,68.8-19.1C33.83,122.7,45.33,35.4,45.33,35.4h.1Z"/>
+        </svg>
+        <span className="w">Alfie<b>PRO</b></span>
+        <span className="t">Live race broadcast</span>
+      </div>
+    </div>
+  );
 }

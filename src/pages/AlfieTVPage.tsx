@@ -17,6 +17,7 @@ import { getPersonalizedVideos, trackVideoView, getUserPreferences } from '../ut
 import { AdDisplay } from '../components/advertising/AdDisplay';
 import type { LivestreamSession, LivestreamArchive, LivestreamRaceSegment } from '../types/livestream';
 import { LiveWatchView } from '../components/livestream/LiveWatchView';
+import { resolveLiveEvents, type LiveEventMeta } from '../utils/liveEventInfo';
 
 interface AlfieTVPageProps {
   darkMode?: boolean;
@@ -212,6 +213,17 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
   const [liveStreams, setLiveStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
   const [upcomingStreams, setUpcomingStreams] = useState<(LivestreamSession & { venue_image?: string; club_name?: string })[]>([]);
   const [replayArchives, setReplayArchives] = useState<LivestreamArchive[]>([]);
+  // Venue photo, host club and event name for each replay's event (for the replay tiles)
+  const [replayEvents, setReplayEvents] = useState<Map<string, LiveEventMeta>>(new Map());
+  const replayEventKey = replayArchives.map(a => a.event_id || '').join(',');
+  useEffect(() => {
+    const ids = [...new Set(replayArchives.map(a => a.event_id).filter((id): id is string => !!id))];
+    if (ids.length === 0) return;
+    let cancelled = false;
+    resolveLiveEvents(ids).then(map => { if (!cancelled) setReplayEvents(map); });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayEventKey]);
   const [selectedLiveStream, setSelectedLiveStream] = useState<(LivestreamSession & { venue_image?: string; club_name?: string }) | null>(null);
   const [selectedReplay, setSelectedReplay] = useState<LivestreamArchive | null>(null);
   // Esc closes the replay player, like the video player
@@ -1085,17 +1097,29 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
     if (replayArchives.length > 0) {
       push(
         <TVRow key="race-replays" title="Race replays" kicker={<span className="atv-row-ic is-replay"><AlfieIcon glyph="video" size={15} /></span>}>
-          {replayArchives.map(archive => (
+          {replayArchives.map(archive => {
+            // "Event | Race 5" (or the older "Race 5 | Event"): race and event drawn over the venue photo
+            const parts = String(archive.title || '').split(' | ').map(p => p.trim()).filter(Boolean);
+            const raceIdx = parts.findIndex(p => /^(race|heat|round)\b/i.test(p) || /\b(race|heat)\s+\d+/i.test(p));
+            const raceLabel = raceIdx >= 0 ? parts[raceIdx] : undefined;
+            const meta = archive.event_id ? replayEvents.get(archive.event_id) : undefined;
+            const eventTitle = parts.filter((_, i) => i !== raceIdx).join(' | ').replace(/\s*[-–|·]\s*live coverage\s*$/i, '') || meta?.eventName || undefined;
+            const image = archive.thumbnail_url || meta?.venueImage
+              || (archive.youtube_video_id ? `https://i.ytimg.com/vi/${archive.youtube_video_id}/hqdefault.jpg` : null);
+            const drawPoster = !archive.thumbnail_url && !!(raceLabel || eventTitle);
+            return (
             <TVEventTile
               key={archive.id}
               kind="replay"
-              image={archive.thumbnail_url}
+              image={image}
+              poster={drawPoster ? { race: raceLabel, title: eventTitle, club: meta?.clubName || undefined } : undefined}
               title={archive.title}
               duration={archive.duration ? formatDuration(archive.duration) : undefined}
               sub={[archive.view_count > 0 ? `${compactNumber(archive.view_count)} views` : '', new Date(archive.recorded_at).toLocaleDateString('en-AU', { month: 'short', day: 'numeric' })].filter(Boolean).join(' · ')}
               onClick={() => setSelectedReplay(archive)}
             />
-          ))}
+            );
+          })}
         </TVRow>
       );
     }
