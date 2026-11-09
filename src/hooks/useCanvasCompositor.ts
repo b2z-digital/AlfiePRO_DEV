@@ -54,7 +54,17 @@ export function useCanvasCompositor({
 
     try {
       if (vid.readyState >= 2) {
-        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        // Fill the 16:9 frame the way the preview does (object-fit: cover): crop, never stretch.
+        // A phone held upright or a 4:3 camera was being squashed into 1920×1080.
+        const vw = vid.videoWidth, vh = vid.videoHeight;
+        if (vw > 0 && vh > 0) {
+          const scale = Math.max(canvas.width / vw, canvas.height / vh);
+          const sw = canvas.width / scale, sh = canvas.height / scale;
+          const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
+          ctx.drawImage(vid, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        } else {
+          ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        }
       }
       if (overlaySnapshotRef.current) {
         ctx.drawImage(overlaySnapshotRef.current, 0, 0, canvas.width, canvas.height);

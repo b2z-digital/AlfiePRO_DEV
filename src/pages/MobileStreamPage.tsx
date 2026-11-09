@@ -274,7 +274,21 @@ export default function MobileStreamPage() {
       pcRef.current = pc;
 
       stream.getTracks().forEach(track => {
-        pc.addTrack(track, stream);
+        const sender = pc.addTrack(track, stream);
+        if (track.kind === 'video') {
+          // Keep the picture sharp: WebRTC otherwise drops resolution first and sends a soft,
+          // low-res picture that ends up in the race videos. Prefer frame-rate drops instead.
+          try { (track as any).contentHint = 'motion'; } catch (e) {}
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+            params.encodings[0].maxBitrate = 6_000_000;
+            (params as any).degradationPreference = 'maintain-resolution';
+            sender.setParameters(params).catch((err: any) => addDebugLog(`Encoder settings not applied: ${err?.message}`));
+          } catch (e: any) {
+            addDebugLog(`Encoder settings not available: ${e?.message}`);
+          }
+        }
       });
 
       let iceCandidateCount = 0;
