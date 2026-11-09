@@ -397,9 +397,9 @@ export const RaceScreen: React.FC = () => {
           <Icon name="racing" size={22} />{session.finish?.length ? `Finishes · ${session.finish.filter(f => !f.letterScore).length} called` : 'Score the finishes'}
         </button>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
-          <button className="m-card m-tile" onClick={() => setSheet('ocs')}><span className="m-sail m-sail-ocs" style={{ fontSize: 12, minWidth: 40, height: 28 }}>OCS</span>Mark OCS</button>
-          <button className="m-card m-tile" onClick={() => setSheet('recall')}><Icon name="recall" size={22} />Recall</button>
-          <button className="m-card m-tile" style={{ color: 'var(--m-red-ink)' }} onClick={() => setSheet('abandon')}><Icon name="close" size={22} />Abandon</button>
+          <button className="m-card m-act-tile" onClick={() => setSheet('ocs')}><span className="m-sail m-sail-ocs" style={{ fontSize: 12, minWidth: 40, height: 28 }}>OCS</span>Mark OCS</button>
+          <button className="m-card m-act-tile" onClick={() => setSheet('recall')}><Icon name="recall" size={22} />Recall</button>
+          <button className="m-card m-act-tile" style={{ color: 'var(--m-red-ink)' }} onClick={() => setSheet('abandon')}><Icon name="close" size={22} />Abandon</button>
         </div>
         {session.marks.length > 0 && (
           <div className="m-card">
@@ -416,7 +416,7 @@ export const RaceScreen: React.FC = () => {
         )}
         <NextCard up={up} />
         <button className="m-card m-li" style={{ gap: 12 }} onClick={() => setSheet('together')}>
-          <span className="m-tile" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)', width: 40, minHeight: 40, padding: 0 }}><Icon name="people" /></span>
+          <span className="m-tile" style={{ background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="people" /></span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontWeight: 600, fontSize: 14.5 }}>Score together</span>
             <span className="m-dim" style={{ display: 'block', fontSize: 12.5 }}>{together.hosting ? (together.spotters.length ? `${together.spotters.map(p => p.name.split(' ')[0]).join(', ')} calling finishes` : 'Session open · no spotters yet') : 'Invite a spotter to call finishes'}</span>
