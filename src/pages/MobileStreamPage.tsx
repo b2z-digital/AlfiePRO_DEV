@@ -3,28 +3,11 @@ import { useParams } from 'react-router-dom';
 import { Video, CircleAlert as AlertCircle, Loader as Loader2, RefreshCw, Signal, Square, ZoomIn, ZoomOut, RotateCcw, Bug } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 import { makeMobileCamApi } from '../utils/mobileCamApi';
+import { getIceServers } from '../utils/iceServers';
+import { CAMERA_QUALITY, isCameraQuality, type CameraQuality } from '../utils/cameraQuality';
 
 const BUILD_VERSION = '20260122-v4';
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  }
-];
 
 type Phase = 'init' | 'camera' | 'connected' | 'error';
 
@@ -33,6 +16,38 @@ export default function MobileStreamPage() {
   // QR codes carry a camera key (?k=) so the phone doesn't need to be signed in
   const camKey = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('k') : null;
   const camApi = React.useMemo(() => makeMobileCamApi(sessionId || '', camKey), [sessionId, camKey]);
+  // Quality: from the QR code (?q=), then this phone's last choice, then High
+  const [quality, setQuality] = useState<CameraQuality>(() => {
+    const fromLink = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') : null;
+    if (isCameraQuality(fromLink)) return fromLink;
+    try { const saved = localStorage.getItem('alfie_cam_quality'); if (isCameraQuality(saved)) return saved; } catch { /* private mode */ }
+    return 'high';
+  });
+  const qualityRef = useRef<CameraQuality>(quality);
+  const videoSenderRef = useRef<RTCRtpSender | null>(null);
+
+  /** Applies a quality to the video being sent, without reconnecting */
+  const applyQuality = useCallback(async (q: CameraQuality) => {
+    qualityRef.current = q;
+    setQuality(q);
+    try { localStorage.setItem('alfie_cam_quality', q); } catch { /* private mode */ }
+    const sender = videoSenderRef.current;
+    if (!sender) return;
+    try {
+      const preset = CAMERA_QUALITY[q];
+      const params = sender.getParameters();
+      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+      params.encodings[0].maxBitrate = preset.maxBitrate;
+      params.encodings[0].scaleResolutionDownBy = preset.scaleDown;
+      // Keep the picture sharp: drop frame rate before resolution
+      (params as any).degradationPreference = 'maintain-resolution';
+      await sender.setParameters(params);
+      addDebugLog(`Quality: ${preset.label} (${preset.detail}, ${(preset.maxBitrate / 1e6).toFixed(1)} Mbps)`);
+    } catch (err: any) {
+      addDebugLog(`Quality not applied: ${err?.message}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [phase, setPhase] = useState<Phase>('init');
   const [statusText, setStatusText] = useState('Starting camera...');
   const [sessionTitle, setSessionTitle] = useState('');
@@ -270,7 +285,9 @@ export default function MobileStreamPage() {
       setStatusText('Setting up connection...');
       addDebugLog('Creating peer connection...');
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const iceServers = await getIceServers({ sessionId, key: camKey });
+      if (!mountedRef.current) return;
+      const pc = new RTCPeerConnection({ iceServers });
       pcRef.current = pc;
 
       stream.getTracks().forEach(track => {
@@ -279,15 +296,8 @@ export default function MobileStreamPage() {
           // Keep the picture sharp: WebRTC otherwise drops resolution first and sends a soft,
           // low-res picture that ends up in the race videos. Prefer frame-rate drops instead.
           try { (track as any).contentHint = 'motion'; } catch (e) {}
-          try {
-            const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-            params.encodings[0].maxBitrate = 6_000_000;
-            (params as any).degradationPreference = 'maintain-resolution';
-            sender.setParameters(params).catch((err: any) => addDebugLog(`Encoder settings not applied: ${err?.message}`));
-          } catch (e: any) {
-            addDebugLog(`Encoder settings not available: ${e?.message}`);
-          }
+          videoSenderRef.current = sender;
+          applyQuality(qualityRef.current);
         }
       });
 
@@ -679,6 +689,27 @@ export default function MobileStreamPage() {
             <div className="flex items-center justify-center gap-2 mb-3">
               <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
               <span className="text-xs font-medium text-yellow-400">{statusText}</span>
+            </div>
+          )}
+
+          {/* Quality: picks how much mobile data the phone uses */}
+          {hasCamera && (
+            <div className="flex flex-col items-center gap-1.5 mb-3">
+              <div className="flex rounded-full bg-black/50 backdrop-blur-sm p-1" role="radiogroup" aria-label="Stream quality">
+                {(Object.keys(CAMERA_QUALITY) as CameraQuality[]).map(q => (
+                  <button
+                    key={q}
+                    type="button"
+                    role="radio"
+                    aria-checked={quality === q}
+                    onClick={(e) => { e.stopPropagation(); applyQuality(q); }}
+                    className={`px-3.5 h-8 rounded-full text-xs font-semibold transition-colors ${quality === q ? 'bg-white text-black' : 'text-white/80'}`}
+                  >
+                    {CAMERA_QUALITY[q].label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-white/70">{CAMERA_QUALITY[quality].detail} · uses {CAMERA_QUALITY[quality].gbPerHour} of mobile data</span>
             </div>
           )}
 

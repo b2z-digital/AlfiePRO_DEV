@@ -28,6 +28,7 @@ import { getRaceStatusEventId } from '../../utils/livestreamEventIds';
 import { fetchScoringRace, stripBroadcastSuffix, raceNumberFromLabel } from '../../utils/liveEventInfo';
 import { saveRaceThumbnail } from './broadcastThumbnail';
 import type { LivestreamRaceSegment } from '../../types/livestream';
+import { getIceServers } from '../../utils/iceServers';
 
 /** Auto director: how long each camera stays on program while racing */
 const AUTO_DIRECTOR_MS = 45000;
@@ -228,13 +229,6 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     }
   }, [activeSession?.id]);
 
-  const ICE_SERVERS = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-  ];
 
   const setupMobileCameraConnection = async (camera: LivestreamCamera, retryCount = 0): Promise<void> => {
     if (camera.camera_type !== 'mobile') return;
@@ -266,7 +260,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         return;
       }
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
       peerConnectionsRef.current[camera.id] = pc;
 
       pc.ontrack = (event) => {
