@@ -5,6 +5,7 @@ import { livestreamStorage } from '../../utils/livestreamStorage';
 import { useRaceCompanion, type CompanionBoat } from '../../utils/liveRaceCompanion';
 import { LiveVideo } from './LiveVideo';
 import { LiveCompanion } from './LiveCompanion';
+import { goneYouTubeIds } from '../../utils/youtubeAvailability';
 
 /** A broadcast's race videos (one per race), refreshed every 30 seconds while shown. */
 export function useRaceVideos(sessionId: string | null | undefined) {
@@ -14,7 +15,11 @@ export function useRaceVideos(sessionId: string | null | undefined) {
     if (!sessionId) return;
     let cancelled = false;
     const load = () => livestreamStorage.getSegments(sessionId)
-      .then(list => { if (!cancelled) setVideos(list); })
+      .then(async list => {
+        // Race videos deleted on YouTube drop out here too
+        const gone = await goneYouTubeIds(list);
+        if (!cancelled) setVideos(list.filter(v => !v.youtube_video_id || !gone.has(v.youtube_video_id)));
+      })
       .catch(() => {});
     load();
     const timer = setInterval(load, 30000);
