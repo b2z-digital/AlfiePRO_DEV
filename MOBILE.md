@@ -149,7 +149,8 @@ One-off set-up, in the repo's Settings → Secrets and variables → Actions:
 Maps and weather keys aren't built into the app: the `app-services` Supabase function (`supabase/functions/app-services`)
 reads them from Supabase → Edge Functions → Secrets (`GOOGLE_MAPS_API_KEY`, `OPENWEATHER_API_KEY`,
 `STORMGLASS_API_KEY`; a few other common names are accepted too), calls OpenWeatherMap and Stormglass for the app,
-and hands the Maps JavaScript key to signed-in members. `utils/weatherAPI.ts` and `utils/googleMaps.ts` use it
+and hands the Maps JavaScript key to signed-in members. Weather is optional: without `OPENWEATHER_API_KEY`, Wind & tides
+shows the Windy map, as the desktop does (Stephen's choice, Nov 2026). `utils/weatherAPI.ts` and `utils/googleMaps.ts` use it
 whenever the build has no `VITE_` key, so the website keeps working as before.
 
 Also: Supabase → Auth → URL configuration → add `alfiepro://auth/callback` (Google sign-in); if the Google Maps key

@@ -10,9 +10,16 @@ const MARINE_API_KEY = import.meta.env.VITE_STORMGLASS_API_KEY || '';
 
 // Without keys in this build (the phone apps), the app-services function calls the weather
 // services with the keys kept in Supabase secrets.
+// A service with no key in Supabase answers 503 (Wind & tides then shows the Windy map); asked once per session.
+const notSetUp = new Set<string>();
 async function viaServices(body: Record<string, unknown>): Promise<any> {
+  const service = String(body.action);
+  if (notSetUp.has(service)) throw new Error(`${service} isn't set up`);
   const { data, error } = await supabase.functions.invoke('app-services', { body });
-  if (error) throw error;
+  if (error) {
+    if ((error as any).context?.status === 503) notSetUp.add(service);
+    throw error;
+  }
   return data;
 }
 
