@@ -1,35 +1,29 @@
 /*
-  # What's On: state and national championships, and latest news
+  # What's On: state and national championships
 
   New "What's in it" options for each club's What's On email (all off until the club turns them on):
 
   - show_state_events      State championships coming up (approved state events of the club's state association)
   - show_national_events   National championships coming up (approved national events of its national association)
-  - show_club_news         Latest club news
-  - show_state_news        Latest news from the state association
-  - show_national_news     Latest news from the national association
 
   Championships: the next 120 days from the start of the email's period, up to 4. With the audience
   set to "members with a boat in the class", a member only sees championships for their classes
   (events with no class set are shown to everyone). Linked to the event website when it has one,
   otherwise the notice of race.
 
-  News: published in the last 30 days, newest first, up to 3, each linked to the article on the
-  club's public site (published articles are public).
-
   How it's added: the current whats_on_render is renamed whats_on_render_base, unchanged, and a new
   whats_on_render with the same arguments calls it and adds the new sections at the end of the email
   body (after "Next week", before the AlfiePRO panel). Every caller (send, preview, test, view in
-  browser) picks it up. whats_on_cfg and whats_on_settings_save learn the five new settings.
+  browser) picks it up. whats_on_cfg and whats_on_settings_save learn the two new settings.
+
+  A week with no club racing for a member but championships coming up says "No club racing this
+  week" and still sends (it isn't a quiet week).
 */
 
 -- ── 1. Settings ──────────────────────────────────────────────────────────────
 ALTER TABLE public.whats_on_settings
   ADD COLUMN IF NOT EXISTS show_state_events    boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS show_national_events boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS show_club_news       boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS show_state_news      boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS show_national_news   boolean NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS show_national_events boolean NOT NULL DEFAULT false;
 
 CREATE OR REPLACE FUNCTION public.whats_on_cfg(p_club uuid, p_override jsonb DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -43,7 +37,7 @@ DECLARE
     'show_docs', 'show_other', 'show_next_week', 'show_alfie_panel', 'help_enabled', 'help_member_id',
     'help_title', 'help_show_phone', 'help_show_email', 'help_email', 'brand_color', 'accent_color',
     'subject', 'intro',
-    'show_state_events', 'show_national_events', 'show_club_news', 'show_state_news', 'show_national_news'];
+    'show_state_events', 'show_national_events'];
 BEGIN
   SELECT upper(coalesce(to_jsonb(c) ->> 'state', '')) INTO v_state FROM clubs c WHERE c.id = p_club;
   v_tz := CASE
@@ -62,8 +56,7 @@ BEGIN
     'include_unactivated', true, 'include_unfinancial', false, 'show_rsvp', true, 'show_details', true,
     'show_docs', true, 'show_other', true, 'show_next_week', true, 'show_alfie_panel', true,
     'help_enabled', false, 'help_show_phone', true, 'help_show_email', true, 'saved', false,
-    'show_state_events', false, 'show_national_events', false,
-    'show_club_news', false, 'show_state_news', false, 'show_national_news', false);
+    'show_state_events', false, 'show_national_events', false);
 
   SELECT to_jsonb(s) INTO v_row FROM whats_on_settings s WHERE s.club_id = p_club;
   IF v_row IS NOT NULL THEN
@@ -110,7 +103,7 @@ BEGIN
     include_unactivated, include_unfinancial, show_rsvp, show_details, show_docs, show_other,
     show_next_week, show_alfie_panel, help_enabled, help_member_id, help_title, help_show_phone,
     help_show_email, help_email, brand_color, accent_color, subject, intro,
-    show_state_events, show_national_events, show_club_news, show_state_news, show_national_news,
+    show_state_events, show_national_events,
     updated_at, updated_by)
   VALUES (
     p_club, (c ->> 'enabled')::boolean, c ->> 'frequency', (c ->> 'send_day')::smallint, (c ->> 'send_time')::time,
@@ -124,8 +117,6 @@ BEGIN
     CASE WHEN coalesce(c ->> 'accent_color', '') ~ '^#[0-9A-Fa-f]{6}$' THEN c ->> 'accent_color' END,
     left(nullif(trim(c ->> 'subject'), ''), 200), left(nullif(trim(c ->> 'intro'), ''), 1000),
     coalesce((c ->> 'show_state_events')::boolean, false), coalesce((c ->> 'show_national_events')::boolean, false),
-    coalesce((c ->> 'show_club_news')::boolean, false), coalesce((c ->> 'show_state_news')::boolean, false),
-    coalesce((c ->> 'show_national_news')::boolean, false),
     now(), auth.uid())
   ON CONFLICT (club_id) DO UPDATE SET
     enabled = EXCLUDED.enabled, frequency = EXCLUDED.frequency, send_day = EXCLUDED.send_day,
@@ -140,8 +131,6 @@ BEGIN
     help_email = EXCLUDED.help_email, brand_color = EXCLUDED.brand_color, accent_color = EXCLUDED.accent_color,
     subject = EXCLUDED.subject, intro = EXCLUDED.intro,
     show_state_events = EXCLUDED.show_state_events, show_national_events = EXCLUDED.show_national_events,
-    show_club_news = EXCLUDED.show_club_news, show_state_news = EXCLUDED.show_state_news,
-    show_national_news = EXCLUDED.show_national_news,
     updated_at = now(), updated_by = auth.uid(),
     -- Changing the send day or time re-arms this week's run
     last_run_key = CASE WHEN s.send_day IS DISTINCT FROM EXCLUDED.send_day OR s.send_time IS DISTINCT FROM EXCLUDED.send_time
@@ -161,15 +150,10 @@ DECLARE
   v_link text := 'color:#0A64D8;text-decoration:none;';
   v_state uuid;
   v_nat uuid;
-  v_state_name text;
-  v_nat_name text;
   v_by_class boolean;
   v_keys text[];
   v_state_ev boolean := coalesce((p_cfg ->> 'show_state_events')::boolean, false);
   v_nat_ev boolean := coalesce((p_cfg ->> 'show_national_events')::boolean, false);
-  v_club_news boolean := coalesce((p_cfg ->> 'show_club_news')::boolean, false);
-  v_state_news boolean := coalesce((p_cfg ->> 'show_state_news')::boolean, false);
-  v_nat_news boolean := coalesce((p_cfg ->> 'show_national_news')::boolean, false);
   v_out text := '';
   v_rows text := '';
   r record;
@@ -177,19 +161,13 @@ DECLARE
   v_meta text;
   v_heading text;
 BEGIN
-  IF v_club IS NULL OR NOT (v_state_ev OR v_nat_ev OR v_club_news OR v_state_news OR v_nat_news) THEN
+  IF v_club IS NULL OR NOT (v_state_ev OR v_nat_ev) THEN
     RETURN '';
   END IF;
 
   SELECT c.state_association_id INTO v_state FROM clubs c WHERE c.id = v_club;
   IF v_state IS NOT NULL THEN
-    SELECT sa.national_association_id,
-           coalesce(nullif(trim(to_jsonb(sa) ->> 'abbreviation'), ''), nullif(trim(to_jsonb(sa) ->> 'short_name'), ''), nullif(trim(sa.name), ''))
-      INTO v_nat, v_state_name FROM state_associations sa WHERE sa.id = v_state;
-  END IF;
-  IF v_nat IS NOT NULL THEN
-    SELECT coalesce(nullif(trim(to_jsonb(na) ->> 'abbreviation'), ''), nullif(trim(to_jsonb(na) ->> 'short_name'), ''), nullif(trim(na.name), ''))
-      INTO v_nat_name FROM national_associations na WHERE na.id = v_nat;
+    SELECT sa.national_association_id INTO v_nat FROM state_associations sa WHERE sa.id = v_state;
   END IF;
 
   -- Championships for this member's classes (unless the club sends everything to everyone)
@@ -231,7 +209,7 @@ BEGIN
         public.whats_on_esc(nullif(trim(r.venue), '')),
         CASE WHEN r.end_d > r.d THEN 'until ' || to_char(r.end_d, 'Dy FMDD Mon') END), '');
       v_rows := v_rows
-        || '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EEF2F7"><tr>'
+        || '<table data-wo="champ" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EEF2F7"><tr>'
         || '<td valign="top" width="44" style="width:44px;padding:12px 0 12px 2px;font-size:12px;font-weight:600;color:#64748B;line-height:1.3">' || upper(to_char(r.d, 'Mon'))
         || '<br><span style="' || v_disp || 'font-size:18px;color:#0B1220">' || to_char(r.d, 'FMDD') || '</span></td>'
         || '<td valign="top" style="padding:12px 0 12px 12px">'
@@ -252,47 +230,6 @@ BEGIN
       v_out := v_out || '<div style="height:14px;line-height:14px;font-size:0">&nbsp;</div>'
         || '<div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#64748B;margin:6px 2px 2px">'
         || v_heading || ' coming up</div>' || v_rows;
-    END IF;
-  END IF;
-
-  -- ── Latest news ──
-  v_rows := '';
-  IF v_club_news OR (v_state_news AND v_state IS NOT NULL) OR (v_nat_news AND v_nat IS NOT NULL) THEN
-    FOR r IN
-      SELECT a.id, a.title, a.published_at,
-             CASE WHEN a.club_id = v_club THEN 'club' WHEN a.state_association_id IS NOT NULL THEN 'state' ELSE 'national' END AS src,
-             left(trim(regexp_replace(regexp_replace(replace(coalesce(nullif(a.excerpt, ''), a.content, ''), '&nbsp;', ' '),
-                                                     '<[^>]*>', ' ', 'g'), '\s+', ' ', 'g')), 170) AS summary
-      FROM articles a
-      WHERE a.status = 'published'
-        AND a.published_at IS NOT NULL AND a.published_at <= now() AND a.published_at >= now() - interval '30 days'
-        AND (   (v_club_news AND a.club_id = v_club)
-             OR (v_state_news AND a.club_id IS NULL AND a.state_association_id = v_state)
-             OR (v_nat_news AND a.club_id IS NULL AND a.state_association_id IS NULL AND a.national_association_id = v_nat))
-      ORDER BY a.published_at DESC
-      LIMIT 3
-    LOOP
-      v_url := CASE WHEN p_preview THEN '#' ELSE v_app || '/club/' || v_club || '/public/news/' || r.id END;
-      v_rows := v_rows
-        || '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #EEF2F7"><tr>'
-        || '<td valign="top" style="padding:12px 2px">'
-        || '<div style="font-size:11px;font-weight:600;color:#64748B;margin-bottom:3px">'
-        || public.whats_on_esc(CASE r.src WHEN 'club' THEN p_club ->> 'abbr'
-                                          WHEN 'state' THEN coalesce(v_state_name, 'State association')
-                                          ELSE coalesce(v_nat_name, 'National association') END)
-        || ' · ' || to_char(r.published_at AT TIME ZONE coalesce(p_cfg ->> 'timezone', 'Australia/Sydney'), 'FMDD Mon') || '</div>'
-        || '<a href="' || public.whats_on_esc(v_url) || '" style="font-size:14.5px;font-weight:600;color:#0B1220;text-decoration:none;line-height:1.35">' || public.whats_on_esc(r.title) || '</a>'
-        || CASE WHEN coalesce(r.summary, '') <> ''
-                THEN '<div style="font-size:13px;line-height:1.5;color:#475569;margin-top:3px">' || public.whats_on_esc(r.summary)
-                     || CASE WHEN length(r.summary) >= 170 THEN '…' ELSE '' END || '</div>' ELSE '' END
-        || '<div style="margin-top:4px"><a href="' || public.whats_on_esc(v_url) || '" style="' || v_link || 'font-size:13px;font-weight:600">Read more</a></div>'
-        || '</td></tr></table>';
-    END LOOP;
-
-    IF v_rows <> '' THEN
-      v_out := v_out || '<div style="height:14px;line-height:14px;font-size:0">&nbsp;</div>'
-        || '<div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#64748B;margin:6px 2px 2px">Latest news</div>'
-        || v_rows;
     END IF;
   END IF;
 
@@ -320,6 +257,8 @@ DECLARE
   v_panel_row text := '<tr><td class="wo-pad" style="padding:20px 36px 28px">';
   v_gap_row text := '<tr><td style="height:20px;line-height:20px;font-size:0">&nbsp;</td></tr>';
   v_marker text;
+  v_champs int;
+  v_period text := CASE WHEN (p_cfg ->> 'covers_days')::int = 14 THEN 'in the next two weeks' ELSE 'this week' END;
 BEGIN
   v_mail := public.whats_on_render_base(p_club, p_cfg, p_member, p_week, p_next, p_from, p_to, p_token, p_preview, p_help);
   BEGIN
@@ -341,6 +280,15 @@ BEGIN
     RETURN v_mail;
   END IF;
   v_html := overlay(v_html PLACING v_extra || v_marker FROM position(v_marker IN v_html) FOR length(v_marker));
-  RETURN jsonb_set(v_mail, '{html}', to_jsonb(v_html));
+  v_champs := (length(v_extra) - length(replace(v_extra, 'data-wo="champ"', ''))) / length('data-wo="champ"');
+
+  -- No club racing for this member, but championships are coming up: say "No club racing",
+  -- and count the championships so a quiet week still sends (my_count drives "skip quiet weeks")
+  IF coalesce((v_mail ->> 'my_count')::int, 0) = 0 AND v_champs > 0 THEN
+    v_html := regexp_replace(v_html, '(<div class="wo-h1"[^>]*>)[^<]*(</div>)', '\1No club racing ' || v_period || '\2');
+    v_html := replace(v_html, 'There&#39;s no racing on the calendar for your boats', 'There&#39;s no club racing on the calendar for your boats');
+    v_mail := v_mail || jsonb_build_object('club_count', 0, 'my_count', v_champs);
+  END IF;
+  RETURN v_mail || jsonb_build_object('html', v_html, 'championships', v_champs);
 END;
 $$;

@@ -33,9 +33,6 @@ export interface WhatsOnForm {
   show_alfie_panel: boolean;
   show_state_events: boolean;
   show_national_events: boolean;
-  show_club_news: boolean;
-  show_state_news: boolean;
-  show_national_news: boolean;
   help_enabled: boolean;
   help_member_id: string | null;
   help_title: string | null;
@@ -94,7 +91,7 @@ const FORM_KEYS: (keyof WhatsOnForm)[] = [
   'include_unactivated', 'include_unfinancial', 'show_rsvp', 'show_details', 'show_docs', 'show_other',
   'show_next_week', 'show_alfie_panel', 'help_enabled', 'help_member_id', 'help_title', 'help_show_phone',
   'help_show_email', 'help_email', 'subject', 'intro',
-  'show_state_events', 'show_national_events', 'show_club_news', 'show_state_news', 'show_national_news',
+  'show_state_events', 'show_national_events',
 ];
 
 const DEFAULT_FORM: WhatsOnForm = {
@@ -103,7 +100,7 @@ const DEFAULT_FORM: WhatsOnForm = {
   show_details: true, show_docs: true, show_other: true, show_next_week: true, show_alfie_panel: true,
   help_enabled: false, help_member_id: null, help_title: null, help_show_phone: true, help_show_email: true,
   help_email: null, subject: null, intro: null,
-  show_state_events: false, show_national_events: false, show_club_news: false, show_state_news: false, show_national_news: false,
+  show_state_events: false, show_national_events: false,
 };
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -560,12 +557,6 @@ const WhatsOnEditor: React.FC<{ clubId: string; clubAbbr: string; onSummary: (s:
           <ToggleRow label="National championships" hint="Your national association's events in the next four months, for each member's classes"
             checked={form.show_national_events} onChange={v => set('show_national_events', v)} />
           <ToggleRow label={form.covers_days === 14 ? 'The week after' : "Next week's racing"} checked={form.show_next_week} onChange={v => set('show_next_week', v)} />
-          <ToggleRow label="Club news" hint="Latest news from the last 30 days (up to 3 stories across the news options)"
-            checked={form.show_club_news} onChange={v => set('show_club_news', v)} />
-          <ToggleRow label="State news" hint="From your state association"
-            checked={form.show_state_news} onChange={v => set('show_state_news', v)} />
-          <ToggleRow label="National news" hint="From your national association"
-            checked={form.show_national_news} onChange={v => set('show_national_news', v)} />
           <ToggleRow label="AlfiePRO panel" hint="Activate my login for members not yet on AlfiePRO · Log in and Forgot password for everyone else"
             checked={form.show_alfie_panel} onChange={v => set('show_alfie_panel', v)} />
         </Group>
