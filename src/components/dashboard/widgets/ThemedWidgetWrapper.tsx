@@ -46,9 +46,7 @@ export const ThemedWidgetWrapper: React.FC<ThemedWidgetWrapperProps> = ({
       {(title || Icon) && (
         <div className="a-widget-head flex items-center gap-3 mb-4">
           {Icon && (
-            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-              <Icon className="w-5 h-5 text-blue-400" />
-            </div>
+            <span className="a-tile" style={{ width: 36, height: 36 }}><Icon size={18} /></span>
           )}
           {title && (
             <h3 className="text-lg font-semibold text-slate-200">{title}</h3>
