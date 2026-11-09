@@ -97,6 +97,7 @@ import MarketingTemplateEditorPage from '../pages/MarketingTemplateEditorPage';
 import MarketingAutomationFlowsPage from '../pages/MarketingAutomationFlowsPage';
 import MarketingAutomationFlowEditorPage from '../pages/MarketingAutomationFlowEditorPage';
 const EmailStudio = React.lazy(() => import('./email-studio/EmailStudio'));
+const SiteBuilder = React.lazy(() => import('./site-builder/SiteBuilder'));
 import LivestreamPage from '../pages/LivestreamPage';
 import RaceSimulatorPage from './race-simulator/RaceSimulatorPage';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
@@ -2236,7 +2237,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 )
               } />
               <Route path="/website/pages/edit/:pageSlug" element={
-                currentClub?.club?.id ? (
+                clubWebsite ? (
+                  <React.Suspense fallback={<div className="p-8 text-center text-slate-400">Loading the site builder…</div>}><SiteBuilder /></React.Suspense>
+                ) : currentClub?.club?.id ? (
                   <OrganizationPageBuilderWrapper
                     organizationType="club"
                     organizationId={currentClub.club.id}

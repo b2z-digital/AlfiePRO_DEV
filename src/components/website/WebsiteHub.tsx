@@ -36,9 +36,19 @@ const TABS: { id: HubTab; label: string; icon: React.ReactNode }[] = [
   { id: 'events', label: 'Event sites', icon: <Trophy size={16} /> },
 ];
 
-/** Draft pages that have something on them (empty drafts don't need publishing). */
-export const draftsToPublish = (pages: { is_published: boolean; rows?: unknown[] | null }[]) =>
-  pages.filter(p => !p.is_published && Array.isArray(p.rows) && p.rows.length > 0);
+type PageLike = { is_published: boolean; rows?: unknown[] | null; draft_rows?: unknown[] | null };
+/** Changes made in the site builder that aren't on the site yet. */
+export const hasDraftChanges = (p: PageLike) => Array.isArray(p.draft_rows);
+/** Draft pages that have something on them (empty drafts don't need publishing), and live pages with unpublished changes. */
+export const draftsToPublish = (pages: PageLike[]) =>
+  pages.filter(p => {
+    const pending = Array.isArray(p.draft_rows) ? p.draft_rows : p.rows;
+    if (!p.is_published) return Array.isArray(pending) && pending.length > 0;
+    return hasDraftChanges(p);
+  });
+/** What publishing a page writes: builder drafts become the live layout. */
+export const publishUpdate = (p: PageLike) =>
+  Array.isArray(p.draft_rows) ? { is_published: true, rows: p.draft_rows, draft_rows: null } : { is_published: true };
 
 const PublishDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { pages, reload, log } = useHub();
@@ -50,7 +60,8 @@ const PublishDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setBusy(ids.length > 1 ? 'all' : ids[0]);
     let ok = 0;
     for (const id of ids) {
-      const res = await updateOrganizationPage(id, { is_published: true } as any);
+      const page = (pages as any[]).find(p => p.id === id);
+      const res = await updateOrganizationPage(id, (page ? publishUpdate(page) : { is_published: true }) as any);
       if (res) {
         ok++;
         log('published', 'page', res.page_title, res.id);
@@ -70,7 +81,7 @@ const PublishDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <span className="a-tile"><Send size={17} /></span>
           <div className="flex-1 min-w-0">
             <h2 className="a-display a-ink m-0 text-[18px] font-semibold">Publish pages</h2>
-            <p className="a-dim m-0 mt-0.5 text-[12.5px]">Draft pages only appear on your site once published. Everything else goes live when you save it.</p>
+            <p className="a-dim m-0 mt-0.5 text-[12.5px]">Draft pages and page changes only appear on your site once published. Everything else goes live when you save it.</p>
           </div>
           <button className="a-ib" onClick={onClose} aria-label="Close"><X size={18} /></button>
         </div>
@@ -82,7 +93,7 @@ const PublishDialog: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               <FileText size={17} className="a-dim" />
               <div className="flex-1 min-w-0">
                 <div className="a-ink text-[14px] font-semibold truncate">{p.page_title}</div>
-                <div className="a-dim text-[12px]">/{p.page_slug}</div>
+                <div className="a-dim text-[12px]">/{p.page_slug}{p.is_published ? ' · changes waiting' : ' · new page'}</div>
               </div>
               <button className="a-btn" style={{ height: 34 }} disabled={!!busy} onClick={() => publish([p.id])}>
                 {busy === p.id ? <Loader2 size={15} className="wh-spin" /> : 'Publish'}
