@@ -37,7 +37,8 @@ const ICON: Record<string, React.ReactNode> = {
   home: <House size={16} />, auto: <FileText size={16} />, page: <FileText size={16} />, link: <Link2 size={16} />, dropdown: <FolderOpen size={16} />,
 };
 
-export interface MenuEditorHandle { add: (item: SiteMenuItem) => void; remove: (pred: (i: SiteMenuItem) => boolean) => void }
+/** keepClean: the change has already been saved, so don't mark the menu as having unsaved edits. */
+export interface MenuEditorHandle { add: (item: SiteMenuItem, keepClean?: boolean) => void; remove: (pred: (i: SiteMenuItem) => boolean, keepClean?: boolean) => void }
 
 const Row: React.FC<{
   f: Flat; index: number; draft?: boolean; open: boolean; onToggle: () => void;
@@ -102,8 +103,8 @@ export const MenuEditor: React.FC<{ registerApi?: (api: MenuEditorHandle) => voi
 
   useEffect(() => {
     registerApi?.({
-      add: (item) => { setFlat(prev => [...prev, { item, depth: 0 }]); setDirty(true); },
-      remove: (pred) => { setFlat(prev => prev.filter(f => !pred(f.item))); setDirty(true); },
+      add: (item, keepClean) => { setFlat(prev => [...prev, { item, depth: 0 }]); if (!keepClean) setDirty(true); },
+      remove: (pred, keepClean) => { setFlat(prev => prev.filter(f => !pred(f.item))); if (!keepClean) setDirty(true); },
     });
   }, [registerApi]);
 
