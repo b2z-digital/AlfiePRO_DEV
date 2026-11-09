@@ -76,7 +76,7 @@ export function relation(a: Boat, b: Boat): Relation {
 const keepingClearForPenalty = (b: Boat) => b.penalty.active && Math.abs(b.penalty.rot) > 45;
 
 /** Section A plus rules 13 and 21: who must keep clear. */
-export function keepClear(a: Boat, b: Boat, t: number): KeepClear {
+export function keepClear(a: Boat, b: Boat, _t: number): KeepClear {
   // Rule 21: a boat returning to start or taking a penalty keeps clear.
   const aR = (a.ocs && !a.started) || keepingClearForPenalty(a);
   const bR = (b.ocs && !b.started) || keepingClearForPenalty(b);

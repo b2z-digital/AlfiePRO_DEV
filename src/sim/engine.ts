@@ -44,6 +44,8 @@ export class Race implements AiHost {
   playerIndex = -1;
   finishedAt: number | null = null;
   ended = false;
+  /** When true and a skipper is set for the player's boat, that skipper helms her (demos and tests). */
+  autopilot = false;
   private passed: ('tack' | 'gybe' | null)[] = [];
   private lastSignal = Infinity;
   private helmAssist: { target: number; until: number } | null = null;
@@ -169,7 +171,7 @@ export class Race implements AiHost {
 
     // Player input.
     const p = this.player;
-    if (p && !p.finished) {
+    if (p && !p.finished && !this.autopilot) {
       let rudder = this.input.rudder;
       if (this.helmAssist && t < this.helmAssist.until) {
         const err = n180(this.helmAssist.target - p.hdg);

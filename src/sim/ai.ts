@@ -231,7 +231,7 @@ export class Skipper {
   }
 
   // ───────────────────────── penalties ─────────────────────────
-  private penaltyPlan(h: AiHost): Plan {
+  private penaltyPlan(_h: AiHost): Plan {
     const b = this.b;
     if (this.penDir === 0) {
       const up = Math.abs(b.twa) < 90;
@@ -458,7 +458,7 @@ export class Skipper {
     return { x: P.x + (S.x - P.x) * t, y: P.y + (S.y - P.y) * t };
   }
 
-  private shouldRound(h: AiHost, leg: Leg, r: Rounding, M: V2): boolean {
+  private shouldRound(_h: AiHost, leg: Leg, r: Rounding, M: V2): boolean {
     const b = this.b, L = b.cls.loa;
     const d = dist(b, M);
     if (b.progress < -150) return d < 6 * L; // went the wrong way round: unwind
