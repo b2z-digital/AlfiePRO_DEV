@@ -3,10 +3,11 @@ import { X, Smartphone, Camera, CircleCheck as CheckCircle } from 'lucide-react'
 import QRCode from 'qrcode';
 import { livestreamStorage } from '../../utils/livestreamStorage';
 import { createMobileCameraLink } from '../../utils/mobileCamApi';
+import { CAMERA_QUALITY, type CameraQuality } from '../../utils/cameraQuality';
 
 interface MobileCameraQRModalProps {
   sessionId: string;
-  streamTitle: string;
+  streamTitle?: string;
   onClose: () => void;
 }
 
@@ -19,16 +20,19 @@ export function MobileCameraQRModal({
   const [cameraConnected, setCameraConnected] = useState(false);
   const baseUrl = `${window.location.origin.replace(/^http:\/\//, 'https://')}/mobile-stream/${sessionId}`;
   // The link carries a secret, expiring camera key so the phone doesn't need to be signed in
-  const [mobileUrl, setMobileUrl] = useState<string | null>(null);
+  const [linkUrl, setLinkUrl] = useState<string | null>(null);
+  // Starting quality for the phone (it can change it on its own screen too)
+  const [quality, setQuality] = useState<CameraQuality>('high');
+  const mobileUrl = linkUrl ? `${linkUrl}${linkUrl.includes('?') ? '&' : '?'}q=${quality}` : null;
 
   useEffect(() => {
     let cancelled = false;
     createMobileCameraLink(sessionId)
-      .then(({ key }) => { if (!cancelled) setMobileUrl(`${baseUrl}?k=${encodeURIComponent(key)}`); })
+      .then(({ key }) => { if (!cancelled) setLinkUrl(`${baseUrl}?k=${encodeURIComponent(key)}`); })
       .catch(err => {
         // Old behaviour still works for phones signed in to AlfiePRO
         console.error('Could not create camera link, falling back to a sign-in link:', err);
-        if (!cancelled) setMobileUrl(baseUrl);
+        if (!cancelled) setLinkUrl(baseUrl);
       });
     return () => { cancelled = true; };
   }, [sessionId, baseUrl]);
@@ -115,6 +119,28 @@ export function MobileCameraQRModal({
           {!cameraConnected && (
             <div className="bg-white rounded-lg p-6 flex items-center justify-center" style={{ minHeight: 304 }}>
               {mobileUrl ? <canvas ref={canvasRef} /> : <span className="text-sm text-slate-500">Creating camera link…</span>}
+            </div>
+          )}
+
+          {/* Quality the phone starts on */}
+          {!cameraConnected && (
+            <div>
+              <p className="text-xs text-slate-400 mb-2">Phone quality</p>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Phone quality">
+                {(Object.keys(CAMERA_QUALITY) as CameraQuality[]).map(q => (
+                  <button
+                    key={q}
+                    type="button"
+                    role="radio"
+                    aria-checked={quality === q}
+                    onClick={() => setQuality(q)}
+                    className={`rounded-lg border px-2 py-2 text-left transition-colors ${quality === q ? 'border-blue-500 bg-blue-600/15' : 'border-slate-700 bg-slate-800/60 hover:bg-slate-800'}`}
+                  >
+                    <span className="block text-sm font-semibold text-white">{CAMERA_QUALITY[q].label}</span>
+                    <span className="block text-[11px] text-slate-400">{CAMERA_QUALITY[q].detail} · {CAMERA_QUALITY[q].gbPerHour}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

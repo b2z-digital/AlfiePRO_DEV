@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useImperativeHandle, f
 import { Camera, Radio, Loader2, Smartphone, Monitor } from 'lucide-react';
 import { supabase } from '../../utils/supabase';
 import type { LivestreamCamera } from '../../types/livestream';
+import { getIceServers } from '../../utils/iceServers';
 
 export interface CameraFeedGridRef {
   getRemoteStream: (cameraId: string) => MediaStream | null;
@@ -16,25 +17,6 @@ interface CameraFeedGridProps {
   onRemoteStreamAvailable?: (cameraId: string, stream: MediaStream | null) => void;
 }
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  }
-];
 
 export const CameraFeedGrid = forwardRef<CameraFeedGridRef, CameraFeedGridProps>(({
   cameras,
@@ -65,7 +47,7 @@ export const CameraFeedGrid = forwardRef<CameraFeedGridRef, CameraFeedGridProps>
     setConnectionStatus(prev => ({ ...prev, [camera.id]: 'connecting' }));
 
     try {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
       peerConnectionsRef.current[camera.id] = pc;
 
       pc.ontrack = (event) => {
