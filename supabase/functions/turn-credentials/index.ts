@@ -13,6 +13,7 @@
 // Secrets (Supabase → Edge Functions → Secrets):
 //   CF_TURN_KEY_ID          the TURN key's ID   (Cloudflare → Realtime → TURN Server → Create)
 //   CF_TURN_KEY_API_TOKEN   the TURN key's API token
+//   TURN_RELAY_MODE         optional: "all" to use the Cloudflare relay for every broadcast
 // Deploy with JWT verification OFF (phones that aren't signed in call it); it checks callers itself.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -55,9 +56,11 @@ Deno.serve(async (req) => {
   }
   if (!allowed) return json({ error: "Not allowed" }, 401);
 
-  // Championship broadcasts only
-  let championship = false;
-  if (typeof sessionId === "string" && sessionId) {
+  // TURN_RELAY_MODE secret: "all" = Cloudflare relay for every broadcast;
+  // anything else (default) = championship broadcasts only
+  const relayForAll = (Deno.env.get("TURN_RELAY_MODE") || "").toLowerCase() === "all";
+  let championship = relayForAll;
+  if (!championship && typeof sessionId === "string" && sessionId) {
     const { data: session } = await admin.from("livestream_sessions").select("event_id").eq("id", sessionId).maybeSingle();
     const eventId = String(session?.event_id || "").replace(/-round-\d+$/, "").replace(/-day-\d+$/, "");
     if (/^[0-9a-f-]{36}$/i.test(eventId)) {
