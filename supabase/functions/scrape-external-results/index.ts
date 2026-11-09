@@ -84,6 +84,7 @@ interface DiscoveredEvent {
   venue: string | null;
   boatClassRaw: string | null;
   boatClassMapped: string | null;
+  raceCount?: number;
 }
 
 function findNearbyDate(html: string, linkIndex: number): string | null {
@@ -111,7 +112,66 @@ function findNearbyVenue(html: string, linkIndex: number): string | null {
   return null;
 }
 
+// New ARYA site (Nov 2026): /results is one table, a row per event linking to /results/<eventid>.
+// The old index.php addresses are gone.
+function currentListUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/radiosailing\.org\.au$/i.test(u.hostname) && /arcade=results/i.test(u.search)) return `${u.origin}/results`;
+  } catch { /* keep as is */ }
+  return url;
+}
+
+const NEW_CLASS_CODES: Record<string, string> = {
+  iom: "IOM", "10r": "10R", rm: "Marblehead", a: "A Class", df65: "DF65", df95: "DF95", rcl: "RC Laser",
+};
+
+function cell(row: string, label: string): string {
+  const m = row.match(new RegExp(`<td[^>]*data-label=["']${label}["'][^>]*>([\\s\\S]*?)<\\/td>`, "i"));
+  return m ? stripTags(m[1]) : "";
+}
+
+function parseNewResultsRows(html: string, baseUrl: string): DiscoveredEvent[] {
+  const origin = new URL(baseUrl).origin;
+  const events: DiscoveredEvent[] = [];
+  const seen = new Set<string>();
+  const re = /<tr[^>]*data-association-result-row[^>]*>([\s\S]*?)<\/tr>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const row = m[1];
+    const link = row.match(/<td[^>]*data-label=["']Event["'][^>]*>[\s\S]*?<a[^>]+href=["'](\/results\/(\d+))["'][^>]*>([\s\S]*?)<\/a>/i);
+    if (!link || seen.has(link[2])) continue;
+    seen.add(link[2]);
+    const name = stripTags(link[3]).replace(/\s{2,}/g, " ").slice(0, 200);
+    const classText = cell(row, "Class");
+    const boatClassMapped = NEW_CLASS_CODES[classText.toLowerCase()] || detectBoatClass(classText) || detectBoatClass(name);
+    let eventDate: string | null = null;
+    const dateText = cell(row, "Date");
+    if (dateText) {
+      const d = new Date(`${dateText} UTC`);
+      if (!isNaN(d.getTime())) eventDate = d.toISOString().slice(0, 10);
+    }
+    const races = parseInt(cell(row, "Races"), 10);
+    events.push({
+      externalEventId: link[2],
+      url: origin + link[1],
+      name,
+      eventDate,
+      venue: cell(row, "Venue") || null,
+      boatClassRaw: boatClassMapped || classText || null,
+      boatClassMapped,
+      raceCount: Number.isFinite(races) ? races : undefined,
+    });
+    if (events.length >= MAX_EVENTS_PER_RUN) break;
+  }
+  return events;
+}
+
 function parseListPage(html: string, baseUrl: string): DiscoveredEvent[] {
+  if (/data-association-result-row/.test(html)) {
+    const fresh = parseNewResultsRows(html, baseUrl);
+    if (fresh.length) return fresh;
+  }
   const events: DiscoveredEvent[] = [];
   const seen = new Set<string>();
   const urlObj = new URL(baseUrl);
@@ -422,7 +482,7 @@ interface MSREvent {
 }
 
 function extractEventIdFromUrl(url: string): string | null {
-  const m = url.match(/[?&]eventid=(\d+)/i);
+  const m = url.match(/[?&]eventid=(\d+)/i) || url.match(/radiosailing\.org\.au\/results\/(\d+)/i);
   return m ? m[1] : null;
 }
 
@@ -713,7 +773,8 @@ Deno.serve(async (req: Request) => {
         if (pageResp?.ok) {
           const pageHtml = await pageResp.text();
           // Look for the mysailingresults API call in the page JS
-          const apiMatch = pageHtml.match(/mysailingresults\.com\/api\/results\/get_results\.php\?eventid=(\d+)/i) ||
+          const apiMatch = pageHtml.match(/data-event-id=["'](\d+)["']/i) ||
+                           pageHtml.match(/mysailingresults\.com\/api\/results\/get_results\.php\?eventid=(\d+)/i) ||
                            pageHtml.match(/get_results\.php\?eventid=(\d+)/i) ||
                            pageHtml.match(/eventid['"]\s*[:=]\s*['"]?(\d+)/i);
           if (apiMatch) resolvedApiEventId = apiMatch[1];
@@ -872,15 +933,19 @@ Deno.serve(async (req: Request) => {
         logId = logData?.id || null;
 
         // Fetch the source page
-        const fetchResponse = await fetch(source.url, {
+        const listUrl = currentListUrl(source.url);
+        const fetchResponse = await fetch(listUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 AlfiePRO-Results-Scraper/1.0",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           },
           signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
-        if (!fetchResponse.ok) throw new Error(`HTTP ${fetchResponse.status} fetching ${source.url}`);
+        if (!fetchResponse.ok) throw new Error(`HTTP ${fetchResponse.status} fetching ${listUrl}`);
         const html = await fetchResponse.text();
+        if (listUrl !== source.url) {
+          await supabase.from("external_result_sources").update({ url: listUrl }).eq("id", source.id);
+        }
 
         if (source.source_type === "single_event") {
           // ── Single event: parse results directly from this page ────────────
@@ -943,7 +1008,8 @@ Deno.serve(async (req: Request) => {
 
         } else {
           // ── Event list: discover links and register them WITHOUT fetching each page ──
-          const discovered = parseListPage(html, source.url);
+          const discovered = parseListPage(html, listUrl);
+          if (!discovered.length) throw new Error(`No events found on ${listUrl} - the page layout may have changed`);
           eventsFound = discovered.length;
 
           for (const ev of discovered) {
@@ -970,6 +1036,19 @@ Deno.serve(async (req: Request) => {
                 boatClassId = bc?.id || null;
               }
 
+              const listFields: Record<string, unknown> = {
+                event_name: ev.name,
+                source_url: ev.url,
+                display_category: source.display_category,
+                last_scraped_at: new Date().toISOString(),
+              };
+              if (ev.eventDate) listFields.event_date = ev.eventDate;
+              if (ev.venue) listFields.venue = ev.venue;
+              if (ev.boatClassRaw) listFields.boat_class_raw = ev.boatClassRaw;
+              if (ev.boatClassMapped) listFields.boat_class_mapped = ev.boatClassMapped;
+              if (boatClassId) listFields.boat_class_id = boatClassId;
+              if (ev.raceCount) listFields.race_count = ev.raceCount;
+
               const payload = {
                 source_id: source.id,
                 external_event_id: ev.externalEventId,
@@ -983,14 +1062,15 @@ Deno.serve(async (req: Request) => {
                 source_url: ev.url,
                 results_json: [],
                 competitor_count: 0,
-                race_count: 0,
+                race_count: ev.raceCount ?? 0,
                 display_category: source.display_category,
                 last_scraped_at: new Date().toISOString(),
               };
 
               if (existing) {
+                // Keep results already fetched for this event; only refresh the list details
                 await supabase.from("external_result_events")
-                  .update({ ...payload, updated_at: new Date().toISOString() })
+                  .update({ ...listFields, updated_at: new Date().toISOString() })
                   .eq("id", existing.id);
                 eventsUpdated++;
               } else {

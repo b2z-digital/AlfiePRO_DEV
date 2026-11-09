@@ -16,6 +16,79 @@ interface RankingEntry {
   events?: number;
 }
 
+// New ARYA site (Nov 2026): /rankings?class=<id>&page=<n>, 15 sailors a page, with every sailor's
+// figures in a data-ranking-details JSON attribute. The old index.php / rankings-<class> pages are gone.
+const ARYA_ORIGIN = "https://radiosailing.org.au";
+const ARYA_CLASSES: Array<{ id: number; name: string; match: RegExp }> = [
+  { id: 1, name: "IOM", match: /\biom\b|one.?metre/i },
+  { id: 2, name: "10R", match: /10.?r(ater)?\b|ten.?rater/i },
+  { id: 3, name: "A Class", match: /\ba.?class\b|aclass/i },
+  { id: 4, name: "Marblehead", match: /marblehead|\brm\b/i },
+  { id: 8, name: "DF65", match: /df.?65/i },
+  { id: 9, name: "RC Laser", match: /rc.?laser|\brcl\b/i },
+  { id: 10, name: "DF95", match: /df.?95/i },
+];
+
+function aryaClass(url: string, yachtClassName: string): { id: number; name: string } | null {
+  const fromUrl = url.match(/[?&]class=(\d+)/);
+  if (fromUrl) {
+    const hit = ARYA_CLASSES.find((c) => c.id === Number(fromUrl[1]));
+    if (hit) return hit;
+  }
+  // old addresses such as index.php?arcade=iom-ranking or /rankings-df95
+  const slug = (url.match(/arcade=([\w-]+)/)?.[1] || url.match(/rankings-([\w-]+)/)?.[1] || "").replace(/-?ranking$/, "");
+  return ARYA_CLASSES.find((c) => slug && c.match.test(slug.replace(/-/g, " ")))
+    || ARYA_CLASSES.find((c) => c.match.test(yachtClassName || ""))
+    || null;
+}
+
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&");
+}
+
+function parseAryaRankingPage(html: string): RankingEntry[] {
+  const attr = html.match(/data-ranking-details=["']([^"']*)["']/);
+  if (!attr) return [];
+  let data: Record<string, { rank?: number | string; name?: string; club?: string; sail?: string; score?: number | string; events?: number | string }> = {};
+  try { data = JSON.parse(decodeEntities(attr[1])); } catch { return []; }
+  return Object.values(data)
+    .map((d) => ({
+      rank: Number(d.rank),
+      name: String(d.name || "").trim(),
+      // stored as the number alone, as before ("AUS 74" -> "74")
+      sailNumber: String(d.sail || "").replace(/^[A-Z]{2,3}\s+/, "").trim() || undefined,
+      state: String(d.club || "").trim() || undefined,
+      points: d.score !== undefined && d.score !== "" ? Number(d.score) : undefined,
+      events: d.events !== undefined && d.events !== "" ? Number(d.events) : undefined,
+    }))
+    .filter((r) => r.name && Number.isFinite(r.rank));
+}
+
+async function fetchAryaRankings(classId: number): Promise<RankingEntry[]> {
+  const byKey = new Map<string, RankingEntry>();
+  let total = Infinity;
+  for (let page = 1; page <= 40 && byKey.size < total; page++) {
+    const res = await fetch(`${ARYA_ORIGIN}/rankings?class=${classId}&page=${page}`, {
+      headers: { "User-Agent": "Mozilla/5.0 AlfiePRO-Rankings/1.0", Accept: "text/html" },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) break;
+    const html = await res.text();
+    const count = html.match(/(\d+)\s+ranked sailors/i);
+    if (count) total = Number(count[1]);
+    const entries = parseAryaRankingPage(html);
+    const before = byKey.size;
+    for (const e of entries) byKey.set(`${e.rank}|${e.name}`, e);
+    if (byKey.size === before) break; // past the last page
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return [...byKey.values()].sort((a, b) => a.rank - b.rank);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -57,16 +130,28 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const { url, yachtClassName, nationalAssociationId } = await req.json();
+    const body = await req.json();
+    let url: string = String(body.url || "");
+    let yachtClassName: string = String(body.yachtClassName || "");
+    const nationalAssociationId = body.nationalAssociationId;
 
-    console.log(`Scraping rankings from: ${url} for ${yachtClassName}`);
+    let host = "";
+    try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { /* invalid */ }
+    // Only the national association's own rankings site is fetched
+    if (host !== "radiosailing.org.au") throw new Error("Rankings can only be imported from radiosailing.org.au");
 
-    // Fetch the HTML page
-    const response = await fetch(url);
-    const html = await response.text();
-
-    // Parse the HTML to extract rankings
-    const rankings = parseRankingsFromHTML(html);
+    const cls = aryaClass(url, yachtClassName);
+    let rankings: RankingEntry[] = [];
+    if (cls) {
+      url = `${ARYA_ORIGIN}/rankings?class=${cls.id}`;
+      yachtClassName = cls.name; // one name per class, whichever screen or job asked
+      console.log(`Scraping rankings from: ${url} for ${yachtClassName}`);
+      rankings = await fetchAryaRankings(cls.id);
+    }
+    if (!rankings.length) {
+      const response = await fetch(url);
+      rankings = parseRankingsFromHTML(await response.text());
+    }
 
     console.log(`Found ${rankings.length} rankings`);
 

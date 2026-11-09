@@ -479,6 +479,82 @@ function parseDetailPage(html: string, fallbackTitle: string): ParsedListing | n
   }
 }
 
+// ─── New ARYA site (Nov 2026): /resources/classifieds cards and /resources/classifieds/<id> ────
+// Listings there have new numbers, so they're saved as arya_n<id>; listings from the old site that
+// aren't on the new one are removed by the usual "no longer listed" step. Sold listings are skipped.
+function currentListUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/radiosailing\.org\.au$/i.test(u.hostname) && /arcade=classifieds/i.test(u.search)) return `${u.origin}/resources/classifieds`;
+  } catch { /* keep as is */ }
+  return url;
+}
+
+function newCategory(cat: string): { category: string; boatClass: string | null } {
+  const boatClass = detectBoatClassFromText(cat);
+  if (boatClass) return { category: "yachts", boatClass };
+  const c = cat.toLowerCase();
+  if (c.includes("sail")) return { category: "sails", boatClass: null };
+  if (c.includes("radio") || c.includes("electr")) return { category: "electronics", boatClass: null };
+  if (c.includes("part") || c.includes("accessor")) return { category: "parts", boatClass: null };
+  return { category: "other", boatClass: null };
+}
+
+function parseNewListPage(html: string, baseUrl: string): ListingLink[] {
+  const origin = new URL(baseUrl).origin;
+  const links: ListingLink[] = [];
+  const seen = new Set<string>();
+  const re = /<article[^>]*class=["']([^"']*classified-card[^"']*)["'][^>]*>([\s\S]*?)<\/article>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    if (/\bis-sold\b/.test(m[1]) || /classified-sold-banner/.test(m[2])) continue;
+    const a = m[2].match(/<h2[^>]*>\s*<a[^>]+href=["'](\/resources\/classifieds\/(\d+))["'][^>]*>([\s\S]*?)<\/a>/i);
+    if (!a) continue;
+    const id = `n${a[2]}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    links.push({ id, url: origin + a[1], title: stripTags(a[3]) });
+  }
+  return links;
+}
+
+function dlValue(html: string, label: string): string {
+  const m = html.match(new RegExp(`<dt[^>]*>\\s*${label}\\s*<\\/dt>\\s*<dd[^>]*>([\\s\\S]*?)<\\/dd>`, "i"));
+  return m ? m[1] : "";
+}
+
+function parseNewDetailPage(html: string, fallbackTitle: string, pageUrl: string): ParsedListing | null {
+  const origin = new URL(pageUrl).origin;
+  const detail = (html.match(/<article[^>]*class=["'][^"']*classified-detail[^"']*["'][^>]*>([\s\S]*?)<\/article>/i) || ["", ""])[1];
+  if (!detail) return null;
+  const title = stripTags((detail.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) || ["", fallbackTitle])[1]) || fallbackTitle;
+  const priceText = stripTags((detail.match(/class=["'][^"']*classified-price[^"']*["'][^>]*>([\s\S]*?)<\//i) || ["", ""])[1]);
+  const price = extractPriceFromText(priceText) || extractPriceFromText(title);
+  const descHtml = (detail.match(/<div[^>]*class=["'][^"']*classified-description[^"']*["'][^>]*>([\s\S]*?)<\/div>\s*<dl/i) || ["", ""])[1];
+  // keep paragraphs and list items on their own lines (stripTags squashes whitespace)
+  const description = stripTags(descHtml
+    .replace(/<\/(p|div|h[1-6])>/gi, " @@NL@@ ").replace(/<li[^>]*>/gi, " @@NL@@ • ").replace(/<br\s*\/?>/gi, " @@NL@@ "))
+    .split("@@NL@@").map(l => l.trim()).filter(Boolean).join("\n").trim();
+  const meta = [...(detail.match(/<div[^>]*classified-meta[^>]*>([\s\S]*?)<\/div>/i) || ["", ""])[1].matchAll(/<span[^>]*>([\s\S]*?)<\/span>/gi)].map(x => stripTags(x[1]));
+  const { category, boatClass } = newCategory(meta[0] || "");
+  const images = [...(detail.match(/classified-gallery[\s\S]*?(?=<div class=["']classified-detail-copy)/i) || [""])[0].matchAll(/<img[^>]+src=["']([^"']+)["']/gi)]
+    .map(x => new URL(x[1].replace(/&amp;/g, "&"), origin).toString());
+  const emailHtml = dlValue(detail, "Email");
+  const phoneHtml = dlValue(detail, "Phone");
+  return {
+    title,
+    description: description || title,
+    price,
+    location: stripTags(dlValue(detail, "Location")),
+    contactName: stripTags(dlValue(detail, "Contact")),
+    contactEmail: (emailHtml.match(/mailto:([^"'\s<>?]+)/i) || ["", stripTags(emailHtml)])[1].trim(),
+    contactPhone: (phoneHtml.match(/tel:([^"'\s<>]+)/i) || ["", stripTags(phoneHtml)])[1].trim(),
+    images: [...new Set(images)],
+    boatClass: boatClass || detectBoatClassFromText(title + " " + description),
+    category,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -546,10 +622,15 @@ Deno.serve(async (req: Request) => {
       let listingsRemoved = 0;
 
       try {
-        const indexHtml = await fetchHtml(source.url);
+        const listUrl = currentListUrl(source.url);
+        const indexHtml = await fetchHtml(listUrl);
         if (!indexHtml) throw new Error("Failed to fetch index page");
 
-        const listingLinks = parseListPage(indexHtml);
+        const isNewSite = /classified-card/.test(indexHtml);
+        const listingLinks = isNewSite ? parseNewListPage(indexHtml, listUrl) : parseListPage(indexHtml);
+        if (listUrl !== source.url) {
+          await supabase.from("classified_scrape_sources").update({ url: listUrl }).eq("id", source.id);
+        }
         listingsFound = listingLinks.length;
 
         if (listingsFound === 0) {
@@ -575,7 +656,9 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          const parsed = parseDetailPage(detailHtml, link.title);
+          const parsed = /classified-detail/.test(detailHtml)
+            ? parseNewDetailPage(detailHtml, link.title, link.url)
+            : parseDetailPage(detailHtml, link.title);
           if (!parsed) {
             continue;
           }
@@ -642,7 +725,7 @@ Deno.serve(async (req: Request) => {
                     title: parsed.title,
                     description: parsed.description,
                     price: parsed.price > 0 ? parsed.price : existing.price,
-                    location: parsed.location || existing.title,
+                    location: parsed.location || undefined,
                     images: finalImages.length > 0 ? finalImages : existing.images,
                     external_contact_name: parsed.contactName || undefined,
                     external_contact_email: parsed.contactEmail || undefined,

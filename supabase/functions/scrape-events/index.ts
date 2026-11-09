@@ -137,6 +137,119 @@ function parseMonthDate(text: string): string | null {
   return null;
 }
 
+// ─── New ARYA site (radiosailing.org.au, Nov 2026): /events cards, /events/<id> pages ──────────
+// Old addresses (index.php?arcade=...) now return 404; sources still saved with them are read from
+// the new pages instead.
+function currentListUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/radiosailing\.org\.au$/i.test(u.hostname) && /arcade=events/i.test(u.search)) return `${u.origin}/events`;
+  } catch { /* keep as is */ }
+  return url;
+}
+
+const NEW_CLASS_MAP: Record<string, string> = {
+  iom: "IOM", "10r": "10R", rcl: "RC Laser", df65: "DF65", rm: "Marblehead", df95: "DF95", a: "A Class",
+};
+
+function attr(tag: string, name: string): string | null {
+  const m = tag.match(new RegExp(`${name}=["']([^"']*)["']`, "i"));
+  return m ? m[1] : null;
+}
+
+function newEventType(dataType: string, name: string): string {
+  const t = dataType.toLowerCase();
+  if (t.includes("international") || t.includes("world")) return "world";
+  if (t.includes("national")) return "national";
+  if (t.includes("state")) return "state";
+  return detectEventType(name);
+}
+
+interface NewListEvent extends DiscoveredEvent { eventEndDate: string | null }
+
+function parseNewEventsListPage(html: string, baseUrl: string): NewListEvent[] {
+  const origin = new URL(baseUrl).origin;
+  const events: NewListEvent[] = [];
+  const seen = new Set<string>();
+  const cards = extractAllMatches(html, /(<article[^>]*class=["'][^"']*event-list-card[^"']*["'][^>]*>)([\s\S]*?)<\/article>/i);
+  for (const c of cards) {
+    const open = c[1];
+    const body = c[2];
+    const link = body.match(/href=["'](\/events\/(\d+))["']/i);
+    if (!link) continue;
+    const id = link[2];
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const name = stripTags(extractText(body, "h3")) || `Event ${id}`;
+    const timeTag = (body.match(/<time[^>]*>/i) || [""])[0];
+    const start = attr(timeTag, "datetime");
+    const end = attr(timeTag, "data-end-date");
+    // the meta line: date, (start time), venue
+    const meta = (body.match(/<div[^>]*event-list-copy[^>]*>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i) || ["", ""])[1].replace(/<svg[\s\S]*?<\/svg>/gi, "");
+    const spans = extractAllMatches(meta, /<span[^>]*>([\s\S]*?)<\/span>/i).map(m => stripTags(m[1])).filter(Boolean);
+    const venue = spans.filter(t => !/\b20\d{2}\b/.test(t) && !/^\d{1,2}(:\d{2})?\s*(am|pm)$/i.test(t)).pop() || null;
+    const dataClass = (attr(open, "data-event-class") || "").toLowerCase();
+    const dataState = (attr(open, "data-event-state") || "").toUpperCase();
+    const dataType = attr(open, "data-event-type") || "";
+    const boatClass = NEW_CLASS_MAP[dataClass] || detectBoatClass(name) || null;
+    const cancelled = /\bcancel/i.test(stripTags(body)) || /is-cancel/i.test(open);
+    const postponed = /\bpostpone/i.test(stripTags(body));
+    events.push({
+      externalEventId: id,
+      url: origin + link[1],
+      name: name.replace(/EVENT CANCELLED\s*/i, "").trim(),
+      eventDate: start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : null,
+      eventEndDate: end && /^\d{4}-\d{2}-\d{2}$/.test(end) && end !== start ? end : null,
+      venue,
+      stateCode: STATE_ABBREVS.includes(dataState) ? dataState : detectState(venue || name),
+      countryCode: "AUS",
+      boatClassRaw: boatClass,
+      boatClassMapped: boatClass,
+      eventStatus: cancelled ? "cancelled" : postponed ? "postponed" : "active",
+      eventType: newEventType(dataType, name),
+    });
+    if (events.length >= MAX_EVENTS_PER_RUN) break;
+  }
+  return events;
+}
+
+function ddAfter(html: string, label: string): string | null {
+  const m = html.match(new RegExp(`<dt[^>]*>\\s*${label}\\s*<\\/dt>\\s*<dd[^>]*>([\\s\\S]*?)<\\/dd>`, "i"));
+  return m ? m[1] : null;
+}
+
+function parseNewEventDetailPage(html: string, baseUrl: string): EventDetail {
+  const origin = new URL(baseUrl).origin;
+  const eventName = stripTags(extractText(html, "h1")) || null;
+  const venueDd = ddAfter(html, "Venue");
+  const venue = venueDd ? stripTags((venueDd.match(/<strong[^>]*>([\s\S]*?)<\/strong>/i) || [, venueDd])[1] as string) : null;
+  const locP = venueDd ? venueDd.match(/<p[^>]*>([\s\S]*?)<\/p>/i) : null;
+  const location = locP
+    ? locP[1].split(/<br\s*\/?>/i).map(x => stripTags(x)).filter(Boolean).join(", ")
+    : null;
+  const strip = (html.match(/association-event-status-strip[\s\S]*?<\/section>/i) || [""])[0];
+  const statusText = stripTags(strip) + " " + stripTags((html.match(/<p class=["']kicker["'][^>]*>([\s\S]*?)<\/p>/i) || ["", ""])[1]);
+  const eventStatus = /cancel/i.test(statusText) ? "cancelled" : /postpone/i.test(statusText) ? "postponed" : "active";
+  const stateCode = detectState(location || venue || eventName || "");
+  const boatClass = detectBoatClass(eventName || "");
+  return {
+    eventName,
+    eventDate: null,
+    eventEndDate: null,
+    venue: venue || location,
+    location: location || venue,
+    stateCode,
+    boatClassRaw: boatClass,
+    boatClassMapped: boatClass,
+    eventType: null,
+    eventStatus,
+    rankingEvent: /ranking/i.test(statusText),
+    documents: extractDocumentsFromHtml(html, origin),
+    registrationUrl: extractRegistrationFromHtml(html, origin),
+    websiteUrl: null,
+  };
+}
+
 interface DiscoveredEvent {
   externalEventId: string;
   url: string;
@@ -279,7 +392,8 @@ function extractDocumentsFromHtml(html: string, origin: string): Array<{ name: s
 
   for (const dl of allLinks) {
     const href = dl[1];
-    const linkText = stripTags(dl[2]);
+    const strongTitle = dl[2].match(/<strong[^>]*>([\s\S]*?)<\/strong>/i);
+    const linkText = stripTags(strongTitle ? strongTitle[1] : dl[2]);
     const lower = linkText.toLowerCase();
     const hrefLower = href.toLowerCase();
 
@@ -325,6 +439,7 @@ function extractRegistrationFromHtml(html: string, origin: string): string | nul
 }
 
 function parseEventDetailPage(html: string, baseUrl: string): EventDetail {
+  if (/association-event-page|event-detail-shell/.test(html)) return parseNewEventDetailPage(html, baseUrl);
   const h3 = extractText(html, "h3");
   const h2 = extractText(html, "h2");
   const h1 = extractText(html, "h1");
@@ -474,6 +589,8 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<string>
 }
 
 function getEventTabUrl(sourceUrl: string, tabName: string): string | null {
+  const newPage = sourceUrl.match(/^(https?:\/\/[^/]+)\/events\/(\d+)/i);
+  if (newPage) return tabName === "documents" ? `${newPage[1]}/events/${newPage[2]}/documents-notices` : null;
   const eventIdMatch = sourceUrl.match(/eventid=(\d+)/i);
   if (!eventIdMatch) return null;
   const eventId = eventIdMatch[1];
@@ -644,15 +761,23 @@ Deno.serve(async (req: Request) => {
       const logId = logRow?.id;
 
       try {
-        const html = await fetchWithTimeout(source.url, FETCH_TIMEOUT_MS);
-        const discovered = parseEventsListPage(html, source.url);
+        const listUrl = currentListUrl(source.url);
+        const html = await fetchWithTimeout(listUrl, FETCH_TIMEOUT_MS);
+        const isNewSite = /event-list-card/.test(html);
+        const discovered: Array<DiscoveredEvent & { eventEndDate?: string | null }> = isNewSite
+          ? parseNewEventsListPage(html, listUrl)
+          : parseEventsListPage(html, listUrl);
+        if (isNewSite && discovered.length === 0) throw new Error("No events found on the new events page");
+        if (listUrl !== source.url) {
+          await supabase.from("external_event_sources").update({ url: listUrl }).eq("id", source.id);
+        }
 
         let created = 0, updated = 0, skipped = 0;
 
         for (const evt of discovered) {
           const existing = await supabase
             .from("external_events")
-            .select("id, event_status")
+            .select("id, event_status, is_visible")
             .eq("source_id", source.id)
             .eq("external_event_id", evt.externalEventId)
             .maybeSingle();
@@ -664,6 +789,13 @@ Deno.serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
             };
             if (evt.eventDate) updates.event_date = evt.eventDate;
+            if (evt.eventEndDate) updates.event_end_date = evt.eventEndDate;
+            // keep the link on the current site (old index.php links are gone)
+            updates.source_url = evt.url;
+            // back on the calendar: re-show events this scraper hid as dropped, never ones an admin hid
+            if (existing.data.is_visible === false && existing.data.event_status === "cancelled" && evt.eventStatus !== "cancelled") {
+              updates.is_visible = true;
+            }
             if (evt.venue) {
               updates.venue = evt.venue;
               updates.location = evt.venue;
@@ -689,7 +821,7 @@ Deno.serve(async (req: Request) => {
               external_event_id: evt.externalEventId,
               event_name: evt.name,
               event_date: evt.eventDate,
-              event_end_date: null,
+              event_end_date: evt.eventEndDate ?? null,
               venue: evt.venue,
               location: evt.venue,
               state_code: evt.stateCode,
@@ -710,16 +842,19 @@ Deno.serve(async (req: Request) => {
         if (existingIds.length > 0) {
           const { data: allExisting } = await supabase
             .from("external_events")
-            .select("id, external_event_id")
+            .select("id, external_event_id, event_date")
             .eq("source_id", source.id);
 
           if (allExisting) {
+            const today = new Date().toISOString().slice(0, 10);
             const removedEvents = allExisting.filter(
               e => e.external_event_id && !existingIds.includes(e.external_event_id)
             );
             for (const removed of removedEvents) {
+              // A past event drops off the "upcoming" list because it happened, not because it was cancelled
+              const past = removed.event_date && String(removed.event_date).slice(0, 10) < today;
               await supabase.from("external_events")
-                .update({ is_visible: false, event_status: "cancelled" })
+                .update(past ? { is_visible: false } : { is_visible: false, event_status: "cancelled" })
                 .eq("id", removed.id);
             }
           }

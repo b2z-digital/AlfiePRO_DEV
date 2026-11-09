@@ -9,30 +9,13 @@ const corsHeaders = {
 
 // Yacht class configurations for syncing
 const YACHT_CLASSES = [
-  {
-    name: "IOM",
-    url: "https://www.radiosailing.org.au/rankings-iom",
-  },
-  {
-    name: "10 Rater",
-    url: "https://www.radiosailing.org.au/rankings-10r",
-  },
-  {
-    name: "Marblehead",
-    url: "https://www.radiosailing.org.au/rankings-marblehead",
-  },
-  {
-    name: "A Class",
-    url: "https://www.radiosailing.org.au/rankings-a-class",
-  },
-  {
-    name: "DF65",
-    url: "https://www.radiosailing.org.au/rankings-df65",
-  },
-  {
-    name: "DF95",
-    url: "https://www.radiosailing.org.au/rankings-df95",
-  },
+  { name: "IOM", url: "https://radiosailing.org.au/rankings?class=1" },
+  { name: "10R", url: "https://radiosailing.org.au/rankings?class=2" },
+  { name: "Marblehead", url: "https://radiosailing.org.au/rankings?class=4" },
+  { name: "A Class", url: "https://radiosailing.org.au/rankings?class=3" },
+  { name: "DF65", url: "https://radiosailing.org.au/rankings?class=8" },
+  { name: "DF95", url: "https://radiosailing.org.au/rankings?class=10" },
+  { name: "RC Laser", url: "https://radiosailing.org.au/rankings?class=9" },
 ];
 
 Deno.serve(async (req: Request) => {
