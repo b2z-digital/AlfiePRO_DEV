@@ -18,6 +18,7 @@ import { AdDisplay } from '../components/advertising/AdDisplay';
 import type { LivestreamSession, LivestreamArchive, LivestreamRaceSegment } from '../types/livestream';
 import { LiveWatchView } from '../components/livestream/LiveWatchView';
 import { resolveLiveEvents, type LiveEventMeta } from '../utils/liveEventInfo';
+import { goneYouTubeIds } from '../utils/youtubeAvailability';
 
 interface AlfieTVPageProps {
   darkMode?: boolean;
@@ -388,6 +389,7 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .from('livestream_sessions')
           .select('*')
           .eq('status', 'live')
+          .neq('broadcast_mode', 'races_only')
           .not('cloudflare_live_input_id', 'is', null)
           .not('cloudflare_customer_code', 'is', null)
           .order('actual_start_time', { ascending: false });
@@ -421,7 +423,9 @@ export default function AlfieTVPage({ darkMode = false }: AlfieTVPageProps) {
           .limit(20);
         if (!isSuperAdmin) archiveQuery = archiveQuery.eq('is_public', true);
         const { data: archives } = await archiveQuery;
-        setReplayArchives(markTests(archives || []));
+        // Race videos deleted or made private on YouTube drop out of AlfieTV
+        const gone = await goneYouTubeIds(archives || []);
+        setReplayArchives(markTests((archives || []).filter(a => !a.youtube_video_id || !gone.has(a.youtube_video_id))));
       } catch (err) {
         console.error('Error loading live streams:', err);
       }

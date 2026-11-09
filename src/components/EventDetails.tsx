@@ -3734,7 +3734,7 @@ export const EventDetails: React.FC<EventDetailsProps> = ({
             <div className="a-seg" role="tablist" aria-label="Event sections" style={{ flexWrap: 'nowrap' }}>
               {([
                 { key: 'details', label: 'Event Details', icon: <Info size={15} />, show: true },
-                { key: 'live', label: 'Live', icon: liveTabSession?.status === 'live' ? <span className="alv-tab-dot" aria-hidden="true" /> : <Radio size={15} />, show: !!(event.enableLiveStream && liveTabSession && (liveTabSession.is_public !== false || isAdmin || isEditor)) },
+                { key: 'live', label: 'Live', icon: liveTabSession?.status === 'live' && liveTabSession.broadcast_mode !== 'races_only' ? <span className="alv-tab-dot" aria-hidden="true" /> : <Radio size={15} />, show: !!(event.enableLiveStream && liveTabSession && (liveTabSession.is_public !== false || isAdmin || isEditor)) },
                 { key: 'registrations', label: 'Registrations', icon: <DollarSign size={15} />, show: !!(event.isPaid && event.entryFee && event.entryFee > 0) },
                 { key: 'documents', label: 'Documents', icon: <FileText size={15} />, show: true },
                 { key: 'media', label: 'Media', icon: <Image size={15} />, show: true },

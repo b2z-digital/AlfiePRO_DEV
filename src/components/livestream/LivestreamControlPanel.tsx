@@ -29,6 +29,7 @@ import { fetchScoringRace, stripBroadcastSuffix, raceNumberFromLabel } from '../
 import { saveRaceThumbnail } from './broadcastThumbnail';
 import type { LivestreamRaceSegment } from '../../types/livestream';
 import { getIceServers } from '../../utils/iceServers';
+import { creditErrorMessage, money, needsCredit, useLivestreamCredit } from '../../utils/livestreamCredit';
 
 /** Auto director: how long each camera stays on program while racing */
 const AUTO_DIRECTOR_MS = 45000;
@@ -58,6 +59,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const { user } = useAuth();
   const { addNotification } = useNotification();
   const [activeSession, setActiveSession] = useState<LivestreamSession | null>(null);
+  const { credit, reload: reloadCredit } = useLivestreamCredit(activeSession?.club_id || clubId);
   const [sessions, setSessions] = useState<SessionWithVenue[]>([]);
   const [cameras, setCameras] = useState<LivestreamCamera[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,6 +198,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         (updatedSession) => {
           setActiveSession(updatedSession);
           updateStreamStatus(updatedSession.status);
+          setViewerCount(updatedSession.viewer_count || 0);
         }
       );
 
@@ -705,7 +708,8 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         streamToSend = cs;
       }
 
-      if (!whipAlreadyConnected) {
+      // Record races: nothing is streamed, each race is only recorded here
+      if (!whipAlreadyConnected && activeSession.broadcast_mode !== 'races_only') {
         if (!activeSession.cloudflare_whip_url) {
           addNotification('error', 'No Cloudflare WHIP URL available', 5000);
           return;
@@ -1374,6 +1378,11 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
   const goLive = async () => {
     if (!activeSession || streamStatus !== 'testing') return;
+    const recordOnly = activeSession.broadcast_mode === 'races_only';
+    if (!recordOnly && needsCredit(credit, activeSession.is_public === false)) {
+      addNotification('error', `Not enough livestream credit to go live (${money(credit!.balance_cents)}). Add credit on the broadcasts board, or use Record races.`, 8000);
+      return;
+    }
     try {
       setStreamStatus('connecting');
       const { data: { session } } = await supabase.auth.getSession();
@@ -1404,7 +1413,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         if (updateError) throw updateError;
         setActiveSession(updatedSession);
         setStreamStatus('live');
-        addNotification('success', 'Stream is live - waiting for RTMP signal from your encoder...', 6000);
+        addNotification('success', recordOnly ? 'Recording races - waiting for the signal from your encoder...' : 'Stream is live - waiting for RTMP signal from your encoder...', 6000);
 
         if (autoSegmentEnabled && updatedSession.event_id) {
           setTimeout(() => startFirstSegment(), 1000);
@@ -1443,7 +1452,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       } else {
         console.log('[GoLive] Using raw camera stream (compositor not ready)');
       }
-      if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
+      if (recordOnly) {
+        startLocalRecording(streamToSend);
+      } else if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_live_input_id) {
         try {
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-cloudflare-stream`;
           await fetch(apiUrl, {
@@ -1457,7 +1468,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
           });
         } catch (e) { console.warn('Could not verify recording mode:', e); }
       }
-      if (activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
+      if (!recordOnly && activeSession.streaming_mode === 'cloudflare_relay' && activeSession.cloudflare_whip_url) {
         addNotification('info', 'Connecting to streaming server...', 3000);
         const whipSuccess = await startWhipStreaming(activeSession.cloudflare_whip_url, streamToSend);
         if (!whipSuccess) { addNotification('error', 'Failed to connect to streaming server.', 8000); setStreamStatus('testing'); return; }
@@ -1468,13 +1479,21 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         .from('livestream_sessions').update({ status: 'live', actual_start_time: actualStartTime }).eq('id', activeSession.id).select().single();
       if (updateError) throw updateError;
       setActiveSession(updatedSession); setStreamStatus('live');
-      addNotification('success', 'Stream is now live!', 5000);
+      addNotification('success', recordOnly ? 'Recording races. Each race is published once it\'s scored.' : 'Stream is now live!', 5000);
       setShowTitleCard(true);
       setTimeout(() => { setShowTitleCard(false); setTitleCardInstant(false); }, 10000);
       if (autoSegmentEnabled && updatedSession.event_id) {
         setTimeout(() => startFirstSegment(), 1000);
       }
-    } catch (error) { console.error('Error going live:', error); setShowTitleCard(false); setTitleCardInstant(false); setStreamStatus('testing'); await stopWhipStreaming(); alert('Failed to go live.'); }
+    } catch (error) {
+      console.error('Error going live:', error);
+      setShowTitleCard(false); setTitleCardInstant(false); setStreamStatus('testing');
+      if (mediaRecorderRef.current?.state === 'recording') { mediaRecorderRef.current.stop(); mediaRecorderRef.current = null; }
+      await stopWhipStreaming();
+      const creditMsg = creditErrorMessage(error);
+      if (creditMsg) { addNotification('error', creditMsg, 9000); reloadCredit(); }
+      else alert(recordOnly ? 'Failed to start recording.' : 'Failed to go live.');
+    }
   };
 
   const pauseResumeInProgressRef = useRef(false);
@@ -1556,6 +1575,8 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   // Test mode: the broadcast runs for real but stays off AlfieTV and event pages, members
   // aren't notified, and race videos go to YouTube unlisted. Watched from its own link.
   const isTestBroadcast = activeSession?.is_public === false;
+  // Record races: recorded here and published per race; not streamed, not in AlfieTV live, free
+  const isRecordOnly = activeSession?.broadcast_mode === 'races_only';
   const toggleTestBroadcast = async () => {
     if (!activeSession) return;
     const makeTest = activeSession.is_public !== false;
@@ -1566,14 +1587,14 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       addNotification(
         'success',
         makeTest
-          ? 'Test mode on: hidden from AlfieTV, and race videos go to YouTube as unlisted.'
-          : 'Test mode off: this broadcast shows in AlfieTV when it\'s live.',
+          ? 'Test mode on: race videos go to YouTube as unlisted' + (isRecordOnly ? '.' : ', and it\'s hidden from AlfieTV.')
+          : isRecordOnly ? 'Test mode off: race videos are published publicly.' : 'Test mode off: this broadcast shows in AlfieTV when it\'s live.',
         5000
       );
       if (makeTest) setShowTestLink(true);
     } catch (error) {
       console.error('Error changing test mode:', error);
-      addNotification('error', 'Could not change test mode. Please try again.');
+      addNotification('error', creditErrorMessage(error) || 'Could not change test mode. Please try again.');
     }
   };
 
@@ -1621,6 +1642,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
       if (mediaStream) { mediaStream.getTracks().forEach(track => track.stop()); setMediaStream(null); }
       await livestreamStorage.updateSession(activeSession.id, { status: 'ended', end_time: new Date().toISOString(), is_paused: false });
       setStreamStatus('offline');
+      reloadCredit();
 
       // Only create a session-level archive if no segments were used.
       // When auto-segmentation is active, each race segment gets its own archive
@@ -1940,6 +1962,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     return (
       <div>
         <LiveHome
+          clubId={clubId}
           sessions={sessions}
           autoCreateForEvent={autoCreateForEvent}
           activating={activatingStream}
@@ -2022,7 +2045,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     : phoneCount && hasLaptop ? (phoneCount === 1 ? 'Phone and laptop' : 'Phones and laptop')
     : phoneCount ? (phoneCount === 1 ? 'Phone camera' : `${phoneCount} phone cameras`)
     : hasLaptop ? 'Laptop camera' : '';
-  const subtitle = [venueName, sourceSummary, isTestBroadcast ? 'Test broadcast' : null].filter(Boolean).join(' · ');
+  const subtitle = [venueName, sourceSummary, isRecordOnly ? 'Record races (not live)' : null, isTestBroadcast ? 'Test broadcast' : null].filter(Boolean).join(' · ');
 
   const relay = activeSession.streaming_mode === 'cloudflare_relay';
   const health: { tone: string; text: string } | null = streamStatus !== 'live' || !relay ? null
@@ -2047,7 +2070,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     } else setActiveSession(null);
   };
   const endBroadcast = () => {
-    if (confirm('End the broadcast? It stops for everyone watching.')) stopStream();
+    if (confirm(isRecordOnly
+      ? 'Finish recording? The race being recorded is saved and published.'
+      : 'End the broadcast? It stops for everyone watching.')) stopStream();
   };
 
   return (
@@ -2065,7 +2090,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
 
         <div className="alv-cr-state">
           {streamStatus === 'live' ? (
-            <span className="alv-cr-onair"><span className="pulse" aria-hidden="true" />{isTestBroadcast ? 'LIVE · TEST' : 'LIVE'}<span className="alv-mono">{formatDuration(streamDuration)}</span></span>
+            <span className="alv-cr-onair"><span className="pulse" aria-hidden="true" />{isRecordOnly ? (isTestBroadcast ? 'REC · TEST' : 'REC') : isTestBroadcast ? 'LIVE · TEST' : 'LIVE'}<span className="alv-mono">{formatDuration(streamDuration)}</span></span>
           ) : streamStatus === 'testing' ? (
             <span className="alv-cr-onair is-preview">PREVIEW</span>
           ) : streamStatus === 'connecting' ? (
@@ -2074,7 +2099,10 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
             <span className="alv-cr-onair is-idle">{isEnded ? 'ENDED' : 'STANDBY'}</span>
           )}
           {health && <span className={`alv-cr-chip ${health.tone}`} title={isCompositing ? 'Overlays are on the stream' : undefined}><span className="dot" />{health.text}</span>}
-          {streamStatus === 'live' && <span className="alv-cr-chip"><Eye className="w-4 h-4" aria-hidden="true" />{viewerCount} watching</span>}
+          {streamStatus === 'live' && !isRecordOnly && <span className="alv-cr-chip"><Eye className="w-4 h-4" aria-hidden="true" />{viewerCount} watching</span>}
+          {streamStatus === 'live' && !isRecordOnly && credit?.settings.enforce && !credit.exempt && credit.balance_cents < credit.settings.low_balance_cents && (
+            <span className="alv-cr-chip is-warn" title="Charged when the broadcast ends. Add credit on the broadcasts board."><span className="dot" />Credit low · {money(credit.balance_cents)}</span>
+          )}
           {activeSession.event_id && scoring && (
             <span className="alv-cr-chip is-scoring">Scoring: {scoring.race}{scoring.label ? ` · ${scoring.label.toLowerCase()}` : ''}</span>
           )}
@@ -2129,14 +2157,14 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
               </button>
               <button type="button" onClick={goLive} className="alv-btn is-small alv-btn-live">
                 <Zap className="w-4 h-4" aria-hidden="true" />
-                Go live
+                {isRecordOnly ? 'Start recording' : 'Go live'}
               </button>
             </>
           )}
           {streamStatus === 'live' && (
             <button type="button" onClick={endBroadcast} className="alv-btn is-small alv-btn-end">
               <Square className="w-3.5 h-3.5" aria-hidden="true" />
-              End broadcast
+              {isRecordOnly ? 'Finish recording' : 'End broadcast'}
             </button>
           )}
           {streamStatus === 'offline' && (
@@ -2358,7 +2386,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
             >
               Results<small>{scoring?.hasResults ? '20 seconds' : 'After a race'}</small>
             </button>
-            <button
+            {!isRecordOnly && <button
               type="button"
               className={`alv-scene is-hold ${isPaused ? 'is-on' : ''}`}
               aria-pressed={isPaused}
@@ -2366,7 +2394,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
               disabled={streamStatus !== 'live'}
             >
               Hold<small>{isPaused ? 'On · tap to resume' : 'Hold screen'}</small>
-            </button>
+            </button>}
           </div>
           )}
 

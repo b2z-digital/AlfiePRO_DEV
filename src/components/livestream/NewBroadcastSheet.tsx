@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, Smartphone, Server, Cloud } from 'lucide-react';
+import { X, Smartphone, Server, Cloud, Clapperboard, Radio } from 'lucide-react';
+import { money, needsCredit, useLivestreamCredit } from '../../utils/livestreamCredit';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import { createBroadcast, loadStreamableEvents, type FilmingMode, type StreamableEvent } from '../../utils/liveBroadcasts';
@@ -29,7 +30,9 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
   const [timing, setTiming] = useState<'now' | 'schedule'>('now');
   const [scheduled, setScheduled] = useState('');
   const [filming, setFilming] = useState<FilmingMode>('device');
-  const [racesOnly, setRacesOnly] = useState(false);
+  // Record races (free: race videos to YouTube/AlfieTV replays) or Livestream (paid: live in AlfieTV)
+  const [mode, setMode] = useState<'record' | 'live'>('record');
+  const { credit } = useLivestreamCredit(clubId);
   const [audience, setAudience] = useState<'everyone' | 'test'>('everyone');
   const [title, setTitle] = useState('');
   const [titleTouched, setTitleTouched] = useState(false);
@@ -49,12 +52,18 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
 
   const pick = (ev: StreamableEvent | null) => {
     setEventId(ev?.id ?? null);
-    if (!titleTouched) setTitle(ev ? `${ev.name} · Live` : '');
+    if (!titleTouched) setTitle(ev ? `${ev.name}${mode === 'live' ? ' · Live' : ''}` : '');
     if (ev) {
       const d = new Date(`${ev.date}T09:30:00`);
       if (d.getTime() > Date.now() + 30 * 60000) { setTiming('schedule'); setScheduled(toLocalInput(d)); }
     }
   };
+
+  const chooseMode = (m: 'record' | 'live') => {
+    setMode(m);
+    if (!titleTouched && selected) setTitle(`${selected.name}${m === 'live' ? ' · Live' : ''}`);
+  };
+  const short = mode === 'live' && needsCredit(credit, audience === 'test');
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const label = (iso: string) => {
@@ -66,7 +75,8 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
     return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
-  const canCreate = !!title.trim() && !saving && (timing === 'now' || !!scheduled);
+  // Race videos are cut from the scoring, so Record races needs an event
+  const canCreate = !!title.trim() && !saving && (timing === 'now' || !!scheduled) && (mode === 'live' || !!eventId);
 
   const create = async () => {
     if (!user || !canCreate) return;
@@ -80,9 +90,11 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
         scheduledTime: timing === 'schedule' ? new Date(scheduled).toISOString() : null,
         filming,
         isPublic: audience === 'everyone',
-        racesOnly: filming === 'cloud' && racesOnly,
+        racesOnly: mode === 'record',
       });
-      addNotification('success', 'Broadcast created. Nothing is public until you press Go live.', 4000);
+      addNotification('success', mode === 'record'
+        ? 'Created. Press Start recording when racing begins.'
+        : 'Broadcast created. Nothing is public until you press Go live.', 4000);
       onCreated(session);
     } catch (e) {
       addNotification('error', e instanceof Error ? e.message : 'Could not create the broadcast');
@@ -106,7 +118,7 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '20px 22px 8px' }}>
           <div>
             <h2 id="alv-new-title" className="alv-disp" style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>New broadcast</h2>
-            <p className="alv-mute" style={{ margin: '4px 0 0', fontSize: 14 }}>One screen. Nothing goes public until you press Go live.</p>
+            <p className="alv-mute" style={{ margin: '4px 0 0', fontSize: 14 }}>One screen. Nothing goes public until you start.</p>
           </div>
           <button type="button" className="alv-ib" onClick={onClose} aria-label="Close" disabled={saving}><X size={18} /></button>
         </div>
@@ -151,6 +163,33 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
             )}
           </section>
 
+          <section aria-labelledby="alv-mode">
+            <h3 id="alv-mode" className="alv-eyebrow" style={{ margin: '0 0 10px' }}>Record or livestream?</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 8 }} role="radiogroup" aria-labelledby="alv-mode">
+              <button type="button" role="radio" aria-checked={mode === 'record'} onClick={() => chooseMode('record')} style={option(mode === 'record')}>
+                <Clapperboard size={18} aria-hidden="true" />
+                <span style={{ display: 'block', fontWeight: 700, marginTop: 6 }}>Record races <span className="alv-chip" style={{ height: 20, marginLeft: 4 }}>Free</span></span>
+                <span className="alv-mute" style={{ fontSize: 12.5, lineHeight: 1.45 }}>Each race is recorded and published to YouTube and AlfieTV replays once it's scored. Not shown live, and members aren't notified.</span>
+              </button>
+              <button type="button" role="radio" aria-checked={mode === 'live'} onClick={() => chooseMode('live')} style={option(mode === 'live')}>
+                <Radio size={18} aria-hidden="true" />
+                <span style={{ display: 'block', fontWeight: 700, marginTop: 6 }}>Livestream</span>
+                <span className="alv-mute" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+                  Live in AlfieTV and the event's Live tab, members are notified, and every race is still published as a video.
+                  {credit && credit.settings.enforce && !credit.exempt ? ` Uses livestream credit (balance ${money(credit.balance_cents)}).` : ''}
+                </span>
+              </button>
+            </div>
+            {mode === 'record' && events !== null && !eventId && (
+              <p className="alv-mute" style={{ margin: '10px 0 0', fontSize: 13.5 }}>Pick the event above: race videos are cut from its scoring.</p>
+            )}
+            {short && (
+              <p role="alert" style={{ margin: '10px 0 0', fontSize: 13.5, color: '#FFB4BE' }}>
+                Not enough livestream credit to go live ({money(credit!.balance_cents)}; {money(credit!.settings.min_balance_cents)} needed). Add credit on the broadcasts board, or choose Record races.
+              </p>
+            )}
+          </section>
+
           <section aria-labelledby="alv-how">
             <h3 id="alv-how" className="alv-eyebrow" style={{ margin: '0 0 10px' }}>How you're filming</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8 }} role="radiogroup" aria-labelledby="alv-how">
@@ -172,12 +211,6 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
                 </button>
               )}
             </div>
-            {filming === 'cloud' && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 14 }}>
-                <input type="checkbox" checked={racesOnly} onChange={(e) => setRacesOnly(e.target.checked)} />
-                Race videos only (no live stream, so no viewing costs)
-              </label>
-            )}
           </section>
 
           <section aria-labelledby="alv-who" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
@@ -187,21 +220,25 @@ export function NewBroadcastSheet({ clubId, onClose, onCreated }: NewBroadcastSh
               <button type="button" aria-pressed={audience === 'test'} onClick={() => setAudience('test')}>Test (link only)</button>
             </div>
             <span className="alv-mute" style={{ fontSize: 13, flex: 1, minWidth: 220 }}>
-              {audience === 'everyone'
-                ? 'Live in AlfieTV and the event\'s Live tab. Each race goes to YouTube (AUS RC Yachting) once it\'s scored.'
-                : 'Hidden from AlfieTV, members aren\'t notified, and race videos go to YouTube unlisted.'}
+              {audience === 'test'
+                ? 'Hidden from AlfieTV, members aren\'t notified, and race videos go to YouTube unlisted.'
+                : mode === 'record'
+                  ? 'Each race goes to YouTube (AUS RC Yachting) and AlfieTV replays once it\'s scored.'
+                  : 'Live in AlfieTV and the event\'s Live tab. Each race goes to YouTube (AUS RC Yachting) once it\'s scored.'}
             </span>
           </section>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, fontWeight: 600 }}>
             Title
-            <input value={title} onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }} placeholder={selected ? `${selected.name} · Live` : 'e.g. Club night · Live'} className="alv-input" maxLength={140} />
+            <input value={title} onChange={(e) => { setTitle(e.target.value); setTitleTouched(true); }} placeholder={selected ? `${selected.name}${mode === 'live' ? ' · Live' : ''}` : mode === 'live' ? 'e.g. Club night · Live' : 'e.g. Club night'} className="alv-input" maxLength={140} />
           </label>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end', padding: '14px 22px', borderTop: '1px solid var(--alv-line)', flexWrap: 'wrap' }}>
           <span className="alv-mute" style={{ fontSize: 13, marginRight: 'auto' }}>
-            {filming === 'cloud' ? 'Creates the broadcast and a volunteer camera link' : 'Creates the broadcast and its Cloudflare input'}
+            {filming === 'cloud' ? 'Creates the broadcast and a volunteer camera link'
+              : mode === 'record' && filming === 'device' ? 'Records on this device; nothing is streamed'
+              : 'Creates the broadcast and its Cloudflare input'}
           </span>
           <button type="button" className="alv-btn" onClick={onClose} disabled={saving}>Cancel</button>
           <button type="button" className="alv-btn alv-btn-p" onClick={create} disabled={!canCreate}>{saving ? 'Creating…' : 'Create broadcast'}</button>

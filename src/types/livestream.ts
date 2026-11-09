@@ -154,6 +154,9 @@ export interface LivestreamSession {
   program_recording_id?: string | null;
   /** Cloud: 'live' streams to AlfieTV; 'races_only' only records each race for YouTube */
   broadcast_mode?: 'live' | 'races_only';
+  /** Livestream credit: when the broadcast was charged, and how much (cents) */
+  billed_at?: string | null;
+  billed_cents?: number | null;
 
   audio_source: AudioSource;
   enable_commentary: boolean;

@@ -1,6 +1,19 @@
 import React from 'react';
 import { Maximize2, Radio, Volume2, VolumeX } from 'lucide-react';
 import type { LivestreamSession } from '../../types/livestream';
+import { supabase } from '../../utils/supabase';
+
+/** One id per browser, so a viewer counts once a minute however many players they open. */
+function viewerKey(): string {
+  try {
+    let k = localStorage.getItem('alfie_viewer_key');
+    if (!k) { k = crypto.randomUUID(); localStorage.setItem('alfie_viewer_key', k); }
+    return k;
+  } catch {
+    const w = window as unknown as { __alfieViewerKey?: string };
+    return (w.__alfieViewerKey ||= `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  }
+}
 
 /**
  * A live broadcast playing inside the page (AlfieTV watch page, event Live tab).
@@ -33,6 +46,20 @@ export function LiveVideo({ session, muted: forceMuted = false, compact = false 
   const iframeEmbedUrl = session.cloudflare_customer_code && session.cloudflare_live_input_id
     ? `https://customer-${session.cloudflare_customer_code}.cloudflarestream.com/${session.cloudflare_live_input_id}/iframe?autoplay=true&muted=false&preload=auto&letterboxColor=000000`
     : null;
+  // Viewer minutes (live viewer count, and what a club's livestream costs): one ping a minute
+  // while this player is on screen in a visible tab
+  React.useEffect(() => {
+    if (session.status !== 'live') return;
+    const key = viewerKey();
+    const ping = () => {
+      if (document.visibilityState !== 'visible') return;
+      supabase.rpc('livestream_viewer_ping', { p_session: session.id, p_viewer: key }).then(() => {}, () => {});
+    };
+    ping();
+    const timer = setInterval(ping, 60000);
+    return () => clearInterval(timer);
+  }, [session.id, session.status]);
+
   const whepUrlRef = React.useRef(whepUrl);
   const iframeEmbedUrlRef = React.useRef(iframeEmbedUrl);
   whepUrlRef.current = whepUrl;
