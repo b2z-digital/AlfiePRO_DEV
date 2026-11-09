@@ -164,6 +164,9 @@ html.alfie-light .a-divide > * + * { border-top-color: rgba(15, 23, 42, 0.07); }
 html.alfie-light .a-row-hover:hover { background: rgba(15, 23, 42, 0.025); }
 html.alfie-light .a-tile { background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; color: #0B1220; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); }
 html.alfie-light .a-tile-rim { border-color: transparent; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box; }
+/* Plain tile (no Alfie outline), for busy screens where only the key items get the outline */
+.a-tile.a-tile-plain { border-color: rgba(255, 255, 255, 0.11); background: rgba(255, 255, 255, 0.03); }
+html.alfie-light .a-tile.a-tile-plain { border-color: rgba(15, 23, 42, 0.10); background: #fff; }
 html.alfie-light .a-seg { background: rgba(15, 23, 42, 0.06); box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08); }
 html.alfie-light .a-seg-i { color: #475569; }
 html.alfie-light .a-seg-i:hover { color: #0B1220; }
@@ -470,9 +473,9 @@ html.alfie-light .a-ev-hero > .flex.h-32 > div:nth-child(2) h3 { color: #fff !im
 /* Shared widget frame (ThemedWidgetWrapper) */
 html.alfie-theme .a-widget { border-radius: 22px !important; }
 html.alfie-theme .a-widget-head h3 { font-family: 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -0.01em; }
-html.alfie-theme .a-widget-head > .p-2.rounded-lg { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 30% !important; background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.11) !important; }
+html.alfie-theme .a-widget-head > .p-2.rounded-lg { width: 36px; height: 36px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 30% !important; border: 1px solid transparent !important; background: linear-gradient(#141A28, #141A28) padding-box, var(--alfie-spectrum) border-box !important; }
 html.alfie-theme .a-widget-head > .p-2.rounded-lg svg { color: #F1F4FA !important; }
-html.alfie-light .a-widget-head > .p-2.rounded-lg { background: #fff !important; border-color: rgba(15, 23, 42, 0.10) !important; }
+html.alfie-light .a-widget-head > .p-2.rounded-lg { border-color: transparent !important; background: linear-gradient(#fff, #fff) padding-box, var(--alfie-spectrum) border-box !important; }
 html.alfie-light .a-widget-head > .p-2.rounded-lg svg { color: #0B1220 !important; }
 
 /* ═══════════════════ Class / format / level labels (board lb-cls, lb-fmt) ═══════════════════ */

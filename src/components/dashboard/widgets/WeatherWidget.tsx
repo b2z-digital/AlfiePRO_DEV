@@ -70,8 +70,8 @@ export const WeatherWidget: React.FC<WidgetProps> = ({ widgetId, isEditMode, onR
       )}
 
       <div className="flex items-center justify-between p-4 pb-2">
-        <div className="flex items-center gap-2">
-          <Wind className={darkMode ? "text-cyan-400" : "text-cyan-500"} size={20} />
+        <div className="flex items-center gap-3">
+          <span className="a-tile" style={{ width: 36, height: 36 }}><Wind size={18} /></span>
           <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-slate-700'}`}>Weather Forecast</h2>
         </div>
         {!isEditMode && (

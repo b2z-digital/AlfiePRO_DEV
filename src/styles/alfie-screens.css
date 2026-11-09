@@ -593,16 +593,16 @@ html.alfie-light .a-duty-empty { border-color: rgba(15,23,42,0.18); color: rgba(
 .a-dc b { display: block; font: 600 10.5px 'Instrument Sans', sans-serif; letter-spacing: 0.1em; color: rgba(235,240,255,0.6); }
 .a-dc span { display: block; font: 600 22px 'Bricolage Grotesque', sans-serif; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; }
 .a-dc i { display: block; font-style: normal; font-size: 11px; color: rgba(235,240,255,0.45); }
-.a-dc-past { background: linear-gradient(#0E1424,#0E1424) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
+.a-dc-past { background: rgba(255,255,255,0.025); border-color: rgba(255,255,255,0.07); }
 .a-dc-past span { color: rgba(235,240,255,0.5); }
-.a-dc-meet { background: linear-gradient(#0E1424,#0E1424) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
-.a-dc-meet b { color: #7FE0D9; }
+.a-dc-meet { background: rgba(64,200,192,0.08); border-color: rgba(64,200,192,0.35); }
+.a-dc-meet b, .a-dc-meet span { color: #7FE0D9; }
 html.alfie-light .a-dc { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; }
 html.alfie-light .a-dc b { color: rgba(15,23,42,0.55); } html.alfie-light .a-dc span { color: #0B1220; } html.alfie-light .a-dc i { color: rgba(15,23,42,0.45); }
-html.alfie-light .a-dc-past { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
+html.alfie-light .a-dc-past { background: rgba(15,23,42,0.03); border-color: rgba(15,23,42,0.08); }
 html.alfie-light .a-dc-past span { color: rgba(15,23,42,0.45); }
-html.alfie-light .a-dc-meet { background: linear-gradient(#fff,#fff) padding-box, var(--alfie-spectrum) border-box; border-color: transparent; }
-html.alfie-light .a-dc-meet b { color: #0F766E; }
+html.alfie-light .a-dc-meet { background: rgba(64,200,192,0.1); border-color: rgba(20,150,140,0.35); }
+html.alfie-light .a-dc-meet b, html.alfie-light .a-dc-meet span { color: #0F766E; }
 .a-cal-ev { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .a-cal-ev + .a-cal-ev { border-top: 1px solid rgba(255,255,255,0.055); }
 .a-cal-ev:hover { background: rgba(255,255,255,0.025); }

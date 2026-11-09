@@ -316,9 +316,7 @@ export const RemittanceStatusWidget: React.FC<RemittanceStatusWidgetProps> = ({
       )}
 
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-lg bg-emerald-600/20">
-          <DollarSign className="text-emerald-400" size={20} />
-        </div>
+        <span className="a-tile" style={{ width: 36, height: 36 }}><DollarSign size={18} /></span>
         <h3 className="text-lg font-semibold text-white">Association Remittances</h3>
       </div>
 
