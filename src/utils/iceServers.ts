@@ -2,9 +2,10 @@
  * Connection servers (STUN/TURN) for phone cameras and the control room.
  *
  * Phones on mobile data usually can't reach the control laptop directly, so their video goes
- * through a relay (TURN). The relay is Cloudflare's TURN service: the turn-credentials function
- * hands out short-lived logins to signed-in users and to phones holding a camera link key.
- * Until that function is set up (or if it can't be reached) the old public servers are used.
+ * through a relay (TURN). Club racing uses the free public relay. State and national
+ * championship broadcasts use Cloudflare's paid TURN service: the turn-credentials function
+ * decides from the broadcast's event and hands out short-lived logins. If the function can't
+ * be reached, the free public servers are used.
  */
 import { supabase } from './supabase';
 
@@ -16,17 +17,21 @@ const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
-let cached: { servers: RTCIceServer[]; until: number; relay: boolean } | null = null;
-let inflight: Promise<RTCIceServer[]> | null = null;
+type Cached = { servers: RTCIceServer[]; until: number; relay: boolean };
+const cache = new Map<string, Cached>();
+const inflight = new Map<string, Promise<RTCIceServer[]>>();
 
-/** True once a Cloudflare relay login has been obtained (for status display) */
-export const usingCloudflareRelay = () => !!cached?.relay;
+/** True once a Cloudflare relay login has been obtained for this broadcast (for status display) */
+export const usingCloudflareRelay = (sessionId?: string | null) => !!cache.get(sessionId || '')?.relay;
 
 export async function getIceServers(opts: { sessionId?: string | null; key?: string | null } = {}): Promise<RTCIceServer[]> {
-  if (cached && cached.until > Date.now()) return cached.servers;
-  if (inflight) return inflight;
+  const cacheKey = opts.sessionId || '';
+  const hit = cache.get(cacheKey);
+  if (hit && hit.until > Date.now()) return hit.servers;
+  const pending = inflight.get(cacheKey);
+  if (pending) return pending;
 
-  inflight = (async () => {
+  const request = (async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -44,20 +49,28 @@ export async function getIceServers(opts: { sessionId?: string | null; key?: str
       }).finally(() => clearTimeout(timer));
       if (!res.ok) throw new Error(`turn-credentials ${res.status}`);
       const body = await res.json();
+      // Club racing: the function says to use the free public relay
+      if (body?.relay === 'public') {
+        console.log('[ICE] Standard relay (club broadcast)');
+        cache.set(cacheKey, { servers: FALLBACK_ICE_SERVERS, until: Date.now() + 30 * 60 * 1000, relay: false });
+        return FALLBACK_ICE_SERVERS;
+      }
       const servers: RTCIceServer[] = Array.isArray(body?.iceServers) ? body.iceServers : [];
       if (!servers.some(s => String(Array.isArray(s.urls) ? s.urls.join(',') : s.urls).includes('turn'))) {
         throw new Error('No relay in response');
       }
+      console.log('[ICE] Cloudflare relay (championship broadcast)');
       // Logins last 6 hours; refresh well before that
-      cached = { servers, until: Date.now() + 4 * 60 * 60 * 1000, relay: true };
+      cache.set(cacheKey, { servers, until: Date.now() + 4 * 60 * 60 * 1000, relay: true });
       return servers;
     } catch (err) {
       console.warn('[ICE] Cloudflare relay unavailable, using public servers:', (err as Error)?.message);
-      cached = { servers: FALLBACK_ICE_SERVERS, until: Date.now() + 5 * 60 * 1000, relay: false };
+      cache.set(cacheKey, { servers: FALLBACK_ICE_SERVERS, until: Date.now() + 5 * 60 * 1000, relay: false });
       return FALLBACK_ICE_SERVERS;
     } finally {
-      inflight = null;
+      inflight.delete(cacheKey);
     }
   })();
-  return inflight;
+  inflight.set(cacheKey, request);
+  return request;
 }

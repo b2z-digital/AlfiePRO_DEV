@@ -47,7 +47,7 @@ export const CameraFeedGrid = forwardRef<CameraFeedGridRef, CameraFeedGridProps>
     setConnectionStatus(prev => ({ ...prev, [camera.id]: 'connecting' }));
 
     try {
-      const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers({ sessionId }) });
       peerConnectionsRef.current[camera.id] = pc;
 
       pc.ontrack = (event) => {

@@ -1,7 +1,10 @@
 // Short-lived relay (TURN) logins for livestream cameras, from Cloudflare's TURN service.
 //
 // Phones on mobile data usually can't connect straight to the control laptop, so their video is
-// relayed. Cloudflare TURN logins expire; this function makes a fresh one per request.
+// relayed. Cloudflare TURN is paid, so it's only used for championship broadcasts: a broadcast
+// linked to a state or national event (public_events.event_level). Everything else is told to use
+// the free public relay ({ relay: "public" }). The decision is made here, so a club can't switch
+// the paid relay on from the app.
 //
 // Who can ask:
 //   - a signed-in AlfiePRO user (control room, scoring screen, signed-in phones), or
@@ -30,7 +33,6 @@ Deno.serve(async (req) => {
 
   const keyId = Deno.env.get("CF_TURN_KEY_ID");
   const keyToken = Deno.env.get("CF_TURN_KEY_API_TOKEN");
-  if (!keyId || !keyToken) return json({ error: "Relay not configured", configured: false }, 503);
 
   const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "");
   const { sessionId, key } = await req.json().catch(() => ({} as Record<string, string>));
@@ -53,6 +55,22 @@ Deno.serve(async (req) => {
   }
   if (!allowed) return json({ error: "Not allowed" }, 401);
 
+  // Championship broadcasts only
+  let championship = false;
+  if (typeof sessionId === "string" && sessionId) {
+    const { data: session } = await admin.from("livestream_sessions").select("event_id").eq("id", sessionId).maybeSingle();
+    const eventId = String(session?.event_id || "").replace(/-round-\d+$/, "").replace(/-day-\d+$/, "");
+    if (/^[0-9a-f-]{36}$/i.test(eventId)) {
+      const { data: event } = await admin.from("public_events").select("event_level").eq("id", eventId).maybeSingle();
+      championship = event?.event_level === "state" || event?.event_level === "national";
+    }
+  }
+  if (!championship) return json({ relay: "public" });
+  if (!keyId || !keyToken) {
+    console.warn("[turn-credentials] CF_TURN_KEY_ID / CF_TURN_KEY_API_TOKEN not set; using the public relay");
+    return json({ relay: "public" });
+  }
+
   const base = `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(keyId)}/credentials`;
   const headers = { Authorization: `Bearer ${keyToken}`, "Content-Type": "application/json" };
   const body = JSON.stringify({ ttl: TTL_SECONDS });
@@ -71,5 +89,5 @@ Deno.serve(async (req) => {
     .map((s: any) => ({ ...s, urls: (Array.isArray(s.urls) ? s.urls : [s.urls]).filter((u: string) => !/:53(\?|$)/.test(u)) }))
     .filter((s: any) => s.urls.length > 0);
 
-  return json({ iceServers, ttl: TTL_SECONDS });
+  return json({ relay: "cloudflare", iceServers, ttl: TTL_SECONDS });
 });

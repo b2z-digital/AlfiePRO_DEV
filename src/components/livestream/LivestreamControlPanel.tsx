@@ -260,7 +260,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
         return;
       }
 
-      const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers({ sessionId: camera.livestream_session_id }) });
       peerConnectionsRef.current[camera.id] = pc;
 
       pc.ontrack = (event) => {
