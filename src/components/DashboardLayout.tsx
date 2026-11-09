@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PanelLeftOpen, PanelLeftClose, ShieldCheck } from 'lucide-react';
-import { Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
+import { Store, Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -118,6 +118,8 @@ import { NewsScrapingTab } from './super-admin/NewsScrapingTab';
 import { ExternalResultsScrapingTab } from './super-admin/ExternalResultsScrapingTab';
 import { ClassifiedsScrapingTab } from './super-admin/ClassifiedsScrapingTab';
 import { EventsScrapingTab } from './super-admin/EventsScrapingTab';
+import { ShopsManagementTab } from './super-admin/ShopsManagementTab';
+import ShopsPage from '../pages/ShopsPage';
 import { UwbTrackingTab } from './super-admin/UwbTrackingTab';
 import { SailorResultsPortal } from './SailorResultsPortal';
 import { usePlatformTracking } from '../hooks/usePlatformTracking';
@@ -1085,6 +1087,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/venues',
           featureKey: 'venues'
         },
+        {
+          id: 'shops',
+          label: 'Shops',
+          icon: Store,
+          description: 'Parts, sails and gear suppliers',
+          path: '/shops'
+        },
         ...(isSuperAdmin ? [{
           id: 'race-simulator',
           label: 'Race Simulator',
@@ -1183,6 +1192,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           { id: 'results-scraping', label: 'Results Scraping', icon: Trophy, description: 'External race results feeds', path: '/results-scraping' },
           { id: 'classifieds-scraping', label: 'Classifieds Scraping', icon: Tag, description: 'External classifieds feeds', path: '/classifieds-scraping' },
           { id: 'events-scraping', label: 'Events Scraping', icon: CalendarDays, description: 'External events feeds', path: '/events-scraping' },
+          { id: 'shops-management', label: 'Shops', icon: Store, description: 'Suppliers members can shop with', path: '/shops-management' },
         ]}
       ]
     : isRaceOfficer && !currentClub
@@ -2018,6 +2028,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                   <ExternalResultsScrapingTab darkMode={true} />
                 </div></div>
               } />
+              <Route path="/shops-management" element={
+                isSuperAdmin ? (
+                  <div className="h-full overflow-y-auto"><div className="p-4 sm:p-6 lg:pt-9 lg:pr-12 lg:pb-24 lg:pl-9">
+                    <ShopsManagementTab darkMode={true} />
+                  </div></div>
+                ) : <ShopsPage />
+              } />
               <Route path="/classifieds-scraping" element={
                 <div className="h-full overflow-y-auto"><div className="p-8 sm:p-10 lg:p-14">
                   <ClassifiedsScrapingTab darkMode={true} />
@@ -2121,6 +2138,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               } />
               <Route path="/weather" element={<WeatherPage />} />
               <Route path="/venues" element={<VenuesPage darkMode={darkMode} />} />
+              <Route path="/shops" element={<ShopsPage />} />
               <Route path="/ro-contacts" element={<RaceOfficerContactsPage darkMode={darkMode} />} />
               <Route path="/external-organizations" element={<ExternalOrganizationsPage darkMode={darkMode} />} />
               <Route path="/my-garage" element={<MyGaragePage darkMode={darkMode} />} />

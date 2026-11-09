@@ -20,6 +20,7 @@ import './styles/alfie-switcher.css';
 import './styles/alfie-screens.css';
 import './styles/alfie-news.css';
 import './styles/alfie-media.css';
+import './styles/alfie-shops.css';
 import './styles/alfie-assoc.css';
 import './styles/alfie-tv.css';
 import './styles/alfie-live.css';

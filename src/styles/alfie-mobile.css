@@ -671,3 +671,46 @@ button.m-sail.m-sail-off, button.m-sail.m-sail-ocs { color: var(--m-red-ink); }
 .m-signal { height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--m-fill-b); background: var(--m-fill); color: var(--m-ink); display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 14.5px; font-weight: 600; }
 .m-signal:active { transform: scale(.96); }
 .m-venue-ph { width: 44px; height: 44px; border-radius: 12px; background: #10233F center / cover no-repeat; }
+
+/* ── Shops ─────────────────────────────────────────────────────────── */
+.m-app .m-shp-spot { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 4px; scrollbar-width: none; }
+.m-app .m-shp-spot::-webkit-scrollbar { display: none; }
+.m-app .m-shp-sl { position: relative; flex: 0 0 86%; scroll-snap-align: center; min-height: 196px; padding: 18px; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; color: #fff; text-align: left; border: 0; background-size: cover; background-position: center; isolation: isolate; }
+.m-app .m-shp-sl::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(6, 10, 20, 0) 20%, rgba(6, 10, 20, .78) 100%); }
+.m-app .m-shp-sl .m-shp-lg { position: absolute; top: 16px; right: 16px; width: 72px; height: 72px; border-radius: 22px; transform: rotate(-5deg); box-shadow: 0 16px 34px rgba(0, 0, 0, .4); }
+.m-app .m-shp-kick { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: rgba(255, 255, 255, .16); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.m-app .m-shp-sl h3 { margin: 4px 0 0; font: 700 25px/1.05 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -.025em; }
+.m-app .m-shp-sl p { margin: 0; font-size: 13.5px; line-height: 1.4; color: rgba(255, 255, 255, .8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.m-app .m-shp-lg { display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; background: #fff; }
+.m-app .m-shp-lg img { width: 100%; height: 100%; object-fit: contain; padding: 7px; }
+.m-app .m-shp-lg b { font: 700 20px 'Bricolage Grotesque', sans-serif; letter-spacing: -.03em; }
+.m-app .m-shp-ic { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 7px; margin-left: -6px; }
+.m-app .m-shp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.m-app .m-shp-st { display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: var(--m-card); border: 1px solid var(--m-card-b); text-align: left; padding: 0; color: inherit; }
+.m-app .m-shp-st:active { transform: scale(.98); }
+.m-app .m-shp-bn { height: 70px; background-size: cover; background-position: center; }
+.m-app .m-shp-bd { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 13px; flex: 1; }
+.m-app .m-shp-bd .m-shp-lg { width: 50px; height: 50px; border-radius: 15px; margin-top: -25px; margin-bottom: 4px; box-shadow: 0 8px 18px rgba(0, 0, 0, .35); }
+.m-app .m-shp-bd .m-shp-lg b { font-size: 17px; }
+.m-app .m-shp-nm { font-weight: 650; font-size: 14.5px; line-height: 1.25; }
+.m-app .m-shp-tg { font-size: 12.5px; line-height: 1.35; color: var(--m-mut); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.m-app .m-shp-cls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; padding-top: 6px; }
+.m-app .m-shp-cl { height: 19px; padding: 0 6px; border-radius: 6px; background: var(--m-fill); font-size: 9.5px; font-weight: 750; letter-spacing: .07em; line-height: 19px; color: var(--m-mut); text-transform: uppercase; }
+.m-app .m-shp-sh { display: flex; align-items: center; gap: 10px; margin: 6px 0 2px; }
+.m-app .m-shp-sh h2 { margin: 0; font: 680 19px/1.2 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -.015em; }
+.m-app .m-shp-sheet { padding: 0 0 calc(var(--m-safe-bottom) + 16px); }
+.m-app .m-shp-sheet .m-grab { position: absolute; top: 8px; left: 0; right: 0; z-index: 2; background: rgba(255, 255, 255, .6); }
+.m-app .m-shp-hero { position: relative; height: 150px; background-size: cover; background-position: center; }
+.m-app .m-shp-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0, 0, 0, 0) 35%, var(--m-sheet) 100%); }
+.m-app .m-shp-in { position: relative; z-index: 1; margin-top: -46px; padding: 0 18px; display: flex; flex-direction: column; gap: 14px; }
+.m-app .m-shp-in .m-shp-lg { width: 84px; height: 84px; border-radius: 25px; box-shadow: 0 0 0 4px var(--m-sheet), 0 14px 30px rgba(0, 0, 0, .35); }
+.m-app .m-shp-in .m-shp-lg b { font-size: 28px; }
+.m-app .m-shp-in h2 { margin: 0; font: 700 26px/1.1 'Bricolage Grotesque', 'Instrument Sans', sans-serif; letter-spacing: -.025em; }
+.m-app .m-shp-fact { display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-radius: 14px; background: var(--m-fill); color: inherit; text-decoration: none; min-width: 0; }
+.m-app .m-shp-fact small { display: block; font-size: 11px; color: var(--m-dim); }
+.m-app .m-shp-fact span { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-app .m-shp-go { display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; border-radius: 16px; border: 0; background: var(--m-spectrum); color: #fff; font-size: 15.5px; font-weight: 700; text-decoration: none; box-shadow: 0 12px 28px rgba(138, 77, 255, .35); }
+.m-app.m-light .m-shp-bd .m-shp-lg { box-shadow: 0 0 0 1px rgba(15, 23, 42, .06), 0 8px 18px rgba(15, 23, 42, .14); }
+.m-app.m-light .m-shp-in .m-shp-lg { box-shadow: 0 0 0 4px var(--m-sheet), 0 14px 30px rgba(15, 23, 42, .16); }
+.m-app.m-light .m-shp-lg { box-shadow: 0 0 0 1px rgba(15, 23, 42, .08); }
+.m-app.m-light .m-shp-cl { background: rgba(15, 23, 42, .06); color: #475569; }

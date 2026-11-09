@@ -24,6 +24,7 @@ import { ClubHub } from './screens/Club';
 import { ChatsInbox, ChatThread } from './screens/Chats';
 import { SkipperProfile } from './screens/Skipper';
 import { ClassifiedsScreen, ListingScreen } from './screens/Classifieds';
+import { ShopsScreen } from './screens/Shops';
 import { NewsScreen, ArticleScreen } from './screens/News';
 import { MediaScreen } from './screens/Media';
 import { TVScreen } from './screens/TV';
@@ -114,6 +115,7 @@ const Shell: React.FC = () => {
           <Route path="/comms/*" element={<Navigate to="/comms" replace />} />
           <Route path="/skipper/:id" element={<SkipperProfile />} />
           <Route path="/classifieds" element={<ClassifiedsScreen />} />
+          <Route path="/shops" element={<ShopsScreen />} />
           <Route path="/classifieds/:id" element={<ListingScreen />} />
           <Route path="/news" element={<NewsScreen />} />
           <Route path="/news/:id" element={<ArticleScreen />} />

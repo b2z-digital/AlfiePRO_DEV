@@ -70,6 +70,15 @@ export const Me: React.FC = () => {
         <Tile icon="wind" bg="rgba(56,189,248,.15)" fg="#6CCBF5" title="Wind & tides" sub="Your venues" to="/weather" />
       </div>
 
+      <button className="m-card" onClick={() => navigate('/shops')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+        <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--m-spectrum)', color: '#fff' }}><Icon name="bag" size={20} /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>Shops</div>
+          <div className="m-dim" style={{ fontSize: 12.5 }}>Parts, sails and gear from suppliers</div>
+        </div>
+        <Icon name="chevron" size={17} className="m-dim" />
+      </button>
+
       <div className="m-card">
         <button className="m-li" onClick={() => navigate('/tasks')}><span className="m-tile" style={{ width: 36, height: 36, background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="tasks" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>My tasks</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/notifications')}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="bell" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Notifications</span><Icon name="chevron" size={17} className="m-dim" /></button>
