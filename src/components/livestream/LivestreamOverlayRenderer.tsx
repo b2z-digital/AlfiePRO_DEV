@@ -667,9 +667,9 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           title={isOnHold
             ? (displayData?.status_notes || 'Racing will resume shortly')
             : (rawStatus === 'completed_for_day' ? "That's racing for today" : 'Thanks for watching')}
-          meta={isOnHold
-            ? [`Up next: ${scoringNow.race}`, clockLabel].filter(Boolean)
-            : ['Race videos are on AlfieTV and YouTube', clockLabel].filter(Boolean)}
+          badgeLead={isOnHold ? 'Up next' : undefined}
+          badges={isOnHold ? [eventRound, scoringNow.race] : [eventRound]}
+          meta={isOnHold ? [clockLabel] : ['Race videos are on AlfieTV and YouTube', clockLabel]}
           results={lastRaceResultsRef.current && lastRaceResultsRef.current.rows.length > 0 ? lastRaceResultsRef.current : null}
           clip={clip}
         />
@@ -765,7 +765,7 @@ export const LivestreamOverlayRenderer = React.forwardRef<HTMLDivElement, Livest
           chip="Live"
           eyebrow={[new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), venueName].filter(Boolean).join(' · ')}
           title={eventMain || 'Live race broadcast'}
-          meta={[scoringNow.race, eventRound, displayData?.status === 'on_hold' ? 'On hold' : null].filter(Boolean) as string[]}
+          badges={[eventRound, scoringNow.race]}
           clip={clip}
         />
       )}
@@ -905,7 +905,7 @@ function formatElapsedTime(startTime: string): string {
  * with the program frame and is captured into the stream as drawn.
  */
 export function BroadcastScreen({
-  variant, opacity = 1, venueImage, hostClubName, hostClubLogo, chip, eyebrow, title, meta, results, clip,
+  variant, opacity = 1, venueImage, hostClubName, hostClubLogo, chip, eyebrow, title, badges = [], badgeLead, meta = [], results, clip,
 }: {
   variant: 'intro' | 'hold' | 'done';
   opacity?: number;
@@ -915,11 +915,16 @@ export function BroadcastScreen({
   chip: string;
   eyebrow?: string;
   title: string;
-  meta: string[];
+  /** Round, race and heat, each in its own badge (always in that order) */
+  badges?: string[];
+  /** Small plain label before the badges, e.g. "Up next" */
+  badgeLead?: string;
+  /** Plain text after the badges (time, notes) */
+  meta?: string[];
   results?: { race: number; rows: Array<{ position: number; sail: string; name: string; hull: string }> } | null;
   clip: (text: string, max: number) => string;
 }) {
-  const [race, ...rest] = meta;
+  const ordered = orderBadges(badges);
   return (
     <div className={`alv-ov-screen is-${variant}`} style={{ opacity }}>
       <div className="bg" style={venueImage ? { backgroundImage: `url("${venueImage}")` } : undefined} />
@@ -939,10 +944,13 @@ export function BroadcastScreen({
         {eyebrow && <span className="eyebrow">{clip(eyebrow, 90)}</span>}
         <span className="rule" />
         <h1>{clip(title, 80)}</h1>
-        {meta.length > 0 && (
+        {(ordered.length > 0 || meta.length > 0) && (
           <div className="meta">
-            {race && <span className={variant === 'intro' ? 'race' : 'first'}><span className="tx">{race}</span></span>}
-            {rest.map((m, i) => <span key={i} className="m">{m}</span>)}
+            {badgeLead && ordered.length > 0 && <span className="lead">{badgeLead}</span>}
+            {ordered.map(b => (
+              <span key={b} className={`badge ${badgeTone(b)}`}><span className="tx">{b}</span></span>
+            ))}
+            {meta.map((m, i) => <span key={i} className="m">{m}</span>)}
           </div>
         )}
       </div>
@@ -970,4 +978,20 @@ export function BroadcastScreen({
       </div>
     </div>
   );
+}
+
+const badgeRank = (label: string) =>
+  /\b(round|rd|day)\b/i.test(label) && !/^(race|heat)\b/i.test(label) ? 0 : /^race\b/i.test(label) ? 1 : /^heat\b/i.test(label) ? 2 : 3;
+const badgeTone = (label: string) =>
+  ['is-round', 'is-race', 'is-heat', 'is-other'][badgeRank(label)];
+/** "Round 9", "Race 5", "Heat A": split combined labels ("Round 2 · Heat A") and order Round → Race → Heat */
+export function orderBadges(labels: Array<string | null | undefined>): string[] {
+  const parts = labels
+    .flatMap(l => String(l || '').split(/\s*[·|-]\s*(?=(?:round|rd|race|heat|day)\b)/i))
+    .map(l => l.trim().replace(/\brd\b/i, 'Round'))
+    .filter(Boolean);
+  const seen = new Set<string>();
+  return parts
+    .filter(p => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => badgeRank(a) - badgeRank(b));
 }
