@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PanelLeftOpen, PanelLeftClose, ShieldCheck } from 'lucide-react';
-import { Store, Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, LayoutDashboard, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, ShipWheel, TvMinimalPlay, Radio, ClipboardList } from 'lucide-react';
+import { Store, Trophy, Building, Calendar, CalendarDays, Users, Hop as Home, Settings, LogOut, TrendingUp, MapPin, ChevronDown, ChevronUp, CreditCard, Globe, Newspaper, DollarSign, SquareCheck as CheckSquare, Monitor, Camera, Flag, Anchor, Mail, Tag, Wrench, Sailboat, FolderOpen, Wind, MessageSquare, MessageCircle, Tv, Upload, Send, Video, Award, Link, Receipt, ChartBar as BarChart3, ToggleLeft, Database, Shield, Activity, Server, Bug, CircleUser as UserCircle, Eye, Bot, LifeBuoy, Rocket, Ship, Radio, ClipboardList } from 'lucide-react';
 import { supabase, getOrCreateChannel, removeChannelByName } from '../utils/supabase';
 import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { RaceManagementPage } from './pages/RaceManagementPage';
@@ -127,6 +127,7 @@ import { ImpersonationBanner } from './ImpersonationBanner';
 import { useImpersonation } from '../contexts/ImpersonationContext';
 import { useAlfieTheme } from '../hooks/useAlfieTheme';
 import { AlfieIconContext } from './brand/AlfieIcon';
+import { NavDashboardIcon, NavClubIcon, NavMemberClubsIcon, NavAssociationsIcon, NavMeIcon, NavNewsIcon, NavRacingIcon, NavMarketplaceIcon, NavConnectIcon, isNavIcon } from './brand/NavIcons';
 
 type DashboardSection = 'home' | 'race-management' | 'club-management' | 'race-calendar' | 'team-management' | 'results' | 'yacht-classes';
 
@@ -775,7 +776,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         {
           id: 'home',
           label: 'Dashboard',
-          icon: LayoutDashboard,
+          icon: NavDashboardIcon,
           description: 'Overview',
           path: '/'
         }
@@ -785,6 +786,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       id: 'associations',
       label: 'Associations',
       collapsible: true,
+      icon: NavAssociationsIcon,
       items: [
         {
           id: 'associations',
@@ -800,7 +802,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       id: 'membership-assoc',
       label: 'Membership',
       collapsible: true,
-      icon: Users,
+      icon: NavMemberClubsIcon,
       items: [
         ...(currentOrganization?.type === 'state' ? [{
           id: 'clubs',
@@ -883,9 +885,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }] : []),
     ...(!currentOrganization ? [{
       id: 'club-operations',
-      label: 'Club Stuff',
+      label: 'Club',
       collapsible: true,
-      icon: Users,
+      icon: NavClubIcon,
       items: [
         {
           id: 'membership-dashboard',
@@ -941,9 +943,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     }] : []),
     {
       id: 'resources-tools',
-      label: 'My Stuff',
+      label: 'Me',
       collapsible: true,
-      icon: FolderOpen,
+      icon: NavMeIcon,
       items: [
         ...(pendingApprovalsCount > 0 || location.pathname.startsWith('/approvals') ? [{
           id: 'approvals',
@@ -983,21 +985,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/weather',
           featureKey: 'weather'
         },
-        {
-          id: 'classifieds',
-          label: 'Classifieds',
-          icon: Tag,
-          description: 'Buy, sell, and trade sailing gear',
-          path: '/classifieds',
-          featureKey: 'classifieds'
-        },
       ]
     },
     {
       id: 'content-media',
       label: 'News & Media',
       collapsible: true,
-      icon: TvMinimalPlay,
+      icon: NavNewsIcon,
       items: [
         {
           id: 'news',
@@ -1035,9 +1029,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
     },
     {
       id: 'racing',
-      label: 'Sailing',
+      label: 'Racing',
       collapsible: true,
-      icon: ShipWheel,
+      icon: NavRacingIcon,
       items: [
         {
           id: 'race-management',
@@ -1087,13 +1081,6 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/venues',
           featureKey: 'venues'
         },
-        {
-          id: 'shops',
-          label: 'Shops',
-          icon: Store,
-          description: 'Parts, sails and gear suppliers',
-          path: '/shops'
-        },
         ...(isSuperAdmin ? [{
           id: 'race-simulator',
           label: 'Race Simulator',
@@ -1133,10 +1120,33 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       ]
     },
     {
-      id: 'communications',
-      label: 'Communications',
+      id: 'marketplace',
+      label: 'Marketplace',
       collapsible: true,
-      icon: MessageCircle,
+      icon: NavMarketplaceIcon,
+      items: [
+        {
+          id: 'classifieds',
+          label: 'Classifieds',
+          icon: Tag,
+          description: 'Buy, sell, and trade sailing gear',
+          path: '/classifieds',
+          featureKey: 'classifieds'
+        },
+        {
+          id: 'shops',
+          label: 'Shops',
+          icon: Store,
+          description: 'Parts, sails and gear suppliers',
+          path: '/shops'
+        }
+      ]
+    },
+    {
+      id: 'communications',
+      label: 'Connect',
+      collapsible: true,
+      icon: NavConnectIcon,
       items: [
         {
           id: 'comms',
@@ -1216,7 +1226,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               id: 'racing',
               label: '',
               collapsible: false,
-              icon: ShipWheel,
+              icon: NavRacingIcon,
               items: [...raceItems, ...standaloneExtraItems]
             }
           ].filter(section => section.items.length > 0);
@@ -1318,7 +1328,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           `}
                           title={section.label}
                         >
-                          {SectionIcon && <SectionIcon size={18} className="opacity-70" />}
+                          {SectionIcon && <SectionIcon size={18} active={hasActiveItem} className={hasActiveItem ? '' : 'opacity-70'} />}
                           {section.id === 'communications' && commsSectionTotal > 0 && (
                             <div className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
                               {commsSectionTotal}
@@ -1346,7 +1356,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         `}
                       >
                         <div className="flex items-center gap-2">
-                          {SectionIcon && <SectionIcon size={16} className="opacity-70" />}
+                          {SectionIcon && <SectionIcon size={20} active={hasActiveItem} className={hasActiveItem ? '' : 'opacity-70'} />}
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
@@ -1412,7 +1422,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                           `}
                           title={(collapsed && !isHoveringNav) ? `${item.label} - ${item.description}` : ''}
                         >
-                          <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />
+                          {isNavIcon(Icon) ? <Icon size={18} active={isActive} className="flex-shrink-0" /> : <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />}
                           {(!collapsed || isHoveringNav) && (
                             <div className="text-left flex-1 flex items-center gap-2">
                               <div className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</div>
@@ -1824,7 +1834,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                         `}
                       >
                         <div className="flex items-center gap-2">
-                          {SectionIcon && <SectionIcon size={16} className="opacity-70" />}
+                          {SectionIcon && <SectionIcon size={20} active={hasActiveItem} className={hasActiveItem ? '' : 'opacity-70'} />}
                           <span className="text-xs font-semibold uppercase tracking-wider">
                             {section.label}
                           </span>
@@ -1884,7 +1894,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                             }`}
                           >
-                            <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />
+                            {isNavIcon(Icon) ? <Icon size={18} active={isActive} className="flex-shrink-0" /> : <Icon size={18} className={`flex-shrink-0 ${isActive ? '!text-white' : ''}`} />}
                             <div className="ml-3 flex-1 flex items-center gap-2">
                               <span className={`text-sm font-medium ${isActive ? '!text-white' : ''}`}>{item.label}</span>
                               {item.id === 'comms' && (unreadNotificationsCount + unreadConversationsCount) > 0 && (
