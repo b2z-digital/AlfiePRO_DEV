@@ -39,6 +39,7 @@ import { RaceTimerScreen } from './screens/RaceTimer';
 import { WeatherScreen } from './screens/Weather';
 import { TasksScreen } from './screens/Tasks';
 import { MyDetailsScreen } from './screens/MyDetails';
+import { VenueScreen } from './screens/Venue';
 import { GroupScreen, GroupsScreen, MembersScreen, MyListingsScreen } from './screens/ClubMore';
 import { TaskDetailScreen, TaskFormScreen } from './screens/TaskDetail';
 import { FindRacingScreen } from './screens/FindRacing';
@@ -143,6 +144,7 @@ const Shell: React.FC = () => {
           <Route path="/find-racing" element={<FindRacingScreen />} />
           <Route path="/race-timer" element={<RaceTimerScreen />} />
           <Route path="/weather" element={<WeatherScreen />} />
+          <Route path="/venue/:id" element={<VenueScreen />} />
           <Route path="/tasks" element={<TasksScreen />} />
           <Route path="/tasks/new" element={<TaskFormScreen />} />
           <Route path="/tasks/:id" element={<TaskDetailScreen />} />

@@ -12,6 +12,7 @@ type Tab = 'details' | 'entries' | 'results' | 'media';
 
 export const EventDetail: React.FC = () => {
   const { key = '' } = useParams();
+  const navigate = useNavigate();
   const { calendar, calendarLoading } = useMobile();
   const item = calendar.find(i => i.key === decodeURIComponent(key));
   const hasResults = (item?.event?.raceResults?.length || 0) > 0;
@@ -87,11 +88,11 @@ export const EventDetail: React.FC = () => {
                 <div className="m-mut" style={{ fontSize: 12.5 }}>{e?.numRaces ? `${e.numRaces} races` : 'Race day'}{e?.dropRules?.length ? ` · drops after ${e.dropRules.join(', ')}` : ''}</div></div>
             </div>
             {item.venue && (
-              <a className="m-li" href={`https://maps.google.com/?q=${encodeURIComponent(item.venue)}`} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+              <button className="m-li" onClick={() => navigate(`/venue/${encodeURIComponent(item.venue!)}`)} style={{ color: 'inherit', width: '100%' }}>
                 <span className="m-tile" style={{ background: 'rgba(255,138,43,.14)', color: '#FFA65C' }}><Icon name="pin" size={19} /></span>
-                <div style={{ flex: 1 }}><div style={{ fontSize: 14.5, fontWeight: 600 }}>{item.venue}</div><div className="m-mut" style={{ fontSize: 12.5 }}>Directions</div></div>
+                <div style={{ flex: 1, textAlign: 'left' }}><div style={{ fontSize: 14.5, fontWeight: 600 }}>{item.venue}</div><div className="m-mut" style={{ fontSize: 12.5 }}>Venue, directions and wind</div></div>
                 <Icon name="chevron" size={18} className="m-dim" />
-              </a>
+              </button>
             )}
             {e?.proMemberName && (
               <div className="m-li">

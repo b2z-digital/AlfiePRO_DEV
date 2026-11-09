@@ -6,6 +6,7 @@ import { Icon, IconName } from '../icons';
 import { Avatar, OfflineBanner, RootHeader, Skeleton, fmtDay } from '../ui';
 import { timeAgo, todayISO } from '../data';
 import { supabase } from '../../utils/supabase';
+import { socialStorage } from '../../utils/socialStorage';
 import { MGroup, REPORT_REASONS, SocialPost, createPost, hidePost, loadChats, loadFeed, loadHiddenPosts, loadMyGroups, reportPost, toggleLike } from '../club';
 
 /** Big-title header used across the Club screens (back, title, actions). */
@@ -36,6 +37,55 @@ const SHORTCUTS: { key: string; label: string; icon: IconName; bg: string; fg: s
   { key: 'news', label: 'News', icon: 'news', bg: 'rgba(255,138,43,.15)', fg: '#FF8A2B', path: '/news' },
   { key: 'shops', label: 'Shops', icon: 'bag', bg: 'var(--m-fill-b)', fg: 'var(--m-ink)', path: '/shops' },
 ];
+
+/** Comments on a post (board: Club feed › comments). Same social_comments as the web. */
+const CommentsSheet: React.FC<{ post: SocialPost; onClose: () => void; onCount: (n: number) => void; onOpenPerson: (id: string) => void }> = ({ post, onClose, onCount, onOpenPerson }) => {
+  const { user } = useAuth();
+  const { profile, toast, tap } = useMobile();
+  const [list, setList] = useState<any[] | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { socialStorage.getComments(post.id).then(c => setList(c || [])).catch(() => setList([])); }, [post.id]);
+  const send = async () => {
+    const body = text.trim();
+    if (!body || !user?.id) return;
+    setBusy(true);
+    try {
+      const c = await socialStorage.createComment({ post_id: post.id, content: body });
+      const next = [...(list || []), c];
+      setList(next); onCount(next.length); setText(''); tap('light');
+    } catch { toast("Couldn't post that. Try again."); } finally { setBusy(false); }
+  };
+  const me = `${profile.firstName} ${profile.lastName}`.trim() || 'Me';
+  return (
+    <>
+      <div className="m-veil" onClick={onClose} />
+      <div className="m-sheet" role="dialog" aria-label="Comments" style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <span className="m-grab" />
+        <div className="m-row" style={{ marginBottom: 8 }}>
+          <div className="m-disp" style={{ flex: 1, fontSize: 19, fontWeight: 700 }}>Comments</div>
+          <button className="m-ibtn" aria-label="Close" onClick={onClose}><Icon name="close" size={18} /></button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 80 }}>
+          {list === null ? <Skeleton h={80} /> : list.length === 0 ? <div className="m-empty">No comments yet. Say something nice.</div> : list.map(c => (
+            <div key={c.id} className="m-li" style={{ alignItems: 'flex-start' }}>
+              <button onClick={() => c.author_id && onOpenPerson(c.author_id)} style={{ background: 'none', border: 0, padding: 0 }} aria-label={c.author?.full_name || 'Member'}><Avatar name={c.author?.full_name || 'Member'} url={c.author?.avatar_url} size={32} /></button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13 }}><b style={{ fontWeight: 600 }}>{c.author_id === user?.id ? 'You' : c.author?.full_name || 'Member'}</b> <span className="m-dim">· {timeAgo(c.created_at)}</span></div>
+                <div style={{ fontSize: 14.5, lineHeight: 1.45, marginTop: 2, whiteSpace: 'pre-wrap' }}>{c.content}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="m-row" style={{ gap: 8, marginTop: 8 }}>
+          <Avatar name={me} url={profile.avatarUrl} size={32} />
+          <input className="m-field" style={{ marginTop: 0, flex: 1 }} placeholder="Add a comment" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void send(); }} />
+          <button className="m-ibtn" aria-label="Post comment" disabled={busy || !text.trim()} onClick={() => void send()} style={{ background: 'var(--m-blue)', color: '#fff', border: 0 }}><Icon name="send" size={17} /></button>
+        </div>
+      </div>
+    </>
+  );
+};
 
 /** A post's ⋯ menu: hide it from my feed, or report it to the club's admins. */
 const PostMenu: React.FC<{ onHide: () => void; onReport: () => void; onClose: () => void }> = ({ onHide, onReport, onClose }) => (
@@ -105,6 +155,8 @@ const HiddenPost: React.FC<{ onUndo: () => void }> = ({ onUndo }) => (
 );
 
 export const PostCard: React.FC<{ post: SocialPost; groupName?: string; mine?: boolean; onLike: (p: SocialPost) => void; onOpenPerson: (id: string) => void; onMore: (p: SocialPost) => void }> = ({ post, groupName, mine, onLike, onOpenPerson, onMore }) => {
+  const [comments, setComments] = useState(false);
+  const [count, setCount] = useState(post.comment_count || 0);
   const name = post.author?.full_name || 'Member';
   const images = (post.attachments || []).filter(a => a.file_type === 'image');
   const liked = post.user_reaction === 'like';
@@ -153,9 +205,10 @@ export const PostCard: React.FC<{ post: SocialPost; groupName?: string; mine?: b
           <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill={liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /></svg>
           {post.like_count || 0}
         </button>
-        <span className="m-row" style={{ gap: 6 }}><Icon name="chat" size={18} />{post.comment_count || 0}</span>
+        <button onClick={() => setComments(true)} aria-label={`Comments (${count})`}><Icon name="chat" size={18} />{count}</button>
         <button style={{ marginLeft: 'auto' }} onClick={share}><Icon name="share" size={18} />Share</button>
       </div>
+      {comments && <CommentsSheet post={post} onClose={() => setComments(false)} onCount={setCount} onOpenPerson={onOpenPerson} />}
     </article>
   );
 };
