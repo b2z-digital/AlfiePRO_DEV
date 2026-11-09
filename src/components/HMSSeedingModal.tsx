@@ -7,6 +7,7 @@ import type { RaceEvent } from '../types/race';
 import type { SkipperWithRanking } from '../utils/hmsSeeding';
 import { assignSkippersUsingHMSSeeding, previewHMSSeeding, validateHMSSeeding } from '../utils/hmsSeeding';
 import { getRankingsForMembers } from '../utils/rankingsStorage';
+import { seedingPreviewToAssignments } from '../utils/heatSetup';
 import { getCountryFlag, getIOCCode } from '../utils/countryFlags';
 
 interface HeatAssignment {
@@ -205,46 +206,8 @@ export const HMSSeedingModal: React.FC<HMSSeedingModalProps> = ({
   function handleConfirm() {
     if (!preview) return;
 
-    console.log('🟢 HMS Seeding - Starting conversion to heat assignments');
-    console.log('Preview heats:', preview.heats.length);
-    console.log('Total skippers in props:', skippers.length);
-
-    // Convert HMS seeding format to HeatAssignment format
-    const assignments: HeatAssignment[] = preview.heats.map((heat, heatIndex) => {
-      const heatDesignation = String.fromCharCode(65 + heatIndex) as HeatDesignation; // A, B, C, etc.
-
-      console.log(`\n🟢 Processing Heat ${heatDesignation}:`);
-      console.log('  Skippers in heat:', heat.skippers.length);
-
-      const skipperIndices = heat.skippers.map(heatSkipper => {
-        // Use originalIndex if available, otherwise fall back to ID matching
-        if (heatSkipper.originalIndex !== undefined) {
-          console.log(`  - Using originalIndex for ${heatSkipper.name}: ${heatSkipper.originalIndex}`);
-          return heatSkipper.originalIndex;
-        }
-
-        const foundIndex = skippers.findIndex(s => s.id === heatSkipper.id);
-        console.log(`  - Searching for ${heatSkipper.name} (ID: ${heatSkipper.id}): found at index ${foundIndex}`);
-        return foundIndex;
-      }).filter(index => index !== -1 && index !== undefined);
-
-      console.log(`  Final indices for Heat ${heatDesignation}:`, skipperIndices);
-
-      return {
-        heatDesignation,
-        skipperIndices
-      };
-    });
-
-    const rankedIndices = preview.heats.flatMap(heat =>
-      heat.skippers
-        .filter(s => s.rank)
-        .map(s => s.originalIndex !== undefined ? s.originalIndex : skippers.findIndex(sk => sk.id === s.id))
-        .filter(i => i !== -1)
-    );
-
-    console.log('\n🟢 Final assignments:', JSON.stringify(assignments, null, 2));
-    console.log('🟢 Ranked skipper indices:', rankedIndices);
+    // Shared with the phone Race desk (utils/heatSetup)
+    const { assignments, rankedIndices } = seedingPreviewToAssignments(preview, skippers);
     onConfirm(assignments, rankedIndices);
     onClose();
   }

@@ -41,6 +41,7 @@ interface SortableRoundRowProps {
   round: {
     name: string;
     date: string;
+    startTime?: string;
     venue: string;
     cancelled?: boolean;
     cancellationReason?: string;
@@ -104,7 +105,7 @@ const SortableRoundRow: React.FC<SortableRoundRowProps> = ({
       </div>
 
       {/* Round Name */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <input
           ref={roundRef}
           type="text"
@@ -142,8 +143,25 @@ const SortableRoundRow: React.FC<SortableRoundRowProps> = ({
         />
       </div>
 
+      {/* Start time (optional; not every club uses one) */}
+      <div className="col-span-2">
+        <input
+          type="time"
+          value={round.startTime || ''}
+          onChange={(e) => onChange(index, 'startTime', e.target.value)}
+          aria-label="Start time (optional)"
+          className={`
+            w-full px-3 py-2 rounded-lg transition-colors text-sm
+            ${darkMode
+              ? 'bg-slate-700 text-slate-200 border border-slate-600 focus:border-emerald-500'
+              : 'bg-white text-slate-900 border border-slate-200 focus:border-emerald-500'}
+          `}
+          style={{ colorScheme: darkMode ? 'dark' : 'light' }}
+        />
+      </div>
+
       {/* Venue with Avatar */}
-      <div className="col-span-5 relative">
+      <div className="col-span-4 relative">
         <select
           required
           value={round.venue}
@@ -270,6 +288,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     clubName: '',
     clubId: '',
     raceDate: '',
+    raceStartTime: '', // Optional first start
     endDate: '', // For multi-day events
     raceVenue: '',
     venueId: '',
@@ -313,6 +332,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     rounds: [] as {
       name: string;
       date: string;
+      startTime?: string;
       venue: string;
       cancelled?: boolean;
       cancellationReason?: string;
@@ -591,6 +611,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         clubName: club?.name || editingEvent.clubName || '',
         clubId: club?.id || editingEvent.clubId || '',
         raceDate: editingEvent.date || '',
+        raceStartTime: editingEvent.startTime || '',
         endDate: editingEvent.endDate || '',
         raceVenue: editingEvent.venue || '',
         venueId: '',
@@ -706,6 +727,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         clubName: club?.name || editingSeries.clubName,
         clubId: club?.id || editingSeries.clubId || '',
         raceDate: '',
+        raceStartTime: '',
         endDate: '',
         raceVenue: '',
         venueId: '',
@@ -746,6 +768,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         rounds: editingSeries.rounds.map(round => ({
           name: round.name,
           date: round.date,
+          startTime: round.startTime || '',
           venue: round.venue,
           cancelled: round.cancelled,
           cancellationReason: round.cancellationReason,
@@ -1143,6 +1166,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
             eventName: formData.eventName,
             clubName: formData.clubName,
             date: formData.raceDate,
+            startTime: formData.raceStartTime || '',
             venue: formData.raceVenue,
             raceClass: formData.raceClass,
             raceFormat: formData.raceFormat,
@@ -1232,6 +1256,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                 name: round.name,
                 venue: round.venue,
                 date: round.date,
+                startTime: round.startTime || '',
                 cancelled: round.cancelled || false,
                 cancellationReason: round.cancellationReason
               };
@@ -1241,6 +1266,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
               name: round.name,
               venue: round.venue,
               date: round.date,
+              startTime: round.startTime || '',
               cancelled: round.cancelled || false,
               cancellationReason: round.cancellationReason,
               results: [],
@@ -2179,6 +2205,34 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                       />
                     </div>
                   </div>
+
+                  {formData.eventLevel === 'club' && (
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        Start Time <span className={`font-normal ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>(optional)</span>
+                      </label>
+                      <div className="relative">
+                        <Clock
+                          size={18}
+                          className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                        />
+                        <input
+                          type="time"
+                          value={formData.raceStartTime}
+                          onChange={(e) => setFormData(prev => ({ ...prev, raceStartTime: e.target.value }))}
+                          className={`
+                            w-full pl-10 pr-4 py-2 rounded-lg transition-colors
+                            ${darkMode
+                              ? 'bg-slate-700 text-slate-200'
+                              : 'bg-white text-slate-900 border border-slate-200'}
+                          `}
+                          style={{
+                            colorScheme: darkMode ? 'dark' : 'light'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {formData.isMultiDay && (
                     <>
@@ -3446,9 +3500,10 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
                     {/* Table Header */}
                     <div className={`grid grid-cols-12 gap-3 px-4 py-3 border-b font-medium text-sm ${darkMode ? 'bg-slate-700/50 border-slate-600 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
                       <div className="col-span-1"></div>
-                      <div className="col-span-3">Round Name</div>
+                      <div className="col-span-2">Round Name</div>
                       <div className="col-span-2">Date</div>
-                      <div className="col-span-5">Venue</div>
+                      <div className="col-span-2">Start <span className="font-normal opacity-70">(optional)</span></div>
+                      <div className="col-span-4">Venue</div>
                       <div className="col-span-1"></div>
                     </div>
 

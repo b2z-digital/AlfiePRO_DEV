@@ -74,6 +74,11 @@ import EmailPreferencesPage from './pages/EmailPreferencesPage';
 import { MobileAppComingSoon } from './components/MobileAppComingSoon';
 import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
+import { isNative } from './lib/native/platform';
+import { readMobilePreviewFlag } from './mobile/preview';
+const MobileApp = lazy(() => import('./mobile/MobileApp'));
+const SpotterApp = lazy(() => import('./mobile/screens/ScoreTogether'));
+const mobilePreview = readMobilePreviewFlag();
 
 function useIsMobilePhone() {
   const [isMobile, setIsMobile] = useState(false);
@@ -81,7 +86,8 @@ function useIsMobilePhone() {
   useEffect(() => {
     const check = () => {
       const width = window.innerWidth;
-      const isMobileWidth = width < 768;
+      // a phone turned on its side is still a phone (its short side stays under 500px)
+      const isMobileWidth = width < 768 || Math.min(width, window.innerHeight) < 500;
       const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       setIsMobile(isMobileWidth && hasTouchScreen);
     };
@@ -119,6 +125,14 @@ function App() {
   const isMobilePhone = useIsMobilePhone();
 
   useDataPreloader();
+
+  // The phone Race desk prepares the event with the desktop's own steps, then asks for the scoring screen
+  const startScoringRef = React.useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    const onStart = () => { void startScoringRef.current(); };
+    window.addEventListener('alfie-start-scoring', onStart);
+    return () => window.removeEventListener('alfie-start-scoring', onStart);
+  }, []);
 
   // Public video player - bypass ALL auth checks entirely
   if (window.location.pathname.startsWith('/play/')) {
@@ -163,6 +177,8 @@ function App() {
       setShowScoring(true);
     }
   };
+
+  startScoringRef.current = handleStartScoring;
 
   const handleExitScoring = () => {
     console.log('🔴🔴🔴 handleExitScoring called in App.tsx - User will return to dashboard');
@@ -232,8 +248,9 @@ function App() {
 
   return (
     <ModalProvider>
-      <ConnectionMonitor />
-      <PWAInstallPrompt />
+      {/* The phone app has its own offline banner and app banner (mobile design board) */}
+      {!(isMobilePhone && (isNative || mobilePreview)) && <ConnectionMonitor />}
+      {!(isMobilePhone && (isNative || mobilePreview)) && <PWAInstallPrompt />}
       <VoiceCallModal />
       <NotificationSystem
         notifications={notifications}
@@ -283,7 +300,8 @@ function App() {
         <Route path="/live/:token/pro-broadcast" element={<ProBroadcastView />} />
 
         {/* Join Scoring Session Route */}
-        <Route path="/join-scoring/:pin?" element={<JoinScoringSessionPage />} />
+        {/* Phones get the spotter's finish pad (join by PIN, no account); computers the scoring sheet join */}
+        <Route path="/join-scoring/:pin?" element={isMobilePhone ? <Suspense fallback={<AlfieLoader light={!darkMode} />}><SpotterApp /></Suspense> : <JoinScoringSessionPage />} />
 
         {/* Public Shared Results Route */}
         <Route path="/results/shared/:shareToken" element={<PublicSharedResultsPage />} />
@@ -313,10 +331,12 @@ function App() {
         {/* Public Video Player (used by native mobile app for AlfieTV) */}
         <Route path="/play/:videoId" element={<PublicVideoPlayer />} />
 
-        {/* AlfieTV Full-Screen Route */}
-        <Route path="/alfie-tv" element={
-          isAuthenticated ? <AlfieTVPage darkMode={darkMode} /> : <Navigate to="/login" />
-        } />
+        {/* AlfieTV Full-Screen Route (the phone app has its own AlfieTV tab) */}
+        {!(isMobilePhone && (isNative || mobilePreview)) && (
+          <Route path="/alfie-tv" element={
+            isAuthenticated ? <AlfieTVPage darkMode={darkMode} /> : <Navigate to="/login" />
+          } />
+        )}
 
         {/* Event Command Center Route */}
         <Route path="/event-command-center/:eventId" element={
@@ -415,6 +435,10 @@ function App() {
               <AlfieLoader light={!darkMode} />
             ) : userClubs.length === 0 && !onboardingCompleted && !isRaceOfficer ? (
               <Navigate to="/onboarding" />
+            ) : isMobilePhone && (isNative || mobilePreview) ? (
+              // Phone screens from the mobile design board (apps always; phone browsers with ?mobile=1 while it's built).
+              // Unfinancial members get the phone's softer "Membership due" screen instead of the hard block.
+              <Suspense fallback={<AlfieLoader light={!darkMode} />}><MobileApp /></Suspense>
             ) : hasUnfinancialMember && unfinancialMemberData ? (
               <UnfinancialMemberScreen memberData={unfinancialMemberData} darkMode={darkMode} />
             ) : isMobilePhone ? (

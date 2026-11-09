@@ -60,3 +60,9 @@ verify_jwt = true
 
 [functions.google-oauth-callback]
 verify_jwt = false
+
+[functions.generate-platform-billing]
+verify_jwt = false
+
+[functions.send-platform-billing-invoice]
+verify_jwt = false

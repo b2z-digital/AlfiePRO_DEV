@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { boatTypeMatchesClass, skipperFromMemberBoat } from '../utils/raceSetup';
 import { AAvatar } from './alfie/Kit';
 import { createPortal } from 'react-dom';
 import { X, Plus, Users, UserPlus, UserCog, CircleAlert as AlertCircle, Check, CircleCheck as CheckCircle, SquarePen as Edit2, Search, ChevronRight, Sailboat, ArrowUpDown, Upload, FileUp, Trash2, ClipboardPaste, ArrowRight, Zap, TriangleAlert as AlertTriangle , ChevronLeft } from 'lucide-react';
@@ -17,19 +18,6 @@ import { getCountryFlag, getCountryName, SAILING_NATIONS } from '../utils/countr
 import { useNotifications } from '../contexts/NotificationContext';
 import { useAuth } from '../contexts/AuthContext';
 import { bulkAddRaceOfficerContacts } from '../utils/raceOfficerContactsStorage';
-
-function boatTypeMatchesClass(boatType: string | undefined | null, raceClass: string | undefined | null): boolean {
-  if (!boatType || !raceClass) return false;
-  if (boatType === raceClass) return true;
-  const boatLower = boatType.toLowerCase();
-  const classLower = raceClass.toLowerCase();
-  if (boatLower === classLower) return true;
-  const classAbbr = raceClass.match(/\(([^)]+)\)/)?.[1];
-  if (classAbbr && classAbbr.toLowerCase() === boatLower) return true;
-  const boatAbbr = boatType.match(/\(([^)]+)\)/)?.[1];
-  if (boatAbbr && boatAbbr.toLowerCase() === classLower) return true;
-  return false;
-}
 
 export interface ImportedAssignmentData {
   skippers: Skipper[];
@@ -916,21 +904,8 @@ export const SkipperModal: React.FC<SkipperModalProps> = ({
           continue;
         }
 
-        const newSkipper = {
-          name: `${member.first_name} ${member.last_name}`,
-          sailNo: boat.sail_number || '',
-          hull: boat.hull || '',
-          club: member.club || '',
-          boatModel: boat.hull || boat.boat_type,
-          startHcap: boat.handicap || 0,
-          avatarUrl: (memberAvatars[member.id] || otherClubAvatars[member.id]) || undefined,
-          memberId: member.id,
-          boatId: boat.id,
-          country_code: member.country_code,
-          country: member.country,
-          category: member.category,
-          state: member.state
-        };
+        // Shared with the phone Race desk (utils/raceSetup)
+        const newSkipper = skipperFromMemberBoat(member as any, boat as any, (memberAvatars[member.id] || otherClubAvatars[member.id]) || undefined);
         newSkippers.push(newSkipper);
         usedSailNumbers.add(boat.sail_number);
       }

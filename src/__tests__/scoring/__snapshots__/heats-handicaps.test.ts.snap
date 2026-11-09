@@ -1,0 +1,111 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`HMS 2022 > initial sizes and schedules (locked) 1`] = `
+{
+  "16/2": [
+    8,
+    8,
+  ],
+  "20/2": [
+    10,
+    10,
+  ],
+  "24/3": [
+    8,
+    8,
+    8,
+  ],
+  "34/3": [
+    11,
+    11,
+    12,
+  ],
+  "41/4": [
+    10,
+    10,
+    10,
+    11,
+  ],
+  "schedule r1 p4": "A",
+  "schedule r1 p6": "A",
+  "schedule r2 p4": "B",
+  "schedule r2 p6": "C",
+  "schedule r3 p4": "B",
+  "schedule r3 p6": "C",
+  "schedule r6 p4": "B",
+  "schedule r6 p6": "C",
+}
+`;
+
+exports[`SHRS 2026-1 > heat sizes, largest heat, non-finisher score and discards (locked) 1`] = `
+{
+  "21/2": {
+    "largest": 11,
+    "nonFinisher": 12,
+    "sizes": [
+      11,
+      10,
+    ],
+  },
+  "38/2": {
+    "largest": 19,
+    "nonFinisher": 20,
+    "sizes": [
+      19,
+      19,
+    ],
+  },
+  "41/3": {
+    "largest": 14,
+    "nonFinisher": 15,
+    "sizes": [
+      14,
+      14,
+      13,
+    ],
+  },
+  "60/3": {
+    "largest": 20,
+    "nonFinisher": 21,
+    "sizes": [
+      20,
+      20,
+      20,
+    ],
+  },
+  "discards": [
+    [
+      1,
+      0,
+    ],
+    [
+      3,
+      0,
+    ],
+    [
+      4,
+      1,
+    ],
+    [
+      7,
+      1,
+    ],
+    [
+      8,
+      2,
+    ],
+    [
+      15,
+      2,
+    ],
+    [
+      16,
+      3,
+    ],
+    [
+      24,
+      4,
+    ],
+  ],
+}
+`;

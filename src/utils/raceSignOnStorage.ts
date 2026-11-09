@@ -1,5 +1,19 @@
 import { supabase } from './supabase';
 
+/** Today's race day in the device's local time (toISOString would give yesterday before 11am in Sydney). */
+export const localRaceDay = (d: Date = new Date()): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** The sign-on entry for an event skipper: same name, or same sail number (the desktop sheet's rule). */
+export const findSignOn = <T extends { skipper_name: string; sail_number: string }>(
+  entries: T[],
+  skipper: { name: string; sailNo?: string }
+): T | undefined =>
+  entries.find(e =>
+    e.skipper_name.toLowerCase() === skipper.name.toLowerCase() ||
+    (!!skipper.sailNo && e.sail_number === skipper.sailNo)
+  );
+
 export interface RaceDaySignOn {
   id: string;
   event_id: string;

@@ -10,7 +10,7 @@ import { formatDate } from '../../utils/date';
 import Papa from 'papaparse';
 import { AdvancedMemberFilter } from './AdvancedMemberFilter';
 import { MemberFilterConfig } from '../../types/memberFilters';
-import { filterMembers as applyMemberFilters } from '../../utils/memberFilters';
+import { filterMembers as applyMemberFilters, getMembershipCategory } from '../../utils/memberFilters';
 import { ManageFiltersModal } from './ManageFiltersModal';
 import { SaveFilterModal } from './SaveFilterModal';
 import AssociationMemberImportModal from './AssociationMemberImportModal';
@@ -565,6 +565,15 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
   };
 
   const uniqueMemberCount = consolidateMembers(members).length;
+  const memberCategoryBreakdown = consolidateMembers(members).reduce(
+    (acc, m) => {
+      const categories = m.clubMemberships.map(cm => getMembershipCategory(cm.membership_level));
+      if (categories.includes('full') || categories.includes('life')) acc.full++;
+      else if (categories.includes('associate')) acc.associateOnly++;
+      return acc;
+    },
+    { full: 0, associateOnly: 0 }
+  );
   const now = new Date();
   const currentMembers = members.filter((m) => m.is_financial && (!m.renewal_date || new Date(m.renewal_date) >= now));
   const expiredMembers = members.filter((m) => !m.is_financial || (m.renewal_date && new Date(m.renewal_date) < now));
@@ -638,7 +647,7 @@ export const StateAssociationMembers: React.FC<StateAssociationMembersProps> = (
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          <KpiCard cap="Members" value={stats.uniqueMembers} sub={stats.totalMembers !== stats.uniqueMembers ? `${stats.totalMembers} club memberships` : 'People across all clubs'} icon={<Users size={18} />} />
+          <KpiCard cap="Members" value={stats.uniqueMembers} sub={`${memberCategoryBreakdown.full} full · ${memberCategoryBreakdown.associateOnly} associate only`} icon={<Users size={18} />} />
           <KpiCard cap="Current" value={stats.currentMembers} sub={`${stats.expiredMembers} expired or unfinancial`} icon={<CheckCircle2 size={18} />} tone="green" />
           <KpiCard cap="Member clubs" value={stats.totalClubs} sub="Clubs in the association" icon={<Building2 size={18} />} />
           <KpiCard cap="Showing" value={stats.filteredCount} sub="Match your search and filters" icon={<Search size={18} />} />

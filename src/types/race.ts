@@ -39,6 +39,7 @@ export interface SeriesRound {
   name: string;
   date: string;
   venue: string;
+  startTime?: string; // Optional first start, 'HH:MM'
   results: RoundResult[];
   completed: boolean;
   lastCompletedRace: number;
@@ -109,6 +110,7 @@ export interface RaceEvent {
   date: string;
   endDate?: string; // For multi-day events
   venue: string;
+  startTime?: string; // Optional first start, 'HH:MM'
   venueImage?: string | null; // Venue image URL for display
   raceClass: BoatType;
   raceFormat: RaceType;

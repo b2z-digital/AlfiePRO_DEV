@@ -3,10 +3,11 @@ import { X, ChevronRight, ChevronLeft, Trophy, Users, Zap, Target, Check, Shuffl
 import { Logo } from './Logo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skipper } from '../types';
-import { HeatManagement, HeatConfiguration, SeedingMethod, HeatDesignation } from '../types/heat';
-import { calculateOptimalHeats as calculateOptimalHeatsHMS, calculateHMSHeatSizes, seedInitialHeats, HMSConfig } from '../utils/hmsHeatSystem';
-import { calculateOptimalHeats as calculateOptimalHeatsSHRS, calculateHeatSizes, seedInitialHeatsForSHRS, generatePreSetQualifyingAssignments, estimateDiversityMetrics } from '../utils/shrsHeatSystem';
+import { HeatManagement, SeedingMethod } from '../types/heat';
+import { calculateOptimalHeats as calculateOptimalHeatsHMS, calculateHMSHeatSizes } from '../utils/hmsHeatSystem';
+import { calculateOptimalHeats as calculateOptimalHeatsSHRS, calculateHeatSizes, estimateDiversityMetrics } from '../utils/shrsHeatSystem';
 import { DiversityGauge } from './DiversityGauge';
+import { buildHeatSetup } from '../utils/heatSetup';
 
 interface HeatRacingSetupWizardProps {
   isOpen: boolean;
@@ -140,161 +141,18 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
   };
 
   const handleActivate = () => {
-    const heatDesignations: HeatDesignation[] = ['A', 'B', 'C', 'D', 'E'];
-    let rounds;
-
-    // Determine if this seeding method should defer to a modal
-    const needsManualModal = seedingMethod === 'manual' && (
-      (scoringSystem === 'shrs' && shrsMode === 'progressive') ||
-      (scoringSystem === 'hms' && fleetManagementEnabled)
-    );
-    const needsRankingModal = seedingMethod === 'ranking' && (
-      (scoringSystem === 'shrs' && shrsMode === 'progressive') ||
-      (scoringSystem === 'hms' && fleetManagementEnabled)
-    );
-
-    if (needsManualModal || needsRankingModal) {
-      // Create configuration with empty placeholder round - the modal will provide real assignments
-      const emptyAssignments = Array.from({ length: effectiveHeats }, (_, i) => ({
-        heatDesignation: heatDesignations[i] as HeatDesignation,
-        skipperIndices: [] as number[]
-      }));
-
-      rounds = [{
-        round: 1,
-        heatAssignments: emptyAssignments,
-        results: [],
-        completed: false
-      }];
-
-      const configuration: HeatConfiguration = {
-        enabled: true,
-        numberOfHeats: effectiveHeats,
-        promotionCount: scoringSystem === 'hms' ? promotionCount : 0,
-        seedingMethod,
-        autoAssign: false,
-        scoringSystem,
-        fleetManagementEnabled,
-        heatLabelStyle,
-        heatOrder,
-        ...(scoringSystem === 'shrs' ? {
-          shrsAssignmentMode: shrsMode,
-          shrsQualifyingRounds: qualifyingRounds,
-        } : {}),
-      };
-
-      const heatManagement: HeatManagement = {
-        configuration,
-        rounds,
-        currentRound: 1,
-        currentHeat: heatDesignations[effectiveHeats - 1],
-      };
-
-      const dropRules: string = scoringSystem;
-
-      onComplete({
-        numRaces,
-        dropRules,
-        heatManagement,
-        observerSettings: {
-          enable_observers: enableObservers,
-          observers_per_heat: observersPerHeat,
-          enable_roll_call: enableRollCall,
-          auto_complete_sail: true,
-        },
-        scoringMode,
-        pendingSeedingAction: needsManualModal ? 'manual' : 'ranking',
-      });
-      return;
-    }
-
-    // Build ranking data from skippers' national_ranking field
-    const rankingData = skippers
-      .map((s, idx) => ({ skipperIndex: idx, ranking: s.national_ranking || 0 }))
-      .filter(r => r.ranking > 0);
-
-    // Build seeding list ordered by national ranking (sail numbers sorted by rank)
-    const seedingList = seedingMethod === 'ranking' && rankingData.length > 0
-      ? [...rankingData]
-          .sort((a, b) => a.ranking - b.ranking)
-          .map(r => skippers[r.skipperIndex].sailNo || skippers[r.skipperIndex].sailNumber || '')
-          .filter(Boolean)
-      : undefined;
-
-    if (scoringSystem === 'shrs') {
-      const heatsMap = seedInitialHeatsForSHRS(skippers, effectiveHeats, seedingList);
-      const initialAssignments = Array.from({ length: effectiveHeats }, (_, i) => {
-        const heatSkippers = heatsMap.get(i + 1) || [];
-        return {
-          heatDesignation: heatDesignations[i] as string,
-          skipperIndices: heatSkippers.map(s => skippers.findIndex(sk => (sk.sailNo || sk.sailNumber) === (s.sailNo || s.sailNumber)))
-        };
-      });
-
-      if (shrsMode === 'preset' && qualifyingRounds > 1) {
-        const allQR = generatePreSetQualifyingAssignments(initialAssignments, effectiveHeats, qualifyingRounds);
-        rounds = allQR.map((ra, idx) => ({
-          round: idx + 1,
-          heatAssignments: ra.map(a => ({
-            heatDesignation: a.heatDesignation as HeatDesignation,
-            skipperIndices: a.skipperIndices
-          })),
-          results: [],
-          completed: false
-        }));
-      } else {
-        rounds = [{
-          round: 1,
-          heatAssignments: initialAssignments.map(a => ({
-            heatDesignation: a.heatDesignation as HeatDesignation,
-            skipperIndices: a.skipperIndices
-          })),
-          results: [],
-          completed: false
-        }];
-      }
-    } else {
-      const hmsConfig: HMSConfig = {
-        numberOfHeats: effectiveHeats,
-        promotionCount,
-        seedingMethod: fleetManagementEnabled ? seedingMethod : 'manual',
-      };
-      const initialAssignments = seedInitialHeats(
-        skippers,
-        hmsConfig,
-        seedingMethod === 'ranking' ? rankingData : undefined
-      );
-
-      rounds = [{
-        round: 1,
-        heatAssignments: initialAssignments,
-        results: [],
-        completed: false
-      }];
-    }
-
-    const configuration: HeatConfiguration = {
-      enabled: true,
-      numberOfHeats: effectiveHeats,
-      promotionCount: scoringSystem === 'hms' ? promotionCount : 0,
-      seedingMethod,
-      autoAssign: false,
+    // Heat building is shared with the phone Race desk (utils/heatSetup)
+    const { heatManagement, pendingSeedingAction } = buildHeatSetup(skippers, {
       scoringSystem,
+      shrsMode,
+      numberOfHeats: effectiveHeats,
+      promotionCount,
+      seedingMethod,
       fleetManagementEnabled,
       heatLabelStyle,
       heatOrder,
-      ...(scoringSystem === 'shrs' ? {
-        shrsAssignmentMode: shrsMode,
-        shrsQualifyingRounds: qualifyingRounds,
-      } : {}),
-    };
-
-    const heatManagement: HeatManagement = {
-      configuration,
-      rounds,
-      currentRound: 1,
-      currentHeat: rounds[0].heatAssignments[rounds[0].heatAssignments.length - 1].heatDesignation,
-    };
+      qualifyingRounds,
+    });
 
     const dropRules: string = scoringSystem;
 
@@ -309,6 +167,7 @@ export const HeatRacingSetupWizard: React.FC<HeatRacingSetupWizardProps> = ({
         auto_complete_sail: true,
       },
       scoringMode,
+      ...(pendingSeedingAction ? { pendingSeedingAction } : {}),
     });
   };
 

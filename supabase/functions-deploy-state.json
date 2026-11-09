@@ -83,7 +83,7 @@
     },
     "generate-platform-billing": {
       "hasChanged": false,
-      "hash": "545a142557bb0d5114e93798f372d87bcecb0cb52caa7976088fec983be683d0"
+      "hash": "1c9bfa42db798cb8a00e9429da78fd54407d34289e33b7042ff85c905e124483"
     },
     "generate-race-document": {
       "hasChanged": false,
@@ -243,7 +243,7 @@
     },
     "send-platform-billing-invoice": {
       "hasChanged": false,
-      "hash": "c87bf4da4a7a32f3720bdadd699e867c80a4c11aa5456d553287c35d74a70497"
+      "hash": "6ecdb4d2c71b99ffe73b6ea5187c17c6536a1838f84f6b4edfff9416e251c0c2"
     },
     "send-renewal-reminder": {
       "hasChanged": false,

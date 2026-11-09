@@ -1,0 +1,5282 @@
+[
+ {
+  "id": "handicap-dns-13-boats",
+  "eventName": "handicap-dns-13-boats",
+  "clubName": "Fixture club",
+  "date": "2026-01-01",
+  "venue": "Fixture",
+  "raceClass": "DF65",
+  "raceFormat": "handicap",
+  "skippers": [
+   {
+    "name": "Skipper 1",
+    "sailNo": "79",
+    "startHcap": 120
+   },
+   {
+    "name": "Skipper 2",
+    "sailNo": "244",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 3",
+    "sailNo": "00",
+    "startHcap": 90
+   },
+   {
+    "name": "Skipper 4",
+    "sailNo": "03",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 5",
+    "sailNo": "05",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 6",
+    "sailNo": "44",
+    "startHcap": 90
+   },
+   {
+    "name": "Skipper 7",
+    "sailNo": "22",
+    "startHcap": 80
+   },
+   {
+    "name": "Skipper 8",
+    "sailNo": "163",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 9",
+    "sailNo": "29",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 10",
+    "sailNo": "58",
+    "startHcap": 70
+   },
+   {
+    "name": "Skipper 11",
+    "sailNo": "27",
+    "startHcap": 120
+   },
+   {
+    "name": "Skipper 12",
+    "sailNo": "72",
+    "startHcap": 110
+   },
+   {
+    "name": "Skipper 13",
+    "sailNo": "04",
+    "startHcap": 150
+   }
+  ],
+  "raceResults": [
+   {
+    "race": 1,
+    "handicap": 120,
+    "position": 1,
+    "adjustedHcap": 90,
+    "skipperIndex": 0
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 1,
+    "handicap": 90,
+    "position": 3,
+    "adjustedHcap": 80,
+    "skipperIndex": 2
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 1,
+    "handicap": 90,
+    "position": 6,
+    "adjustedHcap": 90,
+    "skipperIndex": 5
+   },
+   {
+    "race": 1,
+    "handicap": 80,
+    "position": 7,
+    "adjustedHcap": 80,
+    "skipperIndex": 6
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 1,
+    "handicap": 70,
+    "position": 10,
+    "adjustedHcap": 70,
+    "skipperIndex": 9
+   },
+   {
+    "race": 1,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 1,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 1,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 12
+   },
+   {
+    "race": 2,
+    "handicap": 70,
+    "position": 1,
+    "adjustedHcap": 40,
+    "skipperIndex": 9
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 2,
+    "handicap": 80,
+    "position": 6,
+    "adjustedHcap": 80,
+    "skipperIndex": 2
+   },
+   {
+    "race": 2,
+    "handicap": 90,
+    "position": 7,
+    "adjustedHcap": 90,
+    "skipperIndex": 5
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 2,
+    "handicap": 90,
+    "position": 9,
+    "adjustedHcap": 90,
+    "skipperIndex": 0
+   },
+   {
+    "race": 2,
+    "handicap": 80,
+    "position": 10,
+    "adjustedHcap": 80,
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 2,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 2,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 12
+   },
+   {
+    "race": 3,
+    "handicap": 150,
+    "position": 1,
+    "adjustedHcap": 120,
+    "skipperIndex": 12
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 3,
+    "handicap": 90,
+    "position": 4,
+    "adjustedHcap": 90,
+    "skipperIndex": 0
+   },
+   {
+    "race": 3,
+    "handicap": 80,
+    "position": 5,
+    "adjustedHcap": 80,
+    "skipperIndex": 2
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 3,
+    "handicap": 80,
+    "position": 7,
+    "adjustedHcap": 80,
+    "skipperIndex": 6
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 3,
+    "handicap": 90,
+    "position": 9,
+    "adjustedHcap": 90,
+    "skipperIndex": 5
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 10,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 3,
+    "handicap": 40,
+    "position": 11,
+    "adjustedHcap": 40,
+    "skipperIndex": 9
+   },
+   {
+    "race": 3,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 3,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 4,
+    "handicap": 40,
+    "position": 1,
+    "adjustedHcap": 10,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "handicap": 120,
+    "position": 2,
+    "adjustedHcap": 100,
+    "skipperIndex": 12
+   },
+   {
+    "race": 4,
+    "handicap": 90,
+    "position": 3,
+    "adjustedHcap": 80,
+    "skipperIndex": 0
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 4,
+    "handicap": 90,
+    "position": 5,
+    "adjustedHcap": 90,
+    "skipperIndex": 5
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 4,
+    "handicap": 80,
+    "position": 8,
+    "adjustedHcap": 80,
+    "skipperIndex": 2
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 10,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 4,
+    "handicap": 80,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 80,
+    "skipperIndex": 6
+   },
+   {
+    "race": 4,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 4,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 5,
+    "handicap": 80,
+    "position": 1,
+    "adjustedHcap": 50,
+    "skipperIndex": 0
+   },
+   {
+    "race": 5,
+    "handicap": 80,
+    "position": 2,
+    "adjustedHcap": 60,
+    "skipperIndex": 2
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 5,
+    "handicap": 90,
+    "position": 4,
+    "adjustedHcap": 90,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 5,
+    "handicap": 100,
+    "position": 8,
+    "adjustedHcap": 100,
+    "skipperIndex": 12
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 5,
+    "handicap": 10,
+    "position": 10,
+    "adjustedHcap": 10,
+    "skipperIndex": 9
+   },
+   {
+    "race": 5,
+    "handicap": 80,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 80,
+    "skipperIndex": 6
+   },
+   {
+    "race": 5,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 5,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 6,
+    "handicap": 80,
+    "position": 1,
+    "adjustedHcap": 50,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "handicap": 10,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 6,
+    "handicap": 90,
+    "position": 3,
+    "adjustedHcap": 80,
+    "skipperIndex": 5
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 6,
+    "handicap": 60,
+    "position": 5,
+    "adjustedHcap": 60,
+    "skipperIndex": 2
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 6,
+    "handicap": 50,
+    "position": 8,
+    "adjustedHcap": 50,
+    "skipperIndex": 0
+   },
+   {
+    "race": 6,
+    "handicap": 100,
+    "position": 9,
+    "adjustedHcap": 100,
+    "skipperIndex": 12
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 10,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 6,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 120,
+    "skipperIndex": 10
+   },
+   {
+    "race": 6,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 110,
+    "skipperIndex": 11
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 7,
+    "handicap": 50,
+    "position": 2,
+    "adjustedHcap": 60,
+    "skipperIndex": 6
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 20,
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 7,
+    "handicap": 80,
+    "position": 5,
+    "adjustedHcap": 110,
+    "skipperIndex": 5
+   },
+   {
+    "race": 7,
+    "handicap": 60,
+    "position": 6,
+    "adjustedHcap": 90,
+    "skipperIndex": 2
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 7,
+    "handicap": 100,
+    "position": 9,
+    "adjustedHcap": 130,
+    "skipperIndex": 12
+   },
+   {
+    "race": 7,
+    "handicap": 50,
+    "position": 10,
+    "adjustedHcap": 80,
+    "skipperIndex": 0
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 30,
+    "skipperIndex": 9
+   },
+   {
+    "race": 7,
+    "handicap": 120,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 10
+   },
+   {
+    "race": 7,
+    "handicap": 110,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 140,
+    "skipperIndex": 11
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 10,
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "handicap": 130,
+    "position": 3,
+    "adjustedHcap": 150,
+    "skipperIndex": 12
+   },
+   {
+    "race": 8,
+    "handicap": 110,
+    "position": 4,
+    "adjustedHcap": 140,
+    "skipperIndex": 5
+   },
+   {
+    "race": 8,
+    "handicap": 30,
+    "position": 5,
+    "adjustedHcap": 60,
+    "skipperIndex": 9
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 8,
+    "handicap": 80,
+    "position": 7,
+    "adjustedHcap": 110,
+    "skipperIndex": 0
+   },
+   {
+    "race": 8,
+    "handicap": 90,
+    "position": 8,
+    "adjustedHcap": 120,
+    "skipperIndex": 2
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 8,
+    "handicap": 60,
+    "position": 10,
+    "adjustedHcap": 90,
+    "skipperIndex": 6
+   },
+   {
+    "race": 8,
+    "handicap": 20,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 50,
+    "skipperIndex": 3
+   },
+   {
+    "race": 8,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 10
+   },
+   {
+    "race": 8,
+    "handicap": 140,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 11
+   },
+   {
+    "race": 9,
+    "handicap": 50,
+    "position": 1,
+    "adjustedHcap": 20,
+    "skipperIndex": 3
+   },
+   {
+    "race": 9,
+    "handicap": 90,
+    "position": 2,
+    "adjustedHcap": 70,
+    "skipperIndex": 6
+   },
+   {
+    "race": 9,
+    "handicap": 10,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 9,
+    "handicap": 110,
+    "position": 5,
+    "adjustedHcap": 110,
+    "skipperIndex": 0
+   },
+   {
+    "race": 9,
+    "handicap": 60,
+    "position": 6,
+    "adjustedHcap": 60,
+    "skipperIndex": 9
+   },
+   {
+    "race": 9,
+    "handicap": 150,
+    "position": 7,
+    "adjustedHcap": 150,
+    "skipperIndex": 12
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 9,
+    "handicap": 120,
+    "position": 9,
+    "adjustedHcap": 120,
+    "skipperIndex": 2
+   },
+   {
+    "race": 9,
+    "handicap": 140,
+    "position": 10,
+    "adjustedHcap": 140,
+    "skipperIndex": 5
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 9,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 10
+   },
+   {
+    "race": 9,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 11
+   },
+   {
+    "race": 10,
+    "handicap": 20,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 10,
+    "handicap": 120,
+    "position": 3,
+    "adjustedHcap": 110,
+    "skipperIndex": 2
+   },
+   {
+    "race": 10,
+    "handicap": 70,
+    "position": 4,
+    "adjustedHcap": 70,
+    "skipperIndex": 6
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 10,
+    "handicap": 110,
+    "position": 7,
+    "adjustedHcap": 110,
+    "skipperIndex": 0
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 10,
+    "handicap": 140,
+    "position": 9,
+    "adjustedHcap": 140,
+    "skipperIndex": 5
+   },
+   {
+    "race": 10,
+    "handicap": 150,
+    "position": 10,
+    "adjustedHcap": 150,
+    "skipperIndex": 12
+   },
+   {
+    "race": 10,
+    "handicap": 60,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 60,
+    "skipperIndex": 9
+   },
+   {
+    "race": 10,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 10
+   },
+   {
+    "race": 10,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 150,
+    "skipperIndex": 11
+   }
+  ],
+  "lastCompletedRace": 10,
+  "dropRules": [
+   4,
+   8,
+   16,
+   24,
+   32,
+   40
+  ],
+  "completed": true,
+  "hasDeterminedInitialHcaps": true,
+  "isManualHandicaps": true
+ },
+ {
+  "id": "handicap-dnf-dns-11-boats",
+  "eventName": "handicap-dnf-dns-11-boats",
+  "clubName": "Fixture club",
+  "date": "2026-01-01",
+  "venue": "Fixture",
+  "raceClass": "DF65",
+  "raceFormat": "handicap",
+  "skippers": [
+   {
+    "name": "Skipper 1",
+    "sailNo": "48",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 2",
+    "sailNo": "95",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 3",
+    "sailNo": "75",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 4",
+    "sailNo": "56",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 5",
+    "sailNo": "96",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 6",
+    "sailNo": "00",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 7",
+    "sailNo": "70",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 8",
+    "sailNo": "82",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 9",
+    "sailNo": "78",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 10",
+    "sailNo": "34",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 11",
+    "sailNo": "24",
+    "startHcap": 0
+   }
+  ],
+  "raceResults": [
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 10,
+    "skipperIndex": 0
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 20,
+    "skipperIndex": 6
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 5
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 2,
+    "handicap": 10,
+    "position": 2,
+    "adjustedHcap": 20,
+    "skipperIndex": 0
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 20,
+    "skipperIndex": 2
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 5
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 2,
+    "handicap": 20,
+    "position": 8,
+    "adjustedHcap": 50,
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 10,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 11,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 3,
+    "handicap": 50,
+    "position": 1,
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 10,
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 5
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 3,
+    "handicap": 20,
+    "position": 6,
+    "adjustedHcap": 40,
+    "skipperIndex": 0
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 3,
+    "handicap": 20,
+    "position": 10,
+    "adjustedHcap": 40,
+    "skipperIndex": 2
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 11,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 20,
+    "skipperIndex": 4
+   },
+   {
+    "race": 4,
+    "handicap": 40,
+    "position": 4,
+    "adjustedHcap": 70,
+    "skipperIndex": 2
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 4,
+    "handicap": 40,
+    "position": 6,
+    "adjustedHcap": 70,
+    "skipperIndex": 0
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "handicap": 10,
+    "position": 10,
+    "adjustedHcap": 10,
+    "skipperIndex": 3
+   },
+   {
+    "race": 4,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNF",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 5,
+    "handicap": 70,
+    "position": 3,
+    "adjustedHcap": 90,
+    "skipperIndex": 0
+   },
+   {
+    "race": 5,
+    "handicap": 70,
+    "position": 4,
+    "adjustedHcap": 100,
+    "skipperIndex": 2
+   },
+   {
+    "race": 5,
+    "handicap": 20,
+    "position": 5,
+    "adjustedHcap": 50,
+    "skipperIndex": 4
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 5,
+    "handicap": 10,
+    "position": 7,
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "handicap": 10,
+    "position": 8,
+    "adjustedHcap": 10,
+    "skipperIndex": 3
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 5,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "handicap": 90,
+    "position": 1,
+    "adjustedHcap": 70,
+    "skipperIndex": 0
+   },
+   {
+    "race": 6,
+    "handicap": 50,
+    "position": 2,
+    "adjustedHcap": 40,
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 6,
+    "handicap": 10,
+    "position": 4,
+    "adjustedHcap": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 6,
+    "handicap": 100,
+    "position": 5,
+    "adjustedHcap": 110,
+    "skipperIndex": 2
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 6,
+    "handicap": 10,
+    "position": 7,
+    "adjustedHcap": 10,
+    "skipperIndex": 3
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 6,
+    "handicap": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 6,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "handicap": 110,
+    "position": 1,
+    "adjustedHcap": 90,
+    "skipperIndex": 2
+   },
+   {
+    "race": 7,
+    "handicap": 10,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "handicap": 70,
+    "position": 3,
+    "adjustedHcap": 70,
+    "skipperIndex": 0
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 7,
+    "handicap": 10,
+    "position": 6,
+    "adjustedHcap": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 7,
+    "handicap": 40,
+    "position": 8,
+    "adjustedHcap": 50,
+    "skipperIndex": 4
+   },
+   {
+    "race": 7,
+    "handicap": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 7,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "handicap": 70,
+    "position": 1,
+    "adjustedHcap": 50,
+    "skipperIndex": 0
+   },
+   {
+    "race": 8,
+    "handicap": 90,
+    "position": 2,
+    "adjustedHcap": 80,
+    "skipperIndex": 2
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 8,
+    "handicap": 50,
+    "position": 4,
+    "adjustedHcap": 60,
+    "skipperIndex": 4
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 8,
+    "handicap": 10,
+    "position": 6,
+    "adjustedHcap": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 8,
+    "handicap": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNF",
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 9,
+    "handicap": 50,
+    "position": 1,
+    "adjustedHcap": 30,
+    "skipperIndex": 0
+   },
+   {
+    "race": 9,
+    "handicap": 10,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 1
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 9,
+    "handicap": 80,
+    "position": 4,
+    "adjustedHcap": 90,
+    "skipperIndex": 2
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 9,
+    "handicap": 60,
+    "position": 6,
+    "adjustedHcap": 70,
+    "skipperIndex": 4
+   },
+   {
+    "race": 9,
+    "handicap": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 9,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 9,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 3
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 10,
+    "handicap": 30,
+    "position": 3,
+    "adjustedHcap": 50,
+    "skipperIndex": 0
+   },
+   {
+    "race": 10,
+    "handicap": 90,
+    "position": 4,
+    "adjustedHcap": 120,
+    "skipperIndex": 2
+   },
+   {
+    "race": 10,
+    "handicap": 70,
+    "position": 5,
+    "adjustedHcap": 100,
+    "skipperIndex": 4
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": 6,
+    "adjustedHcap": 0,
+    "skipperIndex": 8
+   },
+   {
+    "race": 10,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 40,
+    "skipperIndex": 6
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 7
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 10,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 0,
+    "skipperIndex": 10
+   },
+   {
+    "race": 10,
+    "handicap": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "adjustedHcap": 10,
+    "skipperIndex": 5
+   }
+  ],
+  "lastCompletedRace": 10,
+  "dropRules": [
+   4,
+   8,
+   16,
+   24,
+   32,
+   40
+  ],
+  "completed": true,
+  "hasDeterminedInitialHcaps": false,
+  "isManualHandicaps": false
+ },
+ {
+  "id": "scratch-dsq-rod-20-boats",
+  "eventName": "scratch-dsq-rod-20-boats",
+  "clubName": "Fixture club",
+  "date": "2026-01-01",
+  "venue": "Fixture",
+  "raceClass": "DF65",
+  "raceFormat": "scratch",
+  "skippers": [
+   {
+    "name": "Skipper 1",
+    "sailNo": "36",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 2",
+    "sailNo": "41",
+    "startHcap": 90
+   },
+   {
+    "name": "Skipper 3",
+    "sailNo": "410",
+    "startHcap": 80
+   },
+   {
+    "name": "Skipper 4",
+    "sailNo": "719",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 5",
+    "sailNo": "75",
+    "startHcap": 60
+   },
+   {
+    "name": "Skipper 6",
+    "sailNo": "795",
+    "startHcap": 90
+   },
+   {
+    "name": "Skipper 7",
+    "sailNo": "94",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 8",
+    "sailNo": "95",
+    "startHcap": 40
+   },
+   {
+    "name": "Skipper 9",
+    "sailNo": "4",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 10",
+    "sailNo": "293",
+    "startHcap": 40
+   },
+   {
+    "name": "Skipper 11",
+    "sailNo": "221",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 12",
+    "sailNo": "49",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 13",
+    "sailNo": "50",
+    "startHcap": 20
+   },
+   {
+    "name": "Skipper 14",
+    "sailNo": "447",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 15",
+    "sailNo": "223",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 16",
+    "sailNo": "66",
+    "startHcap": 150
+   },
+   {
+    "name": "Skipper 17",
+    "sailNo": "762",
+    "startHcap": 100
+   },
+   {
+    "name": "Skipper 18",
+    "sailNo": "231",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 19",
+    "sailNo": "649",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 20",
+    "sailNo": "61",
+    "startHcap": 0
+   }
+  ],
+  "raceResults": [
+   {
+    "race": 11,
+    "position": 1,
+    "skipperIndex": 8
+   },
+   {
+    "race": 11,
+    "position": 2,
+    "skipperIndex": 3
+   },
+   {
+    "race": 11,
+    "position": 3,
+    "skipperIndex": 17
+   },
+   {
+    "race": 11,
+    "position": 4,
+    "skipperIndex": 1
+   },
+   {
+    "race": 11,
+    "position": 5,
+    "skipperIndex": 19
+   },
+   {
+    "race": 11,
+    "position": 6,
+    "skipperIndex": 7
+   },
+   {
+    "race": 11,
+    "position": 7,
+    "skipperIndex": 16
+   },
+   {
+    "race": 11,
+    "position": 8,
+    "skipperIndex": 10
+   },
+   {
+    "race": 11,
+    "position": 9,
+    "skipperIndex": 18
+   },
+   {
+    "race": 11,
+    "position": 10,
+    "skipperIndex": 2
+   },
+   {
+    "race": 11,
+    "position": 11,
+    "skipperIndex": 6
+   },
+   {
+    "race": 11,
+    "position": 12,
+    "skipperIndex": 11
+   },
+   {
+    "race": 11,
+    "position": 13,
+    "skipperIndex": 12
+   },
+   {
+    "race": 11,
+    "position": 14,
+    "skipperIndex": 9
+   },
+   {
+    "race": 11,
+    "position": 15,
+    "skipperIndex": 13
+   },
+   {
+    "race": 11,
+    "position": 16,
+    "skipperIndex": 14
+   },
+   {
+    "race": 11,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 11,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 5
+   },
+   {
+    "race": 11,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 0
+   },
+   {
+    "race": 11,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 15
+   },
+   {
+    "race": 12,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 12,
+    "position": 2,
+    "skipperIndex": 13
+   },
+   {
+    "race": 12,
+    "position": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 12,
+    "position": 4,
+    "skipperIndex": 10
+   },
+   {
+    "race": 12,
+    "position": 5,
+    "skipperIndex": 17
+   },
+   {
+    "race": 12,
+    "position": 6,
+    "skipperIndex": 2
+   },
+   {
+    "race": 12,
+    "position": 7,
+    "skipperIndex": 12
+   },
+   {
+    "race": 12,
+    "position": 8,
+    "skipperIndex": 18
+   },
+   {
+    "race": 12,
+    "position": 9,
+    "skipperIndex": 1
+   },
+   {
+    "race": 12,
+    "position": 10,
+    "skipperIndex": 7
+   },
+   {
+    "race": 12,
+    "position": 11,
+    "skipperIndex": 14
+   },
+   {
+    "race": 12,
+    "position": 12,
+    "skipperIndex": 11
+   },
+   {
+    "race": 12,
+    "position": 13,
+    "skipperIndex": 16
+   },
+   {
+    "race": 12,
+    "position": 14,
+    "skipperIndex": 6
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 0
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 5
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 15
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DSQ",
+    "skipperIndex": 9
+   },
+   {
+    "race": 12,
+    "position": null,
+    "letterScore": "DSQ",
+    "skipperIndex": 19
+   },
+   {
+    "race": 1,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 1,
+    "position": 2,
+    "skipperIndex": 9
+   },
+   {
+    "race": 1,
+    "position": 3,
+    "skipperIndex": 5
+   },
+   {
+    "race": 1,
+    "position": 4,
+    "skipperIndex": 19
+   },
+   {
+    "race": 1,
+    "position": 5,
+    "skipperIndex": 7
+   },
+   {
+    "race": 1,
+    "position": 6,
+    "skipperIndex": 15
+   },
+   {
+    "race": 1,
+    "position": 7,
+    "skipperIndex": 12
+   },
+   {
+    "race": 1,
+    "position": 8,
+    "skipperIndex": 0
+   },
+   {
+    "race": 1,
+    "position": 9,
+    "skipperIndex": 1
+   },
+   {
+    "race": 1,
+    "position": 10,
+    "skipperIndex": 14
+   },
+   {
+    "race": 1,
+    "position": 11,
+    "skipperIndex": 11
+   },
+   {
+    "race": 1,
+    "position": 12,
+    "skipperIndex": 13
+   },
+   {
+    "race": 1,
+    "position": 13,
+    "skipperIndex": 6
+   },
+   {
+    "race": 1,
+    "position": 14,
+    "skipperIndex": 2
+   },
+   {
+    "race": 1,
+    "position": 15,
+    "skipperIndex": 8
+   },
+   {
+    "race": 1,
+    "position": 16,
+    "skipperIndex": 18
+   },
+   {
+    "race": 1,
+    "position": 17,
+    "skipperIndex": 10
+   },
+   {
+    "race": 1,
+    "position": 18,
+    "skipperIndex": 4
+   },
+   {
+    "race": 1,
+    "position": 19,
+    "skipperIndex": 16
+   },
+   {
+    "race": 1,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 17
+   },
+   {
+    "race": 2,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 2,
+    "position": 2,
+    "skipperIndex": 12
+   },
+   {
+    "race": 2,
+    "position": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 2,
+    "position": 4,
+    "skipperIndex": 7
+   },
+   {
+    "race": 2,
+    "position": 5,
+    "skipperIndex": 15
+   },
+   {
+    "race": 2,
+    "position": 6,
+    "skipperIndex": 9
+   },
+   {
+    "race": 2,
+    "position": 7,
+    "skipperIndex": 8
+   },
+   {
+    "race": 2,
+    "position": 8,
+    "skipperIndex": 4
+   },
+   {
+    "race": 2,
+    "position": 9,
+    "skipperIndex": 0
+   },
+   {
+    "race": 2,
+    "position": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 2,
+    "position": 11,
+    "skipperIndex": 19
+   },
+   {
+    "race": 2,
+    "position": 12,
+    "skipperIndex": 16
+   },
+   {
+    "race": 2,
+    "position": 13,
+    "skipperIndex": 17
+   },
+   {
+    "race": 2,
+    "position": 14,
+    "skipperIndex": 18
+   },
+   {
+    "race": 2,
+    "position": 15,
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "position": 16,
+    "skipperIndex": 11
+   },
+   {
+    "race": 2,
+    "position": 17,
+    "skipperIndex": 13
+   },
+   {
+    "race": 2,
+    "position": 18,
+    "skipperIndex": 14
+   },
+   {
+    "race": 2,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 5
+   },
+   {
+    "race": 2,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "position": 1,
+    "skipperIndex": 4
+   },
+   {
+    "race": 3,
+    "position": 2,
+    "skipperIndex": 5
+   },
+   {
+    "race": 3,
+    "position": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 3,
+    "position": 4,
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "position": 5,
+    "skipperIndex": 8
+   },
+   {
+    "race": 3,
+    "position": 6,
+    "skipperIndex": 19
+   },
+   {
+    "race": 3,
+    "position": 7,
+    "skipperIndex": 7
+   },
+   {
+    "race": 3,
+    "position": 8,
+    "skipperIndex": 17
+   },
+   {
+    "race": 3,
+    "position": 9,
+    "skipperIndex": 13
+   },
+   {
+    "race": 3,
+    "position": 10,
+    "skipperIndex": 12
+   },
+   {
+    "race": 3,
+    "position": 11,
+    "skipperIndex": 16
+   },
+   {
+    "race": 3,
+    "position": 12,
+    "skipperIndex": 2
+   },
+   {
+    "race": 3,
+    "position": 13,
+    "skipperIndex": 6
+   },
+   {
+    "race": 3,
+    "position": 14,
+    "skipperIndex": 0
+   },
+   {
+    "race": 3,
+    "position": 15,
+    "skipperIndex": 1
+   },
+   {
+    "race": 3,
+    "position": 16,
+    "skipperIndex": 11
+   },
+   {
+    "race": 3,
+    "position": 17,
+    "skipperIndex": 14
+   },
+   {
+    "race": 3,
+    "position": 18,
+    "skipperIndex": 15
+   },
+   {
+    "race": 3,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 18
+   },
+   {
+    "race": 3,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 4,
+    "position": 2,
+    "skipperIndex": 17
+   },
+   {
+    "race": 4,
+    "position": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 4,
+    "position": 4,
+    "skipperIndex": 12
+   },
+   {
+    "race": 4,
+    "position": 5,
+    "skipperIndex": 2
+   },
+   {
+    "race": 4,
+    "position": 6,
+    "skipperIndex": 15
+   },
+   {
+    "race": 4,
+    "position": 7,
+    "skipperIndex": 6
+   },
+   {
+    "race": 4,
+    "position": 8,
+    "skipperIndex": 19
+   },
+   {
+    "race": 4,
+    "position": 9,
+    "skipperIndex": 1
+   },
+   {
+    "race": 4,
+    "position": 10,
+    "skipperIndex": 13
+   },
+   {
+    "race": 4,
+    "position": 11,
+    "skipperIndex": 16
+   },
+   {
+    "race": 4,
+    "position": 12,
+    "skipperIndex": 10
+   },
+   {
+    "race": 4,
+    "position": 13,
+    "skipperIndex": 11
+   },
+   {
+    "race": 4,
+    "position": 14,
+    "skipperIndex": 0
+   },
+   {
+    "race": 4,
+    "position": 15,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "position": 16,
+    "skipperIndex": 18
+   },
+   {
+    "race": 4,
+    "position": 17,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "position": 18,
+    "skipperIndex": 14
+   },
+   {
+    "race": 4,
+    "position": 19,
+    "skipperIndex": 4
+   },
+   {
+    "race": 4,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "position": 1,
+    "skipperIndex": 7
+   },
+   {
+    "race": 5,
+    "position": 2,
+    "skipperIndex": 3
+   },
+   {
+    "race": 5,
+    "position": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 5,
+    "position": 4,
+    "skipperIndex": 15
+   },
+   {
+    "race": 5,
+    "position": 5,
+    "skipperIndex": 10
+   },
+   {
+    "race": 5,
+    "position": 6,
+    "skipperIndex": 1
+   },
+   {
+    "race": 5,
+    "position": 7,
+    "skipperIndex": 13
+   },
+   {
+    "race": 5,
+    "position": 8,
+    "skipperIndex": 0
+   },
+   {
+    "race": 5,
+    "position": 9,
+    "skipperIndex": 12
+   },
+   {
+    "race": 5,
+    "position": 10,
+    "skipperIndex": 2
+   },
+   {
+    "race": 5,
+    "position": 11,
+    "skipperIndex": 16
+   },
+   {
+    "race": 5,
+    "position": 12,
+    "skipperIndex": 6
+   },
+   {
+    "race": 5,
+    "position": 13,
+    "skipperIndex": 18
+   },
+   {
+    "race": 5,
+    "position": 14,
+    "skipperIndex": 17
+   },
+   {
+    "race": 5,
+    "position": 15,
+    "skipperIndex": 14
+   },
+   {
+    "race": 5,
+    "position": 16,
+    "skipperIndex": 9
+   },
+   {
+    "race": 5,
+    "position": 17,
+    "skipperIndex": 11
+   },
+   {
+    "race": 5,
+    "position": 18,
+    "skipperIndex": 4
+   },
+   {
+    "race": 5,
+    "position": 19,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 19
+   },
+   {
+    "race": 6,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 6,
+    "position": 2,
+    "skipperIndex": 10
+   },
+   {
+    "race": 6,
+    "position": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 6,
+    "position": 4,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "position": 5,
+    "skipperIndex": 0
+   },
+   {
+    "race": 6,
+    "position": 6,
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "position": 7,
+    "skipperIndex": 17
+   },
+   {
+    "race": 6,
+    "position": 8,
+    "skipperIndex": 2
+   },
+   {
+    "race": 6,
+    "position": 9,
+    "skipperIndex": 5
+   },
+   {
+    "race": 6,
+    "position": 10,
+    "skipperIndex": 9
+   },
+   {
+    "race": 6,
+    "position": 11,
+    "skipperIndex": 15
+   },
+   {
+    "race": 6,
+    "position": 12,
+    "skipperIndex": 13
+   },
+   {
+    "race": 6,
+    "position": 13,
+    "skipperIndex": 16
+   },
+   {
+    "race": 6,
+    "position": 14,
+    "skipperIndex": 19
+   },
+   {
+    "race": 6,
+    "position": 15,
+    "skipperIndex": 18
+   },
+   {
+    "race": 6,
+    "position": 16,
+    "skipperIndex": 12
+   },
+   {
+    "race": 6,
+    "position": 17,
+    "skipperIndex": 14
+   },
+   {
+    "race": 6,
+    "position": 18,
+    "skipperIndex": 1
+   },
+   {
+    "race": 6,
+    "position": 19,
+    "skipperIndex": 11
+   },
+   {
+    "race": 6,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "position": 2,
+    "skipperIndex": 15
+   },
+   {
+    "race": 7,
+    "position": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 7,
+    "position": 4,
+    "skipperIndex": 8
+   },
+   {
+    "race": 7,
+    "position": 5,
+    "skipperIndex": 4
+   },
+   {
+    "race": 7,
+    "position": 6,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "position": 7,
+    "skipperIndex": 19
+   },
+   {
+    "race": 7,
+    "position": 8,
+    "skipperIndex": 5
+   },
+   {
+    "race": 7,
+    "position": 9,
+    "skipperIndex": 18
+   },
+   {
+    "race": 7,
+    "position": 10,
+    "skipperIndex": 1
+   },
+   {
+    "race": 7,
+    "position": 11,
+    "skipperIndex": 13
+   },
+   {
+    "race": 7,
+    "position": 12,
+    "skipperIndex": 0
+   },
+   {
+    "race": 7,
+    "position": 13,
+    "skipperIndex": 17
+   },
+   {
+    "race": 7,
+    "position": 14,
+    "skipperIndex": 12
+   },
+   {
+    "race": 7,
+    "position": 15,
+    "skipperIndex": 16
+   },
+   {
+    "race": 7,
+    "position": 16,
+    "skipperIndex": 14
+   },
+   {
+    "race": 7,
+    "position": 17,
+    "skipperIndex": 2
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 6
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 9
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 11
+   },
+   {
+    "race": 8,
+    "position": 1,
+    "skipperIndex": 5
+   },
+   {
+    "race": 8,
+    "position": 2,
+    "skipperIndex": 3
+   },
+   {
+    "race": 8,
+    "position": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 8,
+    "position": 4,
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "position": 5,
+    "skipperIndex": 1
+   },
+   {
+    "race": 8,
+    "position": 6,
+    "skipperIndex": 14
+   },
+   {
+    "race": 8,
+    "position": 7,
+    "skipperIndex": 13
+   },
+   {
+    "race": 8,
+    "position": 8,
+    "skipperIndex": 10
+   },
+   {
+    "race": 8,
+    "position": 9,
+    "skipperIndex": 16
+   },
+   {
+    "race": 8,
+    "position": 10,
+    "skipperIndex": 18
+   },
+   {
+    "race": 8,
+    "position": 11,
+    "skipperIndex": 17
+   },
+   {
+    "race": 8,
+    "position": 12,
+    "skipperIndex": 2
+   },
+   {
+    "race": 8,
+    "position": 13,
+    "skipperIndex": 0
+   },
+   {
+    "race": 8,
+    "position": 14,
+    "skipperIndex": 9
+   },
+   {
+    "race": 8,
+    "position": 15,
+    "skipperIndex": 4
+   },
+   {
+    "race": 8,
+    "position": 16,
+    "skipperIndex": 19
+   },
+   {
+    "race": 8,
+    "position": 17,
+    "skipperIndex": 6
+   },
+   {
+    "race": 8,
+    "position": 18,
+    "skipperIndex": 11
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 15
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 12
+   },
+   {
+    "race": 9,
+    "position": 1,
+    "skipperIndex": 8
+   },
+   {
+    "race": 9,
+    "position": 2,
+    "skipperIndex": 19
+   },
+   {
+    "race": 9,
+    "position": 3,
+    "skipperIndex": 3
+   },
+   {
+    "race": 9,
+    "position": 4,
+    "skipperIndex": 4
+   },
+   {
+    "race": 9,
+    "position": 5,
+    "skipperIndex": 1
+   },
+   {
+    "race": 9,
+    "position": 6,
+    "skipperIndex": 5
+   },
+   {
+    "race": 9,
+    "position": 7,
+    "skipperIndex": 2
+   },
+   {
+    "race": 9,
+    "position": 8,
+    "skipperIndex": 9
+   },
+   {
+    "race": 9,
+    "position": 9,
+    "skipperIndex": 17
+   },
+   {
+    "race": 9,
+    "position": 10,
+    "skipperIndex": 7
+   },
+   {
+    "race": 9,
+    "position": 11,
+    "skipperIndex": 18
+   },
+   {
+    "race": 9,
+    "position": 12,
+    "skipperIndex": 6
+   },
+   {
+    "race": 9,
+    "position": 13,
+    "skipperIndex": 12
+   },
+   {
+    "race": 9,
+    "position": 14,
+    "skipperIndex": 11
+   },
+   {
+    "race": 9,
+    "position": 15,
+    "skipperIndex": 10
+   },
+   {
+    "race": 9,
+    "position": 16,
+    "skipperIndex": 16
+   },
+   {
+    "race": 9,
+    "position": 17,
+    "skipperIndex": 13
+   },
+   {
+    "race": 9,
+    "position": 18,
+    "skipperIndex": 14
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 15
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 0
+   },
+   {
+    "race": 10,
+    "position": 1,
+    "skipperIndex": 3
+   },
+   {
+    "race": 10,
+    "position": 2,
+    "skipperIndex": 8
+   },
+   {
+    "race": 10,
+    "position": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 10,
+    "position": 4,
+    "skipperIndex": 0
+   },
+   {
+    "race": 10,
+    "position": 5,
+    "skipperIndex": 7
+   },
+   {
+    "race": 10,
+    "position": 6,
+    "skipperIndex": 5
+   },
+   {
+    "race": 10,
+    "position": 7,
+    "skipperIndex": 1
+   },
+   {
+    "race": 10,
+    "position": 8,
+    "skipperIndex": 19
+   },
+   {
+    "race": 10,
+    "position": 9,
+    "skipperIndex": 12
+   },
+   {
+    "race": 10,
+    "position": 10,
+    "skipperIndex": 4
+   },
+   {
+    "race": 10,
+    "position": 11,
+    "skipperIndex": 17
+   },
+   {
+    "race": 10,
+    "position": 12,
+    "skipperIndex": 18
+   },
+   {
+    "race": 10,
+    "position": 13,
+    "skipperIndex": 9
+   },
+   {
+    "race": 10,
+    "position": 14,
+    "skipperIndex": 13
+   },
+   {
+    "race": 10,
+    "position": 15,
+    "skipperIndex": 16
+   },
+   {
+    "race": 10,
+    "position": 16,
+    "skipperIndex": 14
+   },
+   {
+    "race": 10,
+    "position": 17,
+    "skipperIndex": 11
+   },
+   {
+    "race": 10,
+    "position": 18,
+    "skipperIndex": 2
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 6
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "ROD",
+    "customPoints": -1,
+    "skipperIndex": 15
+   }
+  ],
+  "lastCompletedRace": 12,
+  "dropRules": [
+   4,
+   8,
+   12,
+   16,
+   20,
+   24,
+   28,
+   32,
+   36,
+   40
+  ],
+  "completed": true,
+  "hasDeterminedInitialHcaps": true,
+  "isManualHandicaps": true
+ },
+ {
+  "id": "scratch-rdg-16-boats",
+  "eventName": "scratch-rdg-16-boats",
+  "clubName": "Fixture club",
+  "date": "2026-01-01",
+  "venue": "Fixture",
+  "raceClass": "DF65",
+  "raceFormat": "scratch",
+  "skippers": [
+   {
+    "name": "Skipper 1",
+    "sailNo": "55",
+    "startHcap": 130
+   },
+   {
+    "name": "Skipper 2",
+    "sailNo": "94",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 3",
+    "sailNo": "385",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 4",
+    "sailNo": "456",
+    "startHcap": 100
+   },
+   {
+    "name": "Skipper 5",
+    "sailNo": "4",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 6",
+    "sailNo": "762",
+    "startHcap": 100
+   },
+   {
+    "name": "Skipper 7",
+    "sailNo": "14",
+    "startHcap": 150
+   },
+   {
+    "name": "Skipper 8",
+    "sailNo": "299",
+    "startHcap": 150
+   },
+   {
+    "name": "Skipper 9",
+    "sailNo": "410",
+    "startHcap": 80
+   },
+   {
+    "name": "Skipper 10",
+    "sailNo": "719",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 11",
+    "sailNo": "00",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 12",
+    "sailNo": "568",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 13",
+    "sailNo": "293",
+    "startHcap": 40
+   },
+   {
+    "name": "Skipper 14",
+    "sailNo": "49",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 15",
+    "sailNo": "66",
+    "startHcap": 150
+   },
+   {
+    "name": "Skipper 16",
+    "sailNo": "41",
+    "startHcap": 90
+   }
+  ],
+  "raceResults": [
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 1,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 1,
+    "skipperIndex": 14
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 1,
+    "handicap": 50,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 50,
+    "customPoints": 2,
+    "skipperIndex": 1
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 3,
+    "skipperIndex": 11
+   },
+   {
+    "race": 1,
+    "handicap": 80,
+    "position": 4,
+    "adjustedHcap": 80,
+    "skipperIndex": 8
+   },
+   {
+    "race": 1,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 4,
+    "skipperIndex": 5
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 13
+   },
+   {
+    "race": 1,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 5,
+    "skipperIndex": 3
+   },
+   {
+    "race": 1,
+    "handicap": 130,
+    "position": 6,
+    "adjustedHcap": 130,
+    "skipperIndex": 0
+   },
+   {
+    "race": 1,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 6,
+    "skipperIndex": 10
+   },
+   {
+    "race": 1,
+    "handicap": 90,
+    "position": 7,
+    "adjustedHcap": 90,
+    "skipperIndex": 15
+   },
+   {
+    "race": 1,
+    "handicap": 40,
+    "position": 8,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 1,
+    "handicap": 150,
+    "position": 9,
+    "adjustedHcap": 150,
+    "skipperIndex": 6
+   },
+   {
+    "race": 1,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 9,
+    "skipperIndex": 7
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 2,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 1,
+    "skipperIndex": 5
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 2,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 2,
+    "skipperIndex": 14
+   },
+   {
+    "race": 2,
+    "handicap": 80,
+    "position": 3,
+    "adjustedHcap": 80,
+    "skipperIndex": 8
+   },
+   {
+    "race": 2,
+    "handicap": 50,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 50,
+    "customPoints": 3,
+    "skipperIndex": 1
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": 4,
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 4,
+    "skipperIndex": 11
+   },
+   {
+    "race": 2,
+    "handicap": 100,
+    "position": 5,
+    "adjustedHcap": 100,
+    "skipperIndex": 3
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 5,
+    "skipperIndex": 10
+   },
+   {
+    "race": 2,
+    "handicap": 90,
+    "position": 6,
+    "adjustedHcap": 90,
+    "skipperIndex": 15
+   },
+   {
+    "race": 2,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 6,
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "handicap": 130,
+    "position": 7,
+    "adjustedHcap": 130,
+    "skipperIndex": 0
+   },
+   {
+    "race": 2,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 7,
+    "skipperIndex": 13
+   },
+   {
+    "race": 2,
+    "handicap": 40,
+    "position": 8,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 2,
+    "handicap": 150,
+    "position": 9,
+    "adjustedHcap": 150,
+    "skipperIndex": 7
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 3,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 1,
+    "skipperIndex": 14
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 3,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 2,
+    "skipperIndex": 5
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 3,
+    "skipperIndex": 11
+   },
+   {
+    "race": 3,
+    "handicap": 50,
+    "position": 4,
+    "adjustedHcap": 50,
+    "skipperIndex": 1
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 4,
+    "skipperIndex": 10
+   },
+   {
+    "race": 3,
+    "handicap": 100,
+    "position": 5,
+    "adjustedHcap": 100,
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "handicap": 80,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 80,
+    "customPoints": 5,
+    "skipperIndex": 8
+   },
+   {
+    "race": 3,
+    "handicap": 150,
+    "position": 6,
+    "adjustedHcap": 150,
+    "skipperIndex": 6
+   },
+   {
+    "race": 3,
+    "handicap": 90,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 90,
+    "customPoints": 6,
+    "skipperIndex": 15
+   },
+   {
+    "race": 3,
+    "handicap": 40,
+    "position": 7,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 3,
+    "handicap": 130,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 130,
+    "customPoints": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 3,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 13
+   },
+   {
+    "race": 3,
+    "handicap": 150,
+    "position": 9,
+    "adjustedHcap": 150,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 1,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "handicap": 40,
+    "position": 2,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 2,
+    "skipperIndex": 2
+   },
+   {
+    "race": 4,
+    "handicap": 150,
+    "position": 3,
+    "adjustedHcap": 150,
+    "skipperIndex": 14
+   },
+   {
+    "race": 4,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 3,
+    "skipperIndex": 3
+   },
+   {
+    "race": 4,
+    "handicap": 80,
+    "position": 4,
+    "adjustedHcap": 80,
+    "skipperIndex": 8
+   },
+   {
+    "race": 4,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 4,
+    "skipperIndex": 6
+   },
+   {
+    "race": 4,
+    "handicap": 50,
+    "position": 5,
+    "adjustedHcap": 50,
+    "skipperIndex": 1
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 5,
+    "skipperIndex": 10
+   },
+   {
+    "race": 4,
+    "handicap": 100,
+    "position": 6,
+    "adjustedHcap": 100,
+    "skipperIndex": 5
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 6,
+    "skipperIndex": 11
+   },
+   {
+    "race": 4,
+    "handicap": 130,
+    "position": 7,
+    "adjustedHcap": 130,
+    "skipperIndex": 0
+   },
+   {
+    "race": 4,
+    "handicap": 90,
+    "position": 8,
+    "adjustedHcap": 90,
+    "skipperIndex": 15
+   },
+   {
+    "race": 4,
+    "handicap": 0,
+    "position": 9,
+    "adjustedHcap": 0,
+    "skipperIndex": 13
+   },
+   {
+    "race": 4,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 9,
+    "skipperIndex": 7
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 1,
+    "skipperIndex": 9
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 2,
+    "skipperIndex": 11
+   },
+   {
+    "race": 5,
+    "handicap": 150,
+    "position": 3,
+    "adjustedHcap": 150,
+    "skipperIndex": 14
+   },
+   {
+    "race": 5,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 3,
+    "skipperIndex": 6
+   },
+   {
+    "race": 5,
+    "handicap": 100,
+    "position": 4,
+    "adjustedHcap": 100,
+    "skipperIndex": 3
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 4,
+    "skipperIndex": 10
+   },
+   {
+    "race": 5,
+    "handicap": 100,
+    "position": 5,
+    "adjustedHcap": 100,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 40,
+    "customPoints": 5,
+    "skipperIndex": 12
+   },
+   {
+    "race": 5,
+    "handicap": 50,
+    "position": 6,
+    "adjustedHcap": 50,
+    "skipperIndex": 1
+   },
+   {
+    "race": 5,
+    "handicap": 90,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 90,
+    "customPoints": 6,
+    "skipperIndex": 15
+   },
+   {
+    "race": 5,
+    "handicap": 80,
+    "position": 7,
+    "adjustedHcap": 80,
+    "skipperIndex": 8
+   },
+   {
+    "race": 5,
+    "handicap": 130,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 130,
+    "customPoints": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 5,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 13
+   },
+   {
+    "race": 5,
+    "handicap": 150,
+    "position": 9,
+    "adjustedHcap": 150,
+    "skipperIndex": 7
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 9
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 2,
+    "skipperIndex": 14
+   },
+   {
+    "race": 6,
+    "handicap": 100,
+    "position": 3,
+    "adjustedHcap": 100,
+    "skipperIndex": 3
+   },
+   {
+    "race": 6,
+    "handicap": 80,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 80,
+    "customPoints": 3,
+    "skipperIndex": 8
+   },
+   {
+    "race": 6,
+    "handicap": 90,
+    "position": 4,
+    "adjustedHcap": 90,
+    "skipperIndex": 15
+   },
+   {
+    "race": 6,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 4,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "handicap": 100,
+    "position": 5,
+    "adjustedHcap": 100,
+    "skipperIndex": 5
+   },
+   {
+    "race": 6,
+    "handicap": 40,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 40,
+    "customPoints": 5,
+    "skipperIndex": 12
+   },
+   {
+    "race": 6,
+    "handicap": 50,
+    "position": 6,
+    "adjustedHcap": 50,
+    "skipperIndex": 1
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 6,
+    "skipperIndex": 10
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": 7,
+    "adjustedHcap": 0,
+    "skipperIndex": 11
+   },
+   {
+    "race": 6,
+    "handicap": 130,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 130,
+    "customPoints": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 6,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 9,
+    "skipperIndex": 13
+   },
+   {
+    "race": 6,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 9,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 1,
+    "skipperIndex": 9
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 2,
+    "adjustedHcap": 0,
+    "skipperIndex": 2
+   },
+   {
+    "race": 7,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 2,
+    "skipperIndex": 14
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": 3,
+    "adjustedHcap": 0,
+    "skipperIndex": 11
+   },
+   {
+    "race": 7,
+    "handicap": 50,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 50,
+    "customPoints": 3,
+    "skipperIndex": 1
+   },
+   {
+    "race": 7,
+    "handicap": 100,
+    "position": 4,
+    "adjustedHcap": 100,
+    "skipperIndex": 5
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 4,
+    "skipperIndex": 10
+   },
+   {
+    "race": 7,
+    "handicap": 40,
+    "position": 5,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 7,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 5,
+    "skipperIndex": 6
+   },
+   {
+    "race": 7,
+    "handicap": 90,
+    "position": 6,
+    "adjustedHcap": 90,
+    "skipperIndex": 15
+   },
+   {
+    "race": 7,
+    "handicap": 130,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 130,
+    "customPoints": 6,
+    "skipperIndex": 0
+   },
+   {
+    "race": 7,
+    "handicap": 100,
+    "position": 7,
+    "adjustedHcap": 100,
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "handicap": 80,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 80,
+    "customPoints": 7,
+    "skipperIndex": 8
+   },
+   {
+    "race": 7,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 9,
+    "skipperIndex": 13
+   },
+   {
+    "race": 7,
+    "handicap": 150,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 150,
+    "customPoints": 9,
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 1,
+    "adjustedHcap": 0,
+    "skipperIndex": 4
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 1,
+    "skipperIndex": 9
+   },
+   {
+    "race": 8,
+    "handicap": 40,
+    "position": 2,
+    "adjustedHcap": 40,
+    "skipperIndex": 12
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 2,
+    "skipperIndex": 2
+   },
+   {
+    "race": 8,
+    "handicap": 100,
+    "position": 3,
+    "adjustedHcap": 100,
+    "skipperIndex": 5
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 0,
+    "customPoints": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 8,
+    "handicap": 150,
+    "position": 4,
+    "adjustedHcap": 150,
+    "skipperIndex": 6
+   },
+   {
+    "race": 8,
+    "handicap": 90,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 90,
+    "customPoints": 4,
+    "skipperIndex": 15
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 5,
+    "adjustedHcap": 0,
+    "skipperIndex": 11
+   },
+   {
+    "race": 8,
+    "handicap": 50,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 50,
+    "customPoints": 5,
+    "skipperIndex": 1
+   },
+   {
+    "race": 8,
+    "handicap": 150,
+    "position": 6,
+    "adjustedHcap": 150,
+    "skipperIndex": 14
+   },
+   {
+    "race": 8,
+    "handicap": 100,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 100,
+    "customPoints": 6,
+    "skipperIndex": 3
+   },
+   {
+    "race": 8,
+    "handicap": 80,
+    "position": 7,
+    "adjustedHcap": 80,
+    "skipperIndex": 8
+   },
+   {
+    "race": 8,
+    "handicap": 130,
+    "position": null,
+    "letterScore": "RDG",
+    "adjustedHcap": 130,
+    "customPoints": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 8,
+    "handicap": 0,
+    "position": 8,
+    "adjustedHcap": 0,
+    "skipperIndex": 13
+   },
+   {
+    "race": 8,
+    "handicap": 150,
+    "position": 9,
+    "adjustedHcap": 150,
+    "skipperIndex": 7
+   }
+  ],
+  "lastCompletedRace": 8,
+  "dropRules": [
+   4,
+   8,
+   16,
+   24,
+   32,
+   40
+  ],
+  "completed": true,
+  "hasDeterminedInitialHcaps": false,
+  "isManualHandicaps": false
+ },
+ {
+  "id": "scratch-dnc-dnf-dns-15-boats",
+  "eventName": "scratch-dnc-dnf-dns-15-boats",
+  "clubName": "Fixture club",
+  "date": "2026-01-01",
+  "venue": "Fixture",
+  "raceClass": "DF65",
+  "raceFormat": "scratch",
+  "skippers": [
+   {
+    "name": "Skipper 1",
+    "sailNo": "36",
+    "startHcap": 0
+   },
+   {
+    "name": "Skipper 2",
+    "sailNo": "410",
+    "startHcap": 30
+   },
+   {
+    "name": "Skipper 3",
+    "sailNo": "719",
+    "startHcap": 60
+   },
+   {
+    "name": "Skipper 4",
+    "sailNo": "75",
+    "startHcap": 20
+   },
+   {
+    "name": "Skipper 5",
+    "sailNo": "795",
+    "startHcap": 40
+   },
+   {
+    "name": "Skipper 6",
+    "sailNo": "194",
+    "startHcap": 20
+   },
+   {
+    "name": "Skipper 7",
+    "sailNo": "95",
+    "startHcap": 40
+   },
+   {
+    "name": "Skipper 8",
+    "sailNo": "4",
+    "startHcap": 60
+   },
+   {
+    "name": "Skipper 9",
+    "sailNo": "293",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 10",
+    "sailNo": "63",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 11",
+    "sailNo": "66",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 12",
+    "sailNo": "90",
+    "startHcap": 20
+   },
+   {
+    "name": "Skipper 13",
+    "sailNo": "231",
+    "startHcap": 30
+   },
+   {
+    "name": "Skipper 14",
+    "sailNo": "61",
+    "startHcap": 50
+   },
+   {
+    "name": "Skipper 15",
+    "sailNo": "649",
+    "startHcap": 30
+   }
+  ],
+  "raceResults": [
+   {
+    "race": 1,
+    "position": 1,
+    "skipperIndex": 11
+   },
+   {
+    "race": 1,
+    "position": 2,
+    "skipperIndex": 10
+   },
+   {
+    "race": 1,
+    "position": 3,
+    "skipperIndex": 9
+   },
+   {
+    "race": 1,
+    "position": 4,
+    "skipperIndex": 0
+   },
+   {
+    "race": 1,
+    "position": 5,
+    "skipperIndex": 8
+   },
+   {
+    "race": 1,
+    "position": 6,
+    "skipperIndex": 2
+   },
+   {
+    "race": 1,
+    "position": 7,
+    "skipperIndex": 12
+   },
+   {
+    "race": 1,
+    "position": 8,
+    "skipperIndex": 7
+   },
+   {
+    "race": 1,
+    "position": 9,
+    "skipperIndex": 13
+   },
+   {
+    "race": 1,
+    "position": 10,
+    "skipperIndex": 14
+   },
+   {
+    "race": 1,
+    "position": 11,
+    "skipperIndex": 5
+   },
+   {
+    "race": 1,
+    "position": 12,
+    "skipperIndex": 1
+   },
+   {
+    "race": 1,
+    "position": 13,
+    "skipperIndex": 3
+   },
+   {
+    "race": 1,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 4
+   },
+   {
+    "race": 1,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "position": 1,
+    "skipperIndex": 7
+   },
+   {
+    "race": 2,
+    "position": 2,
+    "skipperIndex": 11
+   },
+   {
+    "race": 2,
+    "position": 3,
+    "skipperIndex": 1
+   },
+   {
+    "race": 2,
+    "position": 4,
+    "skipperIndex": 0
+   },
+   {
+    "race": 2,
+    "position": 5,
+    "skipperIndex": 8
+   },
+   {
+    "race": 2,
+    "position": 6,
+    "skipperIndex": 12
+   },
+   {
+    "race": 2,
+    "position": 7,
+    "skipperIndex": 10
+   },
+   {
+    "race": 2,
+    "position": 8,
+    "skipperIndex": 2
+   },
+   {
+    "race": 2,
+    "position": 9,
+    "skipperIndex": 6
+   },
+   {
+    "race": 2,
+    "position": 10,
+    "skipperIndex": 13
+   },
+   {
+    "race": 2,
+    "position": 11,
+    "skipperIndex": 9
+   },
+   {
+    "race": 2,
+    "position": 12,
+    "skipperIndex": 5
+   },
+   {
+    "race": 2,
+    "position": 13,
+    "skipperIndex": 14
+   },
+   {
+    "race": 2,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 3
+   },
+   {
+    "race": 2,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 4
+   },
+   {
+    "race": 3,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 3,
+    "position": 2,
+    "skipperIndex": 9
+   },
+   {
+    "race": 3,
+    "position": 3,
+    "skipperIndex": 1
+   },
+   {
+    "race": 3,
+    "position": 4,
+    "skipperIndex": 13
+   },
+   {
+    "race": 3,
+    "position": 5,
+    "skipperIndex": 7
+   },
+   {
+    "race": 3,
+    "position": 6,
+    "skipperIndex": 11
+   },
+   {
+    "race": 3,
+    "position": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 3,
+    "position": 8,
+    "skipperIndex": 12
+   },
+   {
+    "race": 3,
+    "position": 9,
+    "skipperIndex": 5
+   },
+   {
+    "race": 3,
+    "position": 10,
+    "skipperIndex": 6
+   },
+   {
+    "race": 3,
+    "position": 11,
+    "skipperIndex": 10
+   },
+   {
+    "race": 3,
+    "position": 12,
+    "skipperIndex": 14
+   },
+   {
+    "race": 3,
+    "position": 13,
+    "skipperIndex": 8
+   },
+   {
+    "race": 3,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 3,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 4,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 4,
+    "position": 2,
+    "skipperIndex": 7
+   },
+   {
+    "race": 4,
+    "position": 3,
+    "skipperIndex": 13
+   },
+   {
+    "race": 4,
+    "position": 4,
+    "skipperIndex": 10
+   },
+   {
+    "race": 4,
+    "position": 5,
+    "skipperIndex": 6
+   },
+   {
+    "race": 4,
+    "position": 6,
+    "skipperIndex": 8
+   },
+   {
+    "race": 4,
+    "position": 7,
+    "skipperIndex": 0
+   },
+   {
+    "race": 4,
+    "position": 8,
+    "skipperIndex": 9
+   },
+   {
+    "race": 4,
+    "position": 9,
+    "skipperIndex": 5
+   },
+   {
+    "race": 4,
+    "position": 10,
+    "skipperIndex": 14
+   },
+   {
+    "race": 4,
+    "position": 11,
+    "skipperIndex": 12
+   },
+   {
+    "race": 4,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 1
+   },
+   {
+    "race": 4,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 11
+   },
+   {
+    "race": 4,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 4,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 5,
+    "position": 1,
+    "skipperIndex": 7
+   },
+   {
+    "race": 5,
+    "position": 2,
+    "skipperIndex": 0
+   },
+   {
+    "race": 5,
+    "position": 3,
+    "skipperIndex": 9
+   },
+   {
+    "race": 5,
+    "position": 4,
+    "skipperIndex": 13
+   },
+   {
+    "race": 5,
+    "position": 5,
+    "skipperIndex": 2
+   },
+   {
+    "race": 5,
+    "position": 6,
+    "skipperIndex": 10
+   },
+   {
+    "race": 5,
+    "position": 7,
+    "skipperIndex": 11
+   },
+   {
+    "race": 5,
+    "position": 8,
+    "skipperIndex": 6
+   },
+   {
+    "race": 5,
+    "position": 9,
+    "skipperIndex": 12
+   },
+   {
+    "race": 5,
+    "position": 10,
+    "skipperIndex": 14
+   },
+   {
+    "race": 5,
+    "position": 11,
+    "skipperIndex": 8
+   },
+   {
+    "race": 5,
+    "position": 12,
+    "skipperIndex": 1
+   },
+   {
+    "race": 5,
+    "position": 13,
+    "skipperIndex": 5
+   },
+   {
+    "race": 5,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 5,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "position": 1,
+    "skipperIndex": 0
+   },
+   {
+    "race": 6,
+    "position": 2,
+    "skipperIndex": 9
+   },
+   {
+    "race": 6,
+    "position": 3,
+    "skipperIndex": 13
+   },
+   {
+    "race": 6,
+    "position": 4,
+    "skipperIndex": 2
+   },
+   {
+    "race": 6,
+    "position": 5,
+    "skipperIndex": 11
+   },
+   {
+    "race": 6,
+    "position": 6,
+    "skipperIndex": 8
+   },
+   {
+    "race": 6,
+    "position": 7,
+    "skipperIndex": 6
+   },
+   {
+    "race": 6,
+    "position": 8,
+    "skipperIndex": 7
+   },
+   {
+    "race": 6,
+    "position": 9,
+    "skipperIndex": 1
+   },
+   {
+    "race": 6,
+    "position": 10,
+    "skipperIndex": 5
+   },
+   {
+    "race": 6,
+    "position": 11,
+    "skipperIndex": 10
+   },
+   {
+    "race": 6,
+    "position": 12,
+    "skipperIndex": 12
+   },
+   {
+    "race": 6,
+    "position": 13,
+    "skipperIndex": 14
+   },
+   {
+    "race": 6,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 6,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 7,
+    "position": 2,
+    "skipperIndex": 9
+   },
+   {
+    "race": 7,
+    "position": 3,
+    "skipperIndex": 10
+   },
+   {
+    "race": 7,
+    "position": 4,
+    "skipperIndex": 6
+   },
+   {
+    "race": 7,
+    "position": 5,
+    "skipperIndex": 11
+   },
+   {
+    "race": 7,
+    "position": 6,
+    "skipperIndex": 7
+   },
+   {
+    "race": 7,
+    "position": 7,
+    "skipperIndex": 12
+   },
+   {
+    "race": 7,
+    "position": 8,
+    "skipperIndex": 5
+   },
+   {
+    "race": 7,
+    "position": 9,
+    "skipperIndex": 1
+   },
+   {
+    "race": 7,
+    "position": 10,
+    "skipperIndex": 13
+   },
+   {
+    "race": 7,
+    "position": 11,
+    "skipperIndex": 8
+   },
+   {
+    "race": 7,
+    "position": 12,
+    "skipperIndex": 14
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 0
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 7,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 8,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 8,
+    "position": 2,
+    "skipperIndex": 11
+   },
+   {
+    "race": 8,
+    "position": 3,
+    "skipperIndex": 13
+   },
+   {
+    "race": 8,
+    "position": 4,
+    "skipperIndex": 6
+   },
+   {
+    "race": 8,
+    "position": 5,
+    "skipperIndex": 8
+   },
+   {
+    "race": 8,
+    "position": 6,
+    "skipperIndex": 9
+   },
+   {
+    "race": 8,
+    "position": 7,
+    "skipperIndex": 5
+   },
+   {
+    "race": 8,
+    "position": 8,
+    "skipperIndex": 12
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 0
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 7
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 1
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 10
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 3
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 14
+   },
+   {
+    "race": 8,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 4
+   },
+   {
+    "race": 9,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 9,
+    "position": 2,
+    "skipperIndex": 13
+   },
+   {
+    "race": 9,
+    "position": 3,
+    "skipperIndex": 9
+   },
+   {
+    "race": 9,
+    "position": 4,
+    "skipperIndex": 11
+   },
+   {
+    "race": 9,
+    "position": 5,
+    "skipperIndex": 7
+   },
+   {
+    "race": 9,
+    "position": 6,
+    "skipperIndex": 8
+   },
+   {
+    "race": 9,
+    "position": 7,
+    "skipperIndex": 10
+   },
+   {
+    "race": 9,
+    "position": 8,
+    "skipperIndex": 6
+   },
+   {
+    "race": 9,
+    "position": 9,
+    "skipperIndex": 5
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 0
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 3
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 1
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 4
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 14
+   },
+   {
+    "race": 9,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 12
+   },
+   {
+    "race": 10,
+    "position": 1,
+    "skipperIndex": 2
+   },
+   {
+    "race": 10,
+    "position": 2,
+    "skipperIndex": 7
+   },
+   {
+    "race": 10,
+    "position": 3,
+    "skipperIndex": 13
+   },
+   {
+    "race": 10,
+    "position": 4,
+    "skipperIndex": 11
+   },
+   {
+    "race": 10,
+    "position": 5,
+    "skipperIndex": 10
+   },
+   {
+    "race": 10,
+    "position": 6,
+    "skipperIndex": 6
+   },
+   {
+    "race": 10,
+    "position": 7,
+    "skipperIndex": 5
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 0
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 3
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 4
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 14
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNS",
+    "skipperIndex": 12
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 8
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNC",
+    "skipperIndex": 1
+   },
+   {
+    "race": 10,
+    "position": null,
+    "letterScore": "DNF",
+    "skipperIndex": 9
+   }
+  ],
+  "lastCompletedRace": 10,
+  "dropRules": [
+   4,
+   8,
+   16,
+   24,
+   32,
+   40
+  ],
+  "completed": true,
+  "hasDeterminedInitialHcaps": false,
+  "isManualHandicaps": false
+ }
+]

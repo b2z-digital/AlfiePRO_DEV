@@ -111,6 +111,51 @@ function extractById(html: string, id: string): string | null {
   return null;
 }
 
+// Inner HTML of the first element with this class (balanced on its tag name)
+function extractByClass(html: string, cls: string): string | null {
+  const startTagRe = new RegExp(`<(\\w+)[^>]*\\sclass=["'][^"']*\\b${cls}\\b[^"']*["'][^>]*>`, "i");
+  const startTagM = startTagRe.exec(html);
+  if (!startTagM) return null;
+  const tagName = startTagM[1];
+  const startIdx = startTagM.index + startTagM[0].length;
+  let depth = 1;
+  let pos = startIdx;
+  while (pos < html.length && depth > 0) {
+    const nextOpen = html.indexOf(`<${tagName}`, pos);
+    const nextClose = html.indexOf(`</${tagName}>`, pos);
+    if (nextClose === -1) break;
+    if (nextOpen !== -1 && nextOpen < nextClose) { depth++; pos = nextOpen + 1; }
+    else { depth--; if (depth === 0) return html.slice(startIdx, nextClose); pos = nextClose + 1; }
+  }
+  return null;
+}
+
+// New ARYA site (Nov 2026): /news cards and /news/<id> articles. Old index.php addresses are gone.
+function currentListUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/radiosailing\.org\.au$/i.test(u.hostname) && /arcade=news/i.test(u.search)) return `${u.origin}/news`;
+  } catch { /* keep as is */ }
+  return url;
+}
+
+function detectNewAryaLinks(html: string, baseUrl: string): ArticleLink[] {
+  const origin = new URL(baseUrl).origin;
+  const links: ArticleLink[] = [];
+  const seen = new Set<string>();
+  const re = /<article[^>]*class=["'][^"']*news-list-card[^"']*["'][^>]*>([\s\S]*?)<\/article>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const a = m[1].match(/<h3[^>]*>\s*<a[^>]+href=["'](\/news\/\d+)["'][^>]*>([\s\S]*?)<\/a>/i);
+    if (!a) continue;
+    const href = origin + a[1];
+    if (seen.has(href)) continue;
+    seen.add(href);
+    links.push({ href, title: stripTags(a[2]), date: firstMatch(/datetime=["']([^"']+)["']/, m[1]) });
+  }
+  return links;
+}
+
 // ─── Image storage helpers ───────────────────────────────────────────────────
 
 function getMimeType(url: string): string {
@@ -205,6 +250,10 @@ function normaliseCmsUrl(rawHref: string, baseUrl: string): string {
 }
 
 function detectArticleLinks(html: string, baseUrl: string): ArticleLink[] {
+  if (/news-list-card/.test(html)) {
+    const fresh = detectNewAryaLinks(html, baseUrl);
+    if (fresh.length) return fresh;
+  }
   const links: ArticleLink[] = [];
   const seen = new Set<string>();
 
@@ -295,6 +344,10 @@ async function fetchHtml(url: string): Promise<string | null> {
 // ─── Article field extractors ─────────────────────────────────────────────────
 
 function extractTitle(html: string, hintTitle: string): string {
+  if (/news-article-body/.test(html)) {
+    const h1 = firstMatch(/<h1[^>]*>([\s\S]*?)<\/h1>/i, html);
+    if (h1 && stripTags(h1).length > 3) return stripTags(h1);
+  }
   const byId = extractById(html, "NewsPostDetailTitle");
   if (byId) { const t = stripTags(byId); if (t.length > 5) return t; }
 
@@ -314,6 +367,10 @@ function extractTitle(html: string, hintTitle: string): string {
 }
 
 function extractDate(html: string, hintDate: string | null): string {
+  if (/news-article-body/.test(html)) {
+    const d = firstMatch(/class=["'][^"']*article-hero-meta[\s\S]*?<time[^>]*datetime=["']([^"']+)["']/i, html);
+    if (d) { const t = new Date(d); if (!isNaN(t.getTime())) return t.toISOString(); }
+  }
   const byId = extractById(html, "NewsPostDetailDate");
   if (byId) {
     const text = stripTags(byId).trim();
@@ -348,6 +405,10 @@ function extractAuthor(html: string, sourceName: string): string {
 }
 
 function extractCoverImage(html: string, baseUrl: string): string | null {
+  if (/news-article-body/.test(html)) {
+    const og = firstMatch(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i, html);
+    if (og) return absoluteUrl(baseUrl, og.replace(/&amp;/g, "&"));
+  }
   const contentHtml = extractById(html, "NewsPostDetailContent") || extractById(html, "NewsPostDetailSummary") || "";
   if (contentHtml) {
     const imgSrc = firstMatch(/<img[^>]*src=["']([^"']+)["'][^>]*>/i, contentHtml);
@@ -371,6 +432,20 @@ function extractCoverImage(html: string, baseUrl: string): string | null {
 }
 
 function extractContent(html: string, baseUrl: string): string {
+  if (/news-article-body/.test(html)) {
+    const lead = extractByClass(html, "news-article-lead") || "";
+    const body = extractByClass(html, "news-article-body") || "";
+    const both = (lead + "\n" + body).trim();
+    if (stripTags(both).length > 30) {
+      return both
+        .replace(/src=["'](?!https?:\/\/|\/\/|data:)([^"']+)["']/gi, (_, p) => `src="${absoluteUrl(baseUrl, p)}"`)
+        .replace(/href=["'](?!https?:\/\/|\/\/|#|mailto:)([^"']+)["']/gi, (_, p) => `href="${absoluteUrl(baseUrl, p)}"`)
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+        .trim()
+        .substring(0, 80000);
+    }
+  }
   const summary = extractById(html, "NewsPostDetailSummary") || "";
   const body = extractById(html, "NewsPostDetailContent") || "";
   let combined = (summary + "\n" + body).trim();
@@ -476,10 +551,14 @@ Deno.serve(async (req: Request) => {
       let articlesSkipped = 0;
 
       try {
-        const indexHtml = await fetchHtml(source.url);
+        const listUrl = currentListUrl(source.url);
+        const indexHtml = await fetchHtml(listUrl);
+        if (indexHtml && listUrl !== source.url) {
+          await supabase.from("news_scrape_sources").update({ url: listUrl }).eq("id", source.id);
+        }
         if (!indexHtml) throw new Error("Failed to fetch index page");
 
-        const articleLinks = detectArticleLinks(indexHtml, source.url);
+        const articleLinks = detectArticleLinks(indexHtml, listUrl);
         const unique = [...new Map(articleLinks.map(l => [l.href, l])).values()].slice(0, 50);
 
         if (unique.length === 0) {
@@ -504,8 +583,23 @@ Deno.serve(async (req: Request) => {
             .from("articles")
             .select("id")
             .eq("scraped_url", link.href)
-            .maybeSingle();
-          if (existing) { articlesSkipped++; continue; }
+            .limit(1);
+          if (existing && existing.length) { articlesSkipped++; continue; }
+
+          // Same story already imported from the old site (different address): point it at the new one
+          if (link.title) {
+            const { data: sameTitle } = await supabase
+              .from("articles")
+              .select("id")
+              .eq("is_scraped", true)
+              .ilike("scraped_url", `%${new URL(link.href).hostname.replace(/^www\./, "")}%`)
+              .ilike("title", link.title.replace(/[%_]/g, (c) => `\\${c}`));
+            if (sameTitle && sameTitle.length) {
+              await supabase.from("articles").update({ scraped_url: link.href }).in("id", sameTitle.map((r: { id: string }) => r.id));
+              articlesSkipped++;
+              continue;
+            }
+          }
 
           const article = await scrapeArticlePage(link.href, link.title, link.date, source.name);
           if (!article || article.title.length < 5) { articlesSkipped++; continue; }

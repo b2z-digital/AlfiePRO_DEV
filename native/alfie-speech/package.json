@@ -1,0 +1,16 @@
+{
+  "name": "alfie-speech",
+  "version": "1.0.0",
+  "description": "AlfiePRO speech recognition for calling finishes (Apple Speech on iOS, Android SpeechRecognizer).",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "UNLICENSED",
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
+  },
+  "capacitor": {
+    "ios": { "src": "ios" },
+    "android": { "src": "android" }
+  }
+}

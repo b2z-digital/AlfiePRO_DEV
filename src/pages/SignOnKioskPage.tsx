@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Anchor, CircleCheck as CheckCircle, Clock, Search, Users } from 'lucide-react';
 import { supabase } from '../utils/supabase';
-import { getSignOnSheet, signOn, signOff, RaceDaySignOn } from '../utils/raceSignOnStorage';
+import { getSignOnSheet, signOn, signOff, localRaceDay, RaceDaySignOn } from '../utils/raceSignOnStorage';
 
 interface EventSkipper {
   name: string;
@@ -30,7 +30,7 @@ export default function SignOnKioskPage() {
   const [entries, setEntries] = useState<RaceDaySignOn[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [raceDay, setRaceDay] = useState(new Date().toISOString().split('T')[0]);
+  const [raceDay, setRaceDay] = useState(localRaceDay());
   const [searchTerm, setSearchTerm] = useState('');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -202,7 +202,7 @@ export default function SignOnKioskPage() {
           <div className="max-w-lg mx-auto flex gap-2 overflow-x-auto">
             {eventDays.map(day => {
               const isSelected = raceDay === day.date;
-              const isToday = day.date === new Date().toISOString().split('T')[0];
+              const isToday = day.date === localRaceDay();
               return (
                 <button
                   key={day.date}

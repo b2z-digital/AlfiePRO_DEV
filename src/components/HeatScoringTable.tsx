@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { heatProgress, heatRaceResultsFor, heatSailingOrder, skippersScoredInOtherHeats, isInFinals as isInFinalsOf, isInQualifyingRound as isInQualifyingRoundOf } from '../utils/raceProgress';
 import { HeatManagement, HeatDesignation, generateInitialHeatAssignments, getHeatDisplayLabel, getSHRSRoundLabel } from '../types/heat';
 import { Skipper } from '../types';
 import { ScratchRaceTable } from './ScratchRaceTable';
@@ -156,22 +157,11 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return `Race ${roundNum}`;
   };
 
-  const isInQualifyingRound = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound <= shrsQualifyingRounds;
-  const isInFinals = isShrs && shrsQualifyingRounds > 0 && heatManagement.currentRound > shrsQualifyingRounds;
+  const isInQualifyingRound = isInQualifyingRoundOf(heatManagement);
+  const isInFinals = isInFinalsOf(heatManagement);
 
-  const availableHeats = useMemo(() => {
-    if (!currentRound) return [];
-    const heats = currentRound.heatAssignments
-      .map(assignment => assignment.heatDesignation)
-      .sort();
-    if (isInQualifyingRound) {
-      if (heatManagement.configuration?.heatOrder === 'descending') {
-        return [...heats].reverse();
-      }
-      return heats;
-    }
-    return heats.reverse();
-  }, [currentRound, isInQualifyingRound, heatManagement.configuration?.heatOrder]);
+  // Shared with the phone StartBox (utils/raceProgress)
+  const availableHeats = useMemo(() => heatSailingOrder(heatManagement), [currentRound, isInQualifyingRound, heatManagement.configuration?.heatOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Start with the LOWEST heat (last in the list) by default
   // Initialize to null and let useEffect set the correct heat
@@ -628,37 +618,12 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
 
   const skippersInOtherHeatsCurrentRound = useMemo(() => {
     if (!currentRound || !selectedHeat) return new Set<number>();
-    const skippersWithOtherHeatResults = new Set<number>();
-    const skippersWithCurrentHeatResults = new Set<number>();
-    currentRound.results.forEach(r => {
-      if (r.round === heatManagement.currentRound && (r.position !== null || r.letterScore)) {
-        if (r.heatDesignation === selectedHeat) {
-          skippersWithCurrentHeatResults.add(r.skipperIndex);
-        } else {
-          skippersWithOtherHeatResults.add(r.skipperIndex);
-        }
-      }
-    });
-    const result = new Set<number>();
-    skippersWithOtherHeatResults.forEach(idx => {
-      if (!skippersWithCurrentHeatResults.has(idx)) {
-        result.add(idx);
-      }
-    });
-    return result;
+    return skippersScoredInOtherHeats(heatManagement, selectedHeat);
   }, [currentRound, selectedHeat, heatManagement.currentRound]);
 
   // Filter race results for current heat's skippers
   const heatRaceResults = useMemo(() => {
-    const heatSkipperIndicesSet = new Set(heatSkipperIndices);
-    const currentRoundNum = heatManagement.currentRound;
-    return raceResults.filter(result => {
-      if (!heatSkipperIndicesSet.has(result.skipperIndex)) return false;
-      if (result.race === currentRoundNum && skippersInOtherHeatsCurrentRound.has(result.skipperIndex)) {
-        return false;
-      }
-      return true;
-    });
+    return heatRaceResultsFor(raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound);
   }, [raceResults, heatSkipperIndices, heatManagement.currentRound, skippersInOtherHeatsCurrentRound]);
 
   // Wrapper functions to map filtered indices to original indices
@@ -887,42 +852,8 @@ export const HeatScoringTable: React.FC<HeatScoringTableProps> = ({
     return `Heat ${getHeatDisplayLabel(heat, heatManagement.configuration)}`;
   };
 
-  const getHeatProgress = (heat: HeatDesignation) => {
-    const assignment = currentRound?.heatAssignments.find(
-      a => a.heatDesignation === heat
-    );
-    if (!assignment) return { scored: 0, total: 0 };
-
-    const total = assignment.skipperIndices.length;
-
-    const heatResults = currentRound?.results.filter(r =>
-      r.heatDesignation === heat &&
-      r.round === heatManagement.currentRound
-    ) || [];
-
-    let scoredCount = heatResults.filter(r =>
-      r.position !== null || r.letterScore
-    ).length;
-
-    if (scoredCount < total) {
-      const currentRace = heatManagement.currentRound;
-      const raceResultsCount = assignment.skipperIndices.filter(idx =>
-        raceResults.some(r =>
-          r.skipperIndex === idx &&
-          r.race === currentRace &&
-          (r.position !== null || r.letterScore)
-        )
-      ).length;
-      if (raceResultsCount > scoredCount) {
-        scoredCount = raceResultsCount;
-      }
-    }
-
-    return {
-      scored: scoredCount,
-      total
-    };
-  };
+  // Shared with the phone StartBox (utils/raceProgress)
+  const getHeatProgress = (heat: HeatDesignation) => heatProgress(heatManagement, raceResults, heat);
 
   const isHeatComplete = (heat: HeatDesignation) => {
     const roundKey = `${heatManagement.currentRound}-${heat}`;
