@@ -557,8 +557,9 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
   const buildSegmentTitle = (raceLabel: string) => {
     const eventTitle = stripBroadcastSuffix(activeSession?.title || '') || 'Race';
     const heatNum = activeSession?.heat_number;
+    // Round (in the event title) → Race → Heat
     return heatNum && !/heat/i.test(raceLabel)
-      ? `${eventTitle} | Heat ${heatNum} · ${raceLabel}`
+      ? `${eventTitle} | ${raceLabel} · Heat ${heatNum}`
       : `${eventTitle} | ${raceLabel}`;
   };
 
@@ -1992,7 +1993,7 @@ export function LivestreamControlPanel({ clubId, sessionId, autoCreateForEvent, 
     return (
       <>
         <CloudControlRoom
-          session={activeSession as SessionWithVenue}
+          session={{ ...activeSession, ...venueInfo } as SessionWithVenue}
           clubId={clubId}
           onBack={() => setActiveSession(null)}
           onSessionChange={(updated) => {

@@ -31,7 +31,7 @@ import { TestBroadcastLinkModal } from './TestBroadcastLinkModal';
  */
 
 type CloudCam = { id: string; name: string; videoEnabled: boolean };
-type SessionWithVenue = LivestreamSession & { venueName?: string; venueImage?: string };
+type SessionWithVenue = LivestreamSession & { venueName?: string; venueImage?: string; hostClubName?: string; hostClubLogo?: string };
 
 const AUTO_DIRECTOR_MS = 45000;
 /** The club's time zone (this browser's), so the cloud program's clock matches the venue */
@@ -664,6 +664,8 @@ export function CloudControlRoom({ session, clubId, onBack, onSessionChange, onD
                     onScoring={setScoring}
                     venueImage={session.venueImage}
                     venueName={session.venueName}
+                    hostClubName={session.hostClubName}
+                    hostClubLogo={session.hostClubLogo}
                   />
                 )}
                 {isPaused && isLive && (

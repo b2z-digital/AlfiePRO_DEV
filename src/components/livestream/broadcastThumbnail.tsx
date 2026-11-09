@@ -49,7 +49,7 @@ export async function renderRaceThumbnail(info: ThumbnailInfo): Promise<Blob | n
           chip="Race video"
           eyebrow={[info.dateLabel, info.venueName].filter(Boolean).join(' · ')}
           title={info.title}
-          meta={[info.race, info.round].filter(Boolean) as string[]}
+          badges={[info.round, info.race]}
           clip={clip}
         />
       </div>

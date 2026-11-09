@@ -203,8 +203,9 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 .alv-ov-screen .host { display: flex; align-items: center; gap: 1cqw; }
 .alv-ov-screen .host .logo { width: 3.6cqw; height: 3.6cqw; border-radius: 0.9cqw; background-color: #fff; background-size: contain; background-repeat: no-repeat; background-position: center; box-shadow: 0 0.3cqw 1.2cqw rgba(0, 0, 0, 0.35); }
 .alv-ov-screen .host .name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.45cqw; font-weight: 700; letter-spacing: -0.01em; color: #fff; text-shadow: 0 0.1cqw 0.6cqw rgba(0, 0, 0, 0.5); }
-.alv-ov-screen .chip { display: inline-flex; align-items: center; gap: 0.6cqw; height: 2.4cqw; padding: 0 1.1cqw; border-radius: 99cqw; font-size: 1cqw; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: rgba(255, 255, 255, 0.12); border: 0.08cqw solid rgba(255, 255, 255, 0.22); }
-.alv-ov-screen .chip .dot { width: 0.6cqw; height: 0.6cqw; border-radius: 50%; background: currentColor; }
+.alv-ov-screen .chip { display: inline-block; height: 2.4cqw; line-height: 2.4cqw; padding: 0 1.1cqw; white-space: nowrap; border-radius: 99cqw; font-size: 1cqw; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: rgba(255, 255, 255, 0.12); border: 0.08cqw solid rgba(255, 255, 255, 0.22); }
+.alv-ov-screen .chip .dot { display: inline-block; width: 0.6cqw; height: 0.6cqw; margin-right: 0.6cqw; border-radius: 50%; background: currentColor; vertical-align: middle; position: relative; top: -0.08cqw; }
+.alv-ov-screen .chip .tx { display: inline-block; vertical-align: top; }
 .alv-ov-screen .chip.is-intro { background: #E5243B; border-color: #E5243B; }
 .alv-ov-screen .chip.is-hold { color: #FFC864; background: rgba(255, 179, 64, 0.14); border-color: rgba(255, 179, 64, 0.5); }
 .alv-ov-screen .chip.is-done { color: #7BEA9C; background: rgba(48, 209, 88, 0.12); border-color: rgba(48, 209, 88, 0.45); }
@@ -214,11 +215,18 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
 .alv-ov-screen h1 { margin: 0; font-family: 'Bricolage Grotesque', sans-serif; font-size: 4.4cqw; font-weight: 700; line-height: 1.04; letter-spacing: -0.025em; color: #fff; text-shadow: 0 0.2cqw 1.6cqw rgba(0, 0, 0, 0.45); }
 .alv-ov-screen.is-hold h1, .alv-ov-screen.is-done h1 { font-size: 3.8cqw; }
 .alv-ov-screen .meta { display: flex; align-items: center; gap: 1.2cqw; margin-top: 1.8cqw; flex-wrap: wrap; }
-.alv-ov-screen .meta .race { display: inline-flex; align-items: center; height: 2.8cqw; padding: 0 1.3cqw; border-radius: 0.6cqw; background: #2A93FF; color: #fff; font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.45cqw; font-weight: 700; }
-.alv-ov-screen .meta .first { font-size: 1.4cqw; font-weight: 700; color: #fff; }
+.alv-ov-screen .meta { gap: 0.8cqw; }
+.alv-ov-screen .meta .lead { font-size: 1.15cqw; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(235, 240, 255, 0.78); margin-right: 0.3cqw; }
+/* Round / Race / Heat badges. Fixed height + matching line-height so the text sits in the middle
+   both on screen and in the stream capture */
+.alv-ov-screen .meta .badge { display: inline-block; height: 2.8cqw; line-height: 2.8cqw; padding: 0 1.2cqw; border-radius: 0.6cqw; font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.4cqw; font-weight: 700; color: #fff; white-space: nowrap; }
+.alv-ov-screen .meta .badge.is-round { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 0.08cqw rgba(255, 255, 255, 0.35); }
+.alv-ov-screen .meta .badge.is-race { background: #2A93FF; }
+.alv-ov-screen .meta .badge.is-heat { background: #8A4DFF; }
+.alv-ov-screen .meta .badge.is-other { background: rgba(255, 255, 255, 0.12); }
+.alv-ov-screen .meta .badge .tx { display: inline-block; vertical-align: top; position: relative; top: 0.07em; }
 .alv-ov-screen .meta .m { font-size: 1.3cqw; color: rgba(235, 240, 255, 0.78); }
-.alv-ov-screen .meta .m::before { content: '·'; margin-right: 1.2cqw; color: rgba(235, 240, 255, 0.45); }
-.alv-ov-screen .meta .race + .m::before { content: none; margin: 0; }
+.alv-ov-screen .meta .m::before { content: '·'; margin: 0 1cqw 0 0.4cqw; color: rgba(235, 240, 255, 0.45); }
 .alv-ov-screen .results { position: absolute; right: 4.2cqw; bottom: 8.6cqw; width: 28cqw; padding: 1.4cqw 1.6cqw; border-radius: 1.1cqw; background: rgba(6, 11, 22, 0.72); border: 0.08cqw solid rgba(255, 255, 255, 0.12); }
 .alv-ov-screen .results .h { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.5cqw; font-weight: 700; margin-bottom: 0.8cqw; color: #fff; }
 .alv-ov-screen .results .r { display: grid; grid-template-columns: 2.2cqw 4cqw 1fr; align-items: center; height: 2.4cqw; font-size: 1.15cqw; }
@@ -235,8 +243,10 @@ body.alv-onair-dock .alv-onair-host { padding-right: 368px; }
    centre badge text with line-height instead of flex */
 .alv-h2c .alv-ov-screen h1 { position: relative; top: -0.22em; margin-bottom: -0.1em; }
 .alv-h2c .alv-ov-screen .meta { margin-top: 2.2cqw; }
-.alv-h2c .alv-ov-screen .chip .tx, .alv-h2c .alv-ov-screen .meta .race .tx { position: relative; top: -0.3em; }
-.alv-h2c .alv-ov-screen .meta .m, .alv-h2c .alv-ov-screen .meta .first { position: relative; top: -0.2em; }
+/* Offsets measured against the capture (text centred within ±1px in a 1280×720 frame) */
+.alv-h2c .alv-ov-screen .meta .badge .tx { position: relative; top: -0.47em; }
+.alv-h2c .alv-ov-screen .chip .tx { position: relative; top: -0.55em; }
+.alv-h2c .alv-ov-screen .meta .m, .alv-h2c .alv-ov-screen .meta .lead { position: relative; top: -0.47em; }
 
 .alv-ov-results {
   left: 50%; top: 50%; transform: translate(-50%, -50%); width: 46cqw; padding: 1.8cqw 2.2cqw; border-radius: 1.2cqw;
