@@ -49,6 +49,8 @@ const CLASS_ICON_MAP: Record<string, string> = {
   "10": "DF95",
 };
 
+// State, regional and invitational events belong to their state's calendar; only national and
+// world events are filed as national.
 const STATE_ABBREVS = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"];
 
 function detectBoatClass(text: string): string | null {
@@ -708,7 +710,7 @@ Deno.serve(async (req: Request) => {
 
       const resolvedState = detail.stateCode || eventRow.state_code;
       const resolvedType = detail.eventType || eventRow.event_type;
-      if (resolvedType === 'state' && resolvedState && stateCodeToAssocId[resolvedState]) {
+      if (resolvedType !== 'national' && resolvedType !== 'world' && resolvedState && stateCodeToAssocId[resolvedState]) {
         updates.display_category = `state_${stateCodeToAssocId[resolvedState]}`;
       }
 
@@ -804,7 +806,7 @@ Deno.serve(async (req: Request) => {
             if (evt.boatClassMapped) updates.boat_class_mapped = evt.boatClassMapped;
             updates.event_type = evt.eventType;
 
-            if (evt.eventType === 'state' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
+            if (evt.eventType !== 'national' && evt.eventType !== 'world' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
               updates.display_category = `state_${stateCodeToAssocId[evt.stateCode]}`;
             }
 
@@ -812,7 +814,7 @@ Deno.serve(async (req: Request) => {
             updated++;
           } else {
             let eventDisplayCategory = source.display_category;
-            if (evt.eventType === 'state' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
+            if (evt.eventType !== 'national' && evt.eventType !== 'world' && evt.stateCode && stateCodeToAssocId[evt.stateCode]) {
               eventDisplayCategory = `state_${stateCodeToAssocId[evt.stateCode]}`;
             }
 
@@ -936,7 +938,7 @@ Deno.serve(async (req: Request) => {
 
             const resolvedState = detail.stateCode || evt.state_code;
             const resolvedType = detail.eventType || evt.event_type;
-            if (resolvedType === 'state' && resolvedState && stateCodeToAssocId[resolvedState]) {
+            if (resolvedType !== 'national' && resolvedType !== 'world' && resolvedState && stateCodeToAssocId[resolvedState]) {
               updates.display_category = `state_${stateCodeToAssocId[resolvedState]}`;
             }
 
