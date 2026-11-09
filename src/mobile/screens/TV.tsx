@@ -9,12 +9,12 @@ import { useRaceCompanion } from '../../utils/liveRaceCompanion';
 import { useRaceVideos, raceVideoState } from '../../components/livestream/LiveWatchView';
 import { LiveVideo } from '../../components/livestream/LiveVideo';
 import {
-  AlfieTVVideo, LivestreamArchive, MChannel, MStream, TVHome, duration, loadChannelVideos, loadTVHome, recordWatch, searchTV, thumb, toggleWatchlist,
+  AlfieTVVideo, LivestreamArchive, MChannel, MPlaylist, MStream, PLAYLIST_CATEGORIES, TVHome, duration, loadChannelVideos, loadPlaylist, loadPlaylistVideos, loadPlaylists, loadTVHome, recordWatch, searchTVAll, thumb, toggleWatchlist,
 } from '../tv';
 
 const AlfieTVPlayer = lazy(() => import('../../components/alfie-tv/tv/AlfieTVPlayer').then(m => ({ default: m.AlfieTVPlayer })));
 
-type Chip = 'foryou' | 'live' | 'replays' | 'mylist' | 'channels';
+type Chip = 'foryou' | 'live' | 'replays' | 'mylist' | 'channels' | `cat:${string}`;
 const CHIPS: { id: Chip; label: string }[] = [
   { id: 'foryou', label: 'For you' }, { id: 'live', label: 'Live' }, { id: 'replays', label: 'Replays' }, { id: 'mylist', label: 'My List' }, { id: 'channels', label: 'Channels' },
 ];
@@ -32,9 +32,12 @@ const Card: React.FC<{ v: AlfieTVVideo; w?: number; h?: number; progress?: numbe
   </button>
 );
 
-const Row: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const Row: React.FC<{ title: string; children: React.ReactNode; onSeeAll?: () => void; sub?: string }> = ({ title, children, onSeeAll, sub }) => (
   <>
-    <div className="m-sh"><h3>{title}</h3></div>
+    <div className="m-sh">
+      <h3 className="m-ell" style={{ minWidth: 0 }}>{title}{sub && <span style={{ fontWeight: 400, fontSize: 12.5, opacity: .55 }}> · {sub}</span>}</h3>
+      {onSeeAll && <button onClick={onSeeAll} style={{ flexShrink: 0 }}>See all</button>}
+    </div>
     <div className="m-hscroll">{children}</div>
   </>
 );
@@ -53,6 +56,38 @@ export const TVScreen: React.FC = () => {
   const [channel, setChannel] = useState<{ c: MChannel; videos: AlfieTVVideo[] | null } | null>(null);
   const [searching, setSearching] = useState(false);
   const watchId = params.get('watch');
+  const playlistId = params.get('playlist');
+  // Every playlist, as on the web AlfieTV: rows for the top 40 on For you, and by category
+  const [playlists, setPlaylists] = useState<MPlaylist[] | null>(null);
+  const [plVideos, setPlVideos] = useState<Record<string, AlfieTVVideo[]>>({});
+  const channelIds = useMemo(() => (home?.channels || []).map(c => c.id), [home?.channels]);
+  const channelName = useMemo(() => new Map((home?.channels || []).map(c => [c.id, c.channel_name])), [home?.channels]);
+  useEffect(() => {
+    if (!channelIds.length) return;
+    loadPlaylists(channelIds).then(list => {
+      setPlaylists(list);
+      const top = [...list].sort((a, b) => (Number(!!b.is_featured) - Number(!!a.is_featured)) || ((b.video_count || 0) - (a.video_count || 0))).slice(0, 40);
+      loadPlaylistVideos(top.map(p => p.id)).then(v => setPlVideos(m => ({ ...m, ...v }))).catch(() => {});
+    }).catch(() => setPlaylists([]));
+  }, [channelIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const catKey = chip.startsWith('cat:') ? chip.slice(4) : null;
+  const catLists = useMemo(() => (playlists || []).filter(p => catKey && (p.playlist_category || 'general') === catKey)
+    .sort((a, b) => (Number(!!b.is_featured) - Number(!!a.is_featured)) || ((b.video_count || 0) - (a.video_count || 0))), [playlists, catKey]);
+  useEffect(() => {
+    const missing = catLists.slice(0, 30).map(p => p.id).filter(id => !plVideos[id]);
+    if (missing.length) loadPlaylistVideos(missing).then(v => setPlVideos(m => ({ ...m, ...v }))).catch(() => {});
+  }, [catLists]); // eslint-disable-line react-hooks/exhaustive-deps
+  const categories = useMemo(() => {
+    const n = new Map<string, number>();
+    (playlists || []).forEach(p => n.set(p.playlist_category || 'general', (n.get(p.playlist_category || 'general') || 0) + 1));
+    return PLAYLIST_CATEGORIES.filter(([k]) => n.has(k));
+  }, [playlists]);
+  const openPlaylist = (id: string) => setParams({ playlist: id });
+  const playlistRow = (p: MPlaylist) => {
+    const vids = plVideos[p.id] || [];
+    if (!vids.length) return null;
+    return <Row key={p.id} title={p.title} sub={channelName.get(p.channel_id)} onSeeAll={() => openPlaylist(p.id)}>{vids.map(v => <Card key={v.id} v={v} onPlay={x => setPlaying({ v: x })} />)}</Row>;
+  };
 
   const load = React.useCallback(() => {
     loadTVHome(currentClub?.clubId, currentOrganization?.id, currentOrganization?.type || 'club', user?.id).then(setHome).catch(() => setHome(null));
@@ -76,6 +111,7 @@ export const TVScreen: React.FC = () => {
   const heroImg = heroStream ? (heroStream.venue_image ? `url("${heroStream.venue_image}")` : FALLBACK) : heroVideo && thumb(heroVideo) ? `url("${thumb(heroVideo)}")` : FALLBACK;
 
   if (watchId) return <LiveWatch sessionId={watchId} onClose={() => setParams({}, { replace: true })} />;
+  if (playlistId) return <PlaylistView id={playlistId} inList={inList} onMyList={myList} onPlay={(v, start) => setPlaying({ v, start })} onClose={() => (window.history.length > 1 ? navigate(-1) : setParams({}, { replace: true }))} playing={playing} onStopped={() => { setPlaying(null); load(); }} />;
 
   return (
     <div className="m-stack m-tv">
@@ -87,7 +123,7 @@ export const TVScreen: React.FC = () => {
         <button className="m-ibtn" style={{ padding: 0, border: 0, background: 'none' }} aria-label="Me" onClick={() => navigate('/me')}><Avatar name={name} url={profile.avatarUrl} size={36} /></button>
       </header>
       <div className="m-chips" style={{ position: 'relative' }}>
-        {CHIPS.map(c => (
+        {[...CHIPS, ...categories.map(([k, l]) => ({ id: `cat:${k}` as Chip, label: l }))].map(c => (
           <button key={c.id} className={`m-chip ${chip === c.id ? 'm-chip-on' : ''}`} style={chip === c.id ? undefined : { background: 'rgba(0,0,0,.3)', color: '#fff', borderColor: 'rgba(255,255,255,.12)' }} onClick={() => { setChip(c.id); setChannel(null); }}>
             {c.label}{c.id === 'live' && live.length ? ` ${live.length}` : ''}
           </button>
@@ -127,9 +163,32 @@ export const TVScreen: React.FC = () => {
               ))}
             </Row>
           )}
-          {home.rows.map(r => <Row key={r.id} title={r.title}>{r.videos.map(v => <Card key={v.id} v={v} onPlay={x => setPlaying({ v: x })} />)}</Row>)}
           {home.latest.length > 0 && <Row title="Latest">{home.latest.map(v => <Card key={v.id} v={v} onPlay={x => setPlaying({ v: x })} />)}</Row>}
+          {playlists === null || !Object.keys(plVideos).length
+            ? home.rows.map(r => <Row key={r.id} title={r.title} onSeeAll={() => openPlaylist(r.id)}>{r.videos.map(v => <Card key={v.id} v={v} onPlay={x => setPlaying({ v: x })} />)}</Row>)
+            : [...playlists].sort((a, b) => (Number(!!b.is_featured) - Number(!!a.is_featured)) || ((b.video_count || 0) - (a.video_count || 0))).slice(0, 40).map(playlistRow)}
+          {playlists && playlists.length > 40 && <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'rgba(235,240,255,.55)' }}>{playlists.length} playlists in all. Pick a category above to see every one.</p>}
         </>
+      ) : catKey ? (
+        <div className="m-stack" style={{ marginTop: 8 }}>
+          <div style={{ height: 110 }} />
+          <div className="m-disp" style={{ fontSize: 26, fontWeight: 700, color: '#fff', position: 'relative' }}>{(PLAYLIST_CATEGORIES.find(c => c[0] === catKey) || [, ''])[1]} <span style={{ fontSize: 14, fontWeight: 400, opacity: .6 }}>{catLists.length} playlists</span></div>
+          {catLists.length === 0 ? <div className="m-card m-empty">No playlists here yet.</div> : (
+            <>
+              {catLists.slice(0, 30).map(playlistRow)}
+              {catLists.length > 30 && (
+                <div className="m-card">
+                  {catLists.slice(30).map(p => (
+                    <button key={p.id} className="m-li" onClick={() => openPlaylist(p.id)}>
+                      <span className="m-thumb" style={{ width: 96, height: 54, backgroundImage: p.thumbnail_url ? `url("${p.thumbnail_url}")` : FALLBACK }} />
+                      <span style={{ flex: 1, minWidth: 0 }}><span className="m-ell2" style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{p.title}</span><span style={{ fontSize: 12, opacity: .55 }}>{p.video_count || 0} videos · {channelName.get(p.channel_id)}</span></span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       ) : chip === 'live' ? (
         <div className="m-stack" style={{ marginTop: 8 }}>
           {live.length === 0 && (home.upcoming.length === 0) && <div className="m-card m-empty">Nothing live right now. Broadcasts show here the moment they start.</div>}
@@ -177,7 +236,7 @@ export const TVScreen: React.FC = () => {
         </div>
       )}
 
-      {searching && <TVSearch onClose={() => setSearching(false)} onPlay={v => { setSearching(false); setPlaying({ v }); }} />}
+      {searching && <TVSearch channelIds={channelIds} progress={home?.continueWatching || []} onClose={() => setSearching(false)} onPlay={v => { setSearching(false); setPlaying({ v }); }} onPlaylist={id => { setSearching(false); openPlaylist(id); }} onChannel={c => { setSearching(false); setChip('channels'); openChannel(c); }} />}
       {playing && <VideoPlayer v={playing.v} start={playing.start} onClose={() => { setPlaying(null); load(); }} />}
       {replay && <ReplayPlayer r={replay} onClose={() => setReplay(null)} light={light} />}
     </div>
@@ -201,41 +260,147 @@ const StreamRow: React.FC<{ s: MStream; onOpen?: () => void }> = ({ s, onOpen })
 
 /* ─────────────── Search ─────────────── */
 
-const TVSearch: React.FC<{ onClose: () => void; onPlay: (v: AlfieTVVideo) => void }> = ({ onClose, onPlay }) => {
+const TVSearch: React.FC<{ channelIds: string[]; progress: { video: AlfieTVVideo; position: number; duration: number }[]; onClose: () => void; onPlay: (v: AlfieTVVideo) => void; onPlaylist: (id: string) => void; onChannel: (c: MChannel) => void }> = ({ channelIds, progress, onClose, onPlay, onPlaylist, onChannel }) => {
   const { user } = useAuth();
   const [q, setQ] = useState('');
-  const [res, setRes] = useState<AlfieTVVideo[] | null>(null);
+  const [tab, setTab] = useState<'videos' | 'playlists' | 'channels'>('videos');
+  const [res, setRes] = useState<Awaited<ReturnType<typeof searchTVAll>> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
+  const left = useMemo(() => new Map(progress.map(p => [p.video.id, p])), [progress]);
   useEffect(() => {
     clearTimeout(timer.current);
     if (q.trim().length < 2) { setRes(null); return; }
-    timer.current = setTimeout(() => { searchTV(user?.id, q.trim()).then(setRes).catch(() => setRes([])); }, 300);
-  }, [q, user?.id]);
+    timer.current = setTimeout(() => { searchTVAll(user?.id, q.trim(), channelIds).then(setRes).catch(() => setRes({ videos: [], playlists: [], channels: [] })); }, 300);
+  }, [q, user?.id, channelIds]);
+  const counts = res ? { videos: res.videos.length, playlists: res.playlists.length, channels: res.channels.length } : null;
   return (
     <>
       <div className="m-veil" onClick={onClose} />
-      <div className="m-sheet" role="dialog" aria-label="Search AlfieTV" style={{ height: '88dvh' }}>
+      <div className="m-sheet" role="dialog" aria-label="Search AlfieTV" style={{ height: '88dvh', display: 'flex', flexDirection: 'column' }}>
         <span className="m-grab" />
         <div className="m-row" style={{ marginBottom: 10 }}>
           <label className="m-search" style={{ flex: 1 }}>
             <Icon name="search" size={17} />
             <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>Search</span>
-            <input autoFocus placeholder="Races, tuning, classes" value={q} onChange={e => setQ(e.target.value)} />
+            <input autoFocus placeholder="Videos, playlists, channels" value={q} onChange={e => setQ(e.target.value)} />
           </label>
           <button className="m-ibtn" aria-label="Close" onClick={onClose}><Icon name="close" /></button>
         </div>
-        {res === null ? <div className="m-empty">Search every AlfieTV channel.</div> : res.length === 0 ? <div className="m-empty">Nothing found for "{q}".</div> : (
-          <div className="m-card">
-            {res.map(v => (
-              <button key={v.id} className="m-li" onClick={() => onPlay(v)}>
-                <span className="m-thumb" style={{ width: 96, height: 54, backgroundImage: thumb(v) ? `url("${thumb(v)}")` : FALLBACK }} />
-                <span className="m-ell2" style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{v.title}</span>
-              </button>
-            ))}
-          </div>
+        {counts && (
+          <nav className="m-seg" aria-label="Result type" style={{ marginBottom: 10 }}>
+            {(['videos', 'playlists', 'channels'] as const).map(k => <button key={k} className={tab === k ? 'm-on' : ''} onClick={() => setTab(k)}>{k[0].toUpperCase() + k.slice(1)} {counts[k]}</button>)}
+          </nav>
         )}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {res === null ? <div className="m-empty">Search every AlfieTV video, playlist and channel.</div>
+            : tab === 'videos' ? (res.videos.length === 0 ? <div className="m-empty">No videos for "{q}".</div> : (
+              <div className="m-card">
+                {res.videos.map(v => {
+                  const pr = left.get(v.id);
+                  const rem = pr && pr.duration ? Math.max(0, Math.round((pr.duration - pr.position) / 60)) : null;
+                  return (
+                    <button key={v.id} className="m-li" onClick={() => onPlay(v)}>
+                      <span className="m-thumb" style={{ width: 112, height: 63, flexShrink: 0, position: 'relative', backgroundImage: thumb(v) ? `url("${thumb(v)}")` : FALLBACK }}>
+                        {v.duration ? <span className="m-tv-dur">{duration(v.duration)}</span> : null}
+                        {pr && pr.duration ? <span className="m-tv-prog" style={{ width: `${Math.min(100, (pr.position / pr.duration) * 100)}%` }} /> : null}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                        <span className="m-ell2" style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{v.title}</span>
+                        <span className="m-dim" style={{ fontSize: 12 }}>{[v.view_count ? `${v.view_count >= 1000 ? `${Math.round(v.view_count / 100) / 10}k` : v.view_count} views` : '', rem != null ? (rem ? `${rem} min left` : 'watched') : ''].filter(Boolean).join(' · ')}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )) : tab === 'playlists' ? (res.playlists.length === 0 ? <div className="m-empty">No playlists for "{q}".</div> : (
+              <div className="m-card">
+                {res.playlists.map(p => (
+                  <button key={p.id} className="m-li" onClick={() => onPlaylist(p.id)}>
+                    <span className="m-thumb" style={{ width: 112, height: 63, flexShrink: 0, backgroundImage: p.thumbnail_url ? `url("${p.thumbnail_url}")` : FALLBACK }} />
+                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}><span className="m-ell2" style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{p.title}</span><span className="m-dim" style={{ fontSize: 12 }}>Playlist · {p.video_count || 0} videos</span></span>
+                  </button>
+                ))}
+              </div>
+            )) : (res.channels.length === 0 ? <div className="m-empty">No channels for "{q}".</div> : (
+              <div className="m-card">
+                {res.channels.map(c => (
+                  <button key={c.id} className="m-li" onClick={() => onChannel(c)}>
+                    <Avatar name={c.channel_name} url={c.channel_thumbnail} size={40} />
+                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}><span className="m-ell" style={{ display: 'block', fontWeight: 600 }}>{c.channel_name}</span>{c.video_count ? <span className="m-dim" style={{ fontSize: 12 }}>{c.video_count} videos</span> : null}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+        </div>
       </div>
     </>
+  );
+};
+
+/* ─────────────── A playlist ─────────────── */
+
+const PlaylistView: React.FC<{ id: string; inList: Set<string>; onMyList: (v: AlfieTVVideo) => void; onPlay: (v: AlfieTVVideo, start?: number) => void; onClose: () => void; playing: { v: AlfieTVVideo; start?: number } | null; onStopped: () => void }> = ({ id, onPlay, onClose, playing, onStopped }) => {
+  const { user } = useAuth();
+  const { toast } = useMobile();
+  const [data, setData] = useState<Awaited<ReturnType<typeof loadPlaylist>> | undefined>(undefined);
+  const [progress, setProgress] = useState<Map<string, { position: number; duration: number }>>(new Map());
+  useEffect(() => { loadPlaylist(id).then(setData).catch(() => setData(null)); }, [id]);
+  useEffect(() => {
+    if (!user?.id || !data?.videos.length) return;
+    supabase.from('alfie_tv_watch_history').select('video_id, watch_position, watch_duration').eq('user_id', user.id).in('video_id', data.videos.map(v => v.id))
+      .then(({ data: rows }) => setProgress(new Map(((rows as any[]) || []).map(r => [r.video_id, { position: r.watch_position || 0, duration: r.watch_duration || 0 }]))), () => {});
+  }, [user?.id, data?.videos.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const total = (data?.videos || []).reduce((t, v) => t + (v.duration || 0), 0);
+  const fmtTotal = total >= 3600 ? `${Math.floor(total / 3600)} h ${Math.round((total % 3600) / 60)} m` : `${Math.round(total / 60)} min`;
+  const next = data?.videos.find(v => { const p = progress.get(v.id); return !p || !p.duration || p.position < p.duration - 20; }) || data?.videos[0];
+  const share = async () => {
+    const url = `https://alfiepro.com.au/alfie-tv?playlist=${id}`;
+    try { if (navigator.share) await navigator.share({ title: data?.p.title, url }); else { await navigator.clipboard.writeText(url); toast('Link copied'); } } catch { /* dismissed */ }
+  };
+  const art = data?.p.thumbnail_url || (data?.videos[0] ? thumb(data.videos[0]) : '');
+  return (
+    <div className="m-stack m-tv">
+      <div aria-hidden="true" className="m-tv-hero" style={{ backgroundImage: `linear-gradient(180deg, rgba(5,7,12,.35) 0%, rgba(5,7,12,.1) 30%, rgba(5,7,12,.5) 60%, var(--m-tv-bg) 100%), ${art ? `url("${art}")` : FALLBACK}` }} />
+      <header className="m-top" style={{ position: 'relative' }}>
+        <button className="m-ibtn m-ibtn-d" aria-label="Back" onClick={onClose}><Icon name="back" /></button>
+        <div style={{ flex: 1 }} />
+        <button className="m-ibtn m-ibtn-d" aria-label="Share playlist" onClick={() => void share()}><Icon name="share" /></button>
+      </header>
+      {data === undefined ? <><div style={{ height: 120 }} /><Skeleton h={260} /></> : data === null ? <div className="m-card m-empty">This playlist isn't available.</div> : (
+        <>
+          <div style={{ height: 110 }} />
+          <div style={{ position: 'relative' }}>
+            <div className="m-lb" style={{ color: 'rgba(235,240,255,.7)' }}>Playlist</div>
+            <div className="m-disp" style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.1, color: '#fff', marginTop: 4 }}>{data.p.title}</div>
+            <div style={{ fontSize: 13, color: 'rgba(235,240,255,.65)', marginTop: 6 }}>{[`${data.videos.length} videos`, total ? fmtTotal : '', data.channel?.channel_name].filter(Boolean).join(' · ')}</div>
+          </div>
+          <div className="m-row" style={{ gap: 8, position: 'relative' }}>
+            <button className="m-btn m-btn-w" style={{ flex: 1 }} disabled={!next} onClick={() => next && onPlay(next, progress.get(next.id)?.position || undefined)}><Icon name="play" size={18} />{next && progress.has(next.id) ? 'Resume' : 'Play all'}</button>
+            <button className="m-btn m-btn-tvg" style={{ flex: 1 }} onClick={() => void share()}><Icon name="share" size={18} />Share</button>
+          </div>
+          <div className="m-card" style={{ position: 'relative' }}>
+            {data.videos.map((v, i) => {
+              const p = progress.get(v.id);
+              const watched = p && p.duration && p.position >= p.duration - 20;
+              const left = p && p.duration && !watched ? Math.max(1, Math.round((p.duration - p.position) / 60)) : null;
+              return (
+                <button key={v.id} className="m-li" onClick={() => onPlay(v, left ? p!.position : undefined)}>
+                  <span style={{ width: 20, textAlign: 'center', fontSize: 13, opacity: .55, flexShrink: 0 }}>{i + 1}</span>
+                  <span className="m-thumb" style={{ width: 96, height: 54, flexShrink: 0, position: 'relative', backgroundImage: thumb(v) ? `url("${thumb(v)}")` : FALLBACK }}>
+                    {p && p.duration ? <span className="m-tv-prog" style={{ width: `${Math.min(100, (p.position / p.duration) * 100)}%` }} /> : null}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <span className="m-ell2" style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{v.title}</span>
+                    <span style={{ fontSize: 12, opacity: .55 }}>{[duration(v.duration), watched ? 'watched' : left ? `${left} min left` : ''].filter(Boolean).join(' · ')}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {playing && <VideoPlayer v={playing.v} start={playing.start} onClose={onStopped} />}
+    </div>
   );
 };
 

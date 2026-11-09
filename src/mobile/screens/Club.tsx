@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useMobile } from '../MobileContext';
 import { Icon, IconName } from '../icons';
-import { Avatar, OfflineBanner, RootHeader, Skeleton } from '../ui';
-import { timeAgo } from '../data';
+import { Avatar, OfflineBanner, RootHeader, Skeleton, fmtDay } from '../ui';
+import { timeAgo, todayISO } from '../data';
+import { supabase } from '../../utils/supabase';
 import { MGroup, REPORT_REASONS, SocialPost, createPost, hidePost, loadChats, loadFeed, loadHiddenPosts, loadMyGroups, reportPost, toggleLike } from '../club';
 
 /** Big-title header used across the Club screens (back, title, actions). */
@@ -24,15 +25,16 @@ export const PageHeader: React.FC<{ title: string; right?: React.ReactNode; onBa
   );
 };
 
-const SHORTCUTS: { label: string; icon: IconName; bg: string; fg: string; path: string }[] = [
-  { label: 'Chats', icon: 'chat', bg: 'rgba(10,132,255,.16)', fg: '#4DA3FF', path: '/comms' },
-  { label: 'Groups', icon: 'club', bg: 'rgba(138,77,255,.16)', fg: '#B08CFF', path: '/club' },
-  { label: 'Meetings', icon: 'calendar', bg: 'rgba(255,210,94,.14)', fg: '#FFD25E', path: '/calendar?show=meetings' },
-  { label: 'Tasks', icon: 'tasks', bg: 'rgba(77,163,255,.14)', fg: '#7DBBFF', path: '/tasks' },
-  { label: 'Media', icon: 'image', bg: 'rgba(52,199,89,.14)', fg: '#5FD47F', path: '/media' },
-  { label: 'Classifieds', icon: 'tag', bg: 'rgba(255,62,154,.14)', fg: '#FF7DB8', path: '/classifieds' },
-  { label: 'News', icon: 'news', bg: 'rgba(255,138,43,.15)', fg: '#FFA65C', path: '/news' },
-  { label: 'Shops', icon: 'bag', bg: 'rgba(255,255,255,.08)', fg: 'var(--m-ink)', path: '/shops' },
+const SHORTCUTS: { key: string; label: string; icon: IconName; bg: string; fg: string; path: string }[] = [
+  { key: 'chats', label: 'Chats', icon: 'chat', bg: 'rgba(10,132,255,.16)', fg: '#4DA3FF', path: '/comms' },
+  { key: 'members', label: 'Members', icon: 'people', bg: 'rgba(52,199,89,.14)', fg: '#3FC46B', path: '/club/members' },
+  { key: 'groups', label: 'Groups', icon: 'club', bg: 'rgba(138,77,255,.16)', fg: '#9C78FF', path: '/club/groups' },
+  { key: 'meetings', label: 'Meetings', icon: 'calendar', bg: 'rgba(255,210,94,.16)', fg: '#E0A800', path: '/calendar?show=meetings' },
+  { key: 'tasks', label: 'Tasks', icon: 'tasks', bg: 'rgba(77,163,255,.14)', fg: '#3D95FF', path: '/tasks' },
+  { key: 'media', label: 'Media', icon: 'image', bg: 'rgba(52,199,89,.14)', fg: '#3FC46B', path: '/media' },
+  { key: 'classifieds', label: 'Classifieds', icon: 'tag', bg: 'rgba(255,62,154,.14)', fg: '#FF5FA8', path: '/classifieds' },
+  { key: 'news', label: 'News', icon: 'news', bg: 'rgba(255,138,43,.15)', fg: '#FF8A2B', path: '/news' },
+  { key: 'shops', label: 'Shops', icon: 'bag', bg: 'var(--m-fill-b)', fg: 'var(--m-ink)', path: '/shops' },
 ];
 
 /** A post's ⋯ menu: hide it from my feed, or report it to the club's admins. */
@@ -102,7 +104,7 @@ const HiddenPost: React.FC<{ onUndo: () => void }> = ({ onUndo }) => (
   </div>
 );
 
-const PostCard: React.FC<{ post: SocialPost; groupName?: string; mine?: boolean; onLike: (p: SocialPost) => void; onOpenPerson: (id: string) => void; onMore: (p: SocialPost) => void }> = ({ post, groupName, mine, onLike, onOpenPerson, onMore }) => {
+export const PostCard: React.FC<{ post: SocialPost; groupName?: string; mine?: boolean; onLike: (p: SocialPost) => void; onOpenPerson: (id: string) => void; onMore: (p: SocialPost) => void }> = ({ post, groupName, mine, onLike, onOpenPerson, onMore }) => {
   const name = post.author?.full_name || 'Member';
   const images = (post.attachments || []).filter(a => a.file_type === 'image');
   const liked = post.user_reaction === 'like';
@@ -254,18 +256,44 @@ export const ClubHub: React.FC = () => {
     try { await toggleLike(p.id); } catch { toast("Couldn't save that. Try again."); reload(); }
   };
   const name = `${profile.firstName} ${profile.lastName}`.trim() || 'Me';
+  const { currentClub } = useAuth();
+  const { calendar, memberIds } = useMobile();
+  const [counts, setCounts] = useState<{ members?: number; tasks?: number; media?: number; classifieds?: number }>({});
+  useEffect(() => {
+    const clubId = currentClub?.clubId;
+    if (!clubId) return;
+    Promise.all([
+      supabase.from('members').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
+      memberIds.length ? supabase.from('club_tasks').select('id', { count: 'exact', head: true }).eq('club_id', clubId).in('assignee_id', memberIds).neq('status', 'completed') : Promise.resolve({ count: 0 } as any),
+      supabase.from('event_media').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('media_type', 'image'),
+      supabase.from('classifieds').select('id', { count: 'exact', head: true }).eq('status', 'active').gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()),
+    ]).then(([m, t, me, c]) => setCounts({ members: m.count ?? undefined, tasks: t.count ?? undefined, media: me.count ?? undefined, classifieds: c.count ?? undefined })).catch(() => {});
+  }, [currentClub?.clubId, memberIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nextMeeting = calendar.find(i => i.kind === 'meeting' && i.date >= todayISO());
+  const subs: Record<string, string> = {
+    chats: chatUnread ? `${chatUnread} unread` : 'Messages',
+    members: counts.members != null ? `${counts.members} people` : 'People',
+    groups: groups.length ? `${groups.length} group${groups.length === 1 ? '' : 's'}` : 'Join one',
+    meetings: nextMeeting ? fmtDay(nextMeeting.date, { weekday: 'short', day: 'numeric', month: 'short' }) : 'None booked',
+    tasks: counts.tasks ? `${counts.tasks} for you` : 'All clear',
+    media: counts.media != null ? `${counts.media} photos` : 'Photos',
+    classifieds: counts.classifieds ? `${counts.classifieds} new` : 'Buy and sell',
+    news: 'Club news',
+    shops: 'Suppliers',
+  };
 
   return (
     <div className="m-stack">
       <RootHeader title="Club" right={<button className="m-ibtn" aria-label="Search people" onClick={() => navigate('/comms?new=1')}><Icon name="search" /></button>} />
-      <div className="m-scs">
-        {SHORTCUTS.map(s => (
-          <button key={s.label} className="m-sc" onClick={() => (s.label === 'Groups' ? document.getElementById('m-club-chips')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) : navigate(s.path))}>
-            <span style={{ background: s.bg, color: s.fg }}>
-              <Icon name={s.icon} size={22} />
-              {s.label === 'Chats' && chatUnread > 0 && <b className="m-badge">{chatUnread}</b>}
+      <div className="m-club-grid">
+        {SHORTCUTS.map(sc => (
+          <button key={sc.key} className="m-card" onClick={() => navigate(sc.path)} style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, textAlign: 'left', position: 'relative' }}>
+            <span className="m-tile" style={{ width: 36, height: 36, borderRadius: 11, background: sc.bg, color: sc.fg }}><Icon name={sc.icon} size={19} /></span>
+            <span style={{ minWidth: 0, width: '100%' }}>
+              <span style={{ display: 'block', fontWeight: 600, fontSize: 13.5 }}>{sc.label}</span>
+              <span className="m-dim m-ell" style={{ display: 'block', fontSize: 11.5 }}>{subs[sc.key] || '\u00a0'}</span>
             </span>
-            {s.label}
+            {sc.key === 'chats' && chatUnread > 0 && <b className="m-badge" style={{ top: 8, right: 8 }}>{chatUnread}</b>}
           </button>
         ))}
       </div>

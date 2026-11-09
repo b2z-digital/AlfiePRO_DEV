@@ -235,3 +235,45 @@ export function computeStats(items: MCalendarItem[], memberIds: string[], fullNa
   results.sort((a, b) => b.item.date.localeCompare(a.item.date));
   return { races, wins, podiums, avgFinish: finishN ? Math.round((finishSum / finishN) * 10) / 10 : null, months, rivals, results };
 }
+
+/* ─────────────── Phase 2: boat photos, performance by rig, care jobs ─────────────── */
+
+export async function loadBoatImages(boatId: string): Promise<{ id: string; url: string; caption: string | null; primary: boolean }[]> {
+  const { data } = await supabase.from('boat_images').select('*').eq('boat_id', boatId).order('created_at', { ascending: false });
+  return ((data as any[]) || []).map(r => ({ id: r.id, url: r.image_url, caption: r.caption, primary: !!r.is_primary }));
+}
+
+/** Upload as the desktop Gallery tab does (media bucket, <club>/boats/...). */
+export async function addBoatImage(boatId: string, clubId: string | undefined, file: File) {
+  const { compressImage } = await import('../utils/imageCompression');
+  const f = file.type.startsWith('image/') ? await compressImage(file, 'photo') : file;
+  const path = `${clubId || 'personal'}/boats/${boatId}-${Date.now()}.${(f.name.split('.').pop() || 'jpg')}`;
+  const { error } = await supabase.storage.from('media').upload(path, f, { cacheControl: '3600', upsert: false });
+  if (error) throw error;
+  const url = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+  const { error: e2 } = await supabase.from('boat_images').insert({ boat_id: boatId, image_url: url, is_primary: false, caption: null });
+  if (e2) throw e2;
+}
+
+/** The desktop Care tab's repeat options (MaintenanceTab recurrenceOptions). */
+export const RECURRENCE: [string, string][] = [['once', 'Once'], ['weekly', 'Every week'], ['monthly', 'Every month'], ['quarterly', 'Every 3 months'], ['annually', 'Every year']];
+
+/** Every logged race on every rig of a boat, with the rig and conditions it was sailed in. */
+export async function loadBoatRaceLogs(boatId: string) {
+  const rigs = await loadRigs(boatId);
+  if (!rigs.length) return { rigs, conds: [] as MRigCondition[], logs: [] as any[] };
+  const { data: c } = await supabase.from('rig_conditions').select('*').in('rig_id', rigs.map(r => r.id));
+  const conds = ((c as any[]) || []).map(x => ({ id: x.id, rigId: x.rig_id, wind: x.wind_condition, water: x.water_condition, settings: x.settings || {}, notes: x.notes, rating: x.performance_rating })) as MRigCondition[];
+  const { data: logs } = conds.length ? await supabase.from('race_logs').select('*').in('rig_condition_id', conds.map(x => x.id)).order('race_date', { ascending: false }).limit(300) : { data: [] as any[] };
+  return { rigs, conds, logs: (logs as any[]) || [] };
+}
+
+export async function addReminder(boatId: string, r: { title: string; due_date: string | null; recurrence: string; description?: string }) {
+  const { error } = await supabase.from('maintenance_reminders').insert({ boat_id: boatId, title: r.title, description: r.description || null, due_date: r.due_date, recurrence: r.recurrence, reminder_type: 'time_based', is_active: true, is_completed: false, notification_days_before: 3 });
+  if (error) throw error;
+}
+
+export async function addWorkLog(boatId: string, l: { title: string; cost: number | null; performed_date: string; performed_by?: string; type?: 'repair' | 'upgrade' | 'inspection' | 'cleaning' | 'other' }) {
+  const { error } = await supabase.from('maintenance_logs').insert({ boat_id: boatId, title: l.title, cost: l.cost, performed_date: l.performed_date, performed_by: l.performed_by || null, maintenance_type: l.type || 'other' });
+  if (error) throw error;
+}

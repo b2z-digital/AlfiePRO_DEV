@@ -98,6 +98,67 @@ export async function loadTVHome(clubId: string | undefined, orgId: string | und
   };
 }
 
+/* ─────────────── Playlists: every one, as on the web AlfieTV ─────────────── */
+
+export interface MPlaylist { id: string; title: string; description?: string | null; thumbnail_url?: string | null; video_count?: number | null; channel_id: string; playlist_category?: string | null; is_featured?: boolean | null }
+
+/** The web's category chips for playlists (AlfieTVPage CATEGORY_LABELS). */
+export const PLAYLIST_CATEGORIES: [string, string][] = [
+  ['live_events', 'Live Events'], ['rc_yachting', 'RC Yachting'], ['big_boat_yachting', 'Big Boat'], ['training_tips', 'Training'],
+  ['highlights_recaps', 'Highlights'], ['event_archives', 'Archives'], ['general', 'General'],
+];
+
+/** Every visible playlist on the given channels, ordered as the web orders them (featured, then newest). */
+export async function loadPlaylists(channelIds: string[]): Promise<MPlaylist[]> {
+  if (!channelIds.length) return [];
+  const { data } = await supabase.from('alfie_tv_youtube_playlists')
+    .select('id, title, description, thumbnail_url, video_count, channel_id, playlist_category, is_featured')
+    .in('channel_id', channelIds).eq('is_visible', true)
+    .order('is_featured', { ascending: false }).order('published_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false });
+  return (data || []) as MPlaylist[];
+}
+
+/** The first ten videos of each playlist, in playlist order (two queries for the lot). */
+export async function loadPlaylistVideos(playlistIds: string[], per = 10): Promise<Record<string, AlfieTVVideo[]>> {
+  const out: Record<string, AlfieTVVideo[]> = {};
+  if (!playlistIds.length) return out;
+  const { data: links } = await supabase.from('alfie_tv_youtube_playlist_videos').select('youtube_playlist_id, video_id, position')
+    .in('youtube_playlist_id', playlistIds).order('position').limit(Math.min(1000, playlistIds.length * 40));
+  const byList = new Map<string, string[]>();
+  (links || []).forEach((l: any) => { const a = byList.get(l.youtube_playlist_id) || []; if (a.length < per) a.push(l.video_id); byList.set(l.youtube_playlist_id, a); });
+  const ids = [...new Set([...byList.values()].flat())];
+  if (!ids.length) return out;
+  const { data: vids } = await supabase.from('alfie_tv_videos').select('*').in('id', ids);
+  const vById = new Map(((vids || []) as AlfieTVVideo[]).map(v => [v.id, v]));
+  byList.forEach((list, pid) => { out[pid] = list.map(id => vById.get(id)).filter(Boolean) as AlfieTVVideo[]; });
+  return out;
+}
+
+/** A whole playlist for its own page. */
+export async function loadPlaylist(id: string): Promise<{ p: MPlaylist; channel: MChannel | null; videos: AlfieTVVideo[] } | null> {
+  const { data: p } = await supabase.from('alfie_tv_youtube_playlists').select('id, title, description, thumbnail_url, video_count, channel_id, playlist_category, is_featured').eq('id', id).maybeSingle();
+  if (!p) return null;
+  const [{ data: ch }, { data: links }] = await Promise.all([
+    supabase.from('alfie_tv_channels').select('id, channel_name, channel_thumbnail, video_count, category').eq('id', (p as any).channel_id).maybeSingle(),
+    supabase.from('alfie_tv_youtube_playlist_videos').select('video_id').eq('youtube_playlist_id', id).order('position').limit(200),
+  ]);
+  const order = (links || []).map((l: any) => l.video_id);
+  const { data: vids } = order.length ? await supabase.from('alfie_tv_videos').select('*').in('id', order) : { data: [] as any[] };
+  const idx = new Map(order.map((x, i) => [x, i]));
+  return { p: p as MPlaylist, channel: (ch as MChannel) || null, videos: ((vids || []) as AlfieTVVideo[]).sort((a, b) => (idx.get(a.id) ?? 999) - (idx.get(b.id) ?? 999)) };
+}
+
+/** Search results by kind, for the Videos / Playlists / Channels tabs. */
+export async function searchTVAll(userId: string | undefined, q: string, channelIds: string[]) {
+  const [videos, pl, ch] = await Promise.all([
+    searchTV(userId, q),
+    channelIds.length ? supabase.from('alfie_tv_youtube_playlists').select('id, title, thumbnail_url, video_count, channel_id, playlist_category').in('channel_id', channelIds).eq('is_visible', true).ilike('title', `%${q}%`).limit(20) : Promise.resolve({ data: [] as any[] }),
+    channelIds.length ? supabase.from('alfie_tv_channels').select('id, channel_name, channel_thumbnail, video_count, category').in('id', channelIds).ilike('channel_name', `%${q}%`).limit(10) : Promise.resolve({ data: [] as any[] }),
+  ]);
+  const allowed = new Set(channelIds);
+  return { videos: videos.filter(v => !channelIds.length || allowed.has(v.channel_id)), playlists: (pl.data || []) as MPlaylist[], channels: (ch.data || []) as MChannel[] };
+}
+
 export async function loadChannelVideos(channelId: string): Promise<AlfieTVVideo[]> {
   const { data } = await supabase.from('alfie_tv_videos').select('*').eq('channel_id', channelId).order('published_at', { ascending: false }).limit(40);
   return (data || []) as AlfieTVVideo[];

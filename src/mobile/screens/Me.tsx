@@ -38,14 +38,15 @@ export const Me: React.FC = () => {
   return (
     <div className="m-stack">
       <header className="m-top" style={{ minHeight: 76, gap: 12 }}>
-        <Avatar name={name} url={profile.avatarUrl} size={58} ring />
-        <div className="m-top-title">
-          <div className="m-disp" style={{ fontSize: 22, fontWeight: 700 }}>{name}</div>
-          <button onClick={() => navigate('/choose-club')} style={{ background: 'none', border: 0, padding: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--m-blue-ink)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <button className="m-ibtn" aria-label="Back" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))}><Icon name="back" /></button>
+        <Avatar name={name} url={profile.avatarUrl} size={50} ring />
+        <div className="m-top-title" style={{ textAlign: 'left', alignItems: 'flex-start', minWidth: 0 }}>
+          <div className="m-disp m-ell" style={{ fontSize: 21, fontWeight: 700, maxWidth: '100%' }}>{name}</div>
+          <button onClick={() => navigate('/choose-club')} style={{ background: 'none', border: 0, padding: 0, fontSize: 13, fontWeight: 600, color: 'var(--m-blue-ink)', display: 'inline-flex', alignItems: 'center', gap: 4, textAlign: 'left', maxWidth: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
             {where || 'Choose a club'}{userClubs.length > 1 && <Icon name="down" size={14} />}
           </button>
         </div>
-        <button className="m-ibtn" aria-label="Edit profile" onClick={() => navigate('/settings')}><Icon name="doc" size={18} /></button>
+        <button className="m-ibtn" aria-label="My details" onClick={() => navigate('/me/details')}><Icon name="edit" size={18} /></button>
       </header>
       <OfflineBanner />
 
@@ -80,6 +81,7 @@ export const Me: React.FC = () => {
       </button>
 
       <div className="m-card">
+        <button className="m-li" onClick={() => navigate('/me/details')}><span className="m-tile" style={{ width: 36, height: 36, background: 'rgba(255,62,154,.14)', color: '#FF7DB8' }}><Icon name="heart" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>My details</span><span className="m-dim" style={{ fontSize: 13 }}>Contact, emergency</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/tasks')}><span className="m-tile" style={{ width: 36, height: 36, background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="tasks" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>My tasks</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/notifications')}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="bell" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Notifications</span><Icon name="chevron" size={17} className="m-dim" /></button>
         <button className="m-li" onClick={() => navigate('/settings')}><span className="m-tile" style={{ width: 36, height: 36, background: 'var(--m-fill)' }}><Icon name="me" size={18} /></span><span style={{ flex: 1, fontSize: 15 }}>Privacy &amp; account</span><Icon name="chevron" size={17} className="m-dim" /></button>

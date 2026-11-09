@@ -40,7 +40,7 @@ export const ClassifiedsScreen: React.FC = () => {
   const [favs, setFavs] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
-  const [selling, setSelling] = useState(false);
+  const [selling, setSelling] = useState(() => new URLSearchParams(window.location.search).get('sell') === '1');
 
   const load = React.useCallback(() => {
     loadClassifieds(currentClub?.clubId, user?.id).then(r => { setItems(r.items); setFavs(r.favourites); }).catch(() => setItems([]));
@@ -75,7 +75,7 @@ export const ClassifiedsScreen: React.FC = () => {
 
   return (
     <div className="m-stack">
-      <PageHeader title="Classifieds" right={<button className="m-pill-btn" onClick={() => requireFinancial() && setSelling(true)}><Icon name="camera" size={17} />Sell</button>} />
+      <PageHeader title="Classifieds" right={<><button className="m-ibtn" aria-label="My listings" onClick={() => navigate('/classifieds/mine')}><Icon name="tag" size={18} /></button><button className="m-pill-btn" onClick={() => requireFinancial() && setSelling(true)}><Icon name="camera" size={17} />Sell</button></>} />
       <label className="m-search">
         <Icon name="search" size={17} />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden' }}>Search classifieds</span>

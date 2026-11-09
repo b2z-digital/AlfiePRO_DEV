@@ -38,6 +38,9 @@ import { MeetingScreen } from './screens/Meeting';
 import { RaceTimerScreen } from './screens/RaceTimer';
 import { WeatherScreen } from './screens/Weather';
 import { TasksScreen } from './screens/Tasks';
+import { MyDetailsScreen } from './screens/MyDetails';
+import { GroupScreen, GroupsScreen, MembersScreen, MyListingsScreen } from './screens/ClubMore';
+import { TaskDetailScreen, TaskFormScreen } from './screens/TaskDetail';
 import { FindRacingScreen } from './screens/FindRacing';
 import { ChooseClubScreen, NotificationsPromptScreen, MembershipDueScreen, FIRST_RUN, flag, loadMyAssociations } from './screens/FirstRun';
 import { SettingsScreen } from './screens/Settings';
@@ -50,7 +53,7 @@ import '../styles/alfie-mobile.css';
 
 /** Screens that sit outside the tab bar (pushed full screen). */
 const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
-const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/[^/]+/, /^\/news\/[^/]+/];
+const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/(?!mine$)[^/]+/, /^\/news\/[^/]+/];
 
 const Shell: React.FC = () => {
   const { pathname } = useLocation();
@@ -100,6 +103,7 @@ const Shell: React.FC = () => {
           <Route path="/results/series/:id" element={<SeriesScreen />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/me" element={<Me />} />
+          <Route path="/me/details" element={<MyDetailsScreen />} />
           <Route path="/ask-alfie" element={<AskAlfieRoute onOpen={() => setAlfieOpen(true)} />} />
 
           <Route path="/race-desk" element={<RaceDeskScreen />} />
@@ -115,6 +119,9 @@ const Shell: React.FC = () => {
           <Route path="/race-desk/sync" element={<SyncScreen />} />
           <Route path="/race-desk/event/:key/sheet" element={<FullSheetScreen />} />
           <Route path="/club" element={<TermsGate><ClubHub /></TermsGate>} />
+          <Route path="/club/members" element={<MembersScreen />} />
+          <Route path="/club/groups" element={<TermsGate><GroupsScreen /></TermsGate>} />
+          <Route path="/club/group/:id" element={<TermsGate><GroupScreen /></TermsGate>} />
           <Route path="/community/*" element={<Navigate to="/club" replace />} />
           <Route path="/comms" element={<TermsGate><ChatsInbox /></TermsGate>} />
           <Route path="/comms/chat/:userId" element={<TermsGate><ChatThread /></TermsGate>} />
@@ -122,6 +129,7 @@ const Shell: React.FC = () => {
           <Route path="/skipper/:id" element={<SkipperProfile />} />
           <Route path="/classifieds" element={<ClassifiedsScreen />} />
           <Route path="/shops" element={<ShopsScreen />} />
+          <Route path="/classifieds/mine" element={<MyListingsScreen />} />
           <Route path="/classifieds/:id" element={<ListingScreen />} />
           <Route path="/news" element={<NewsScreen />} />
           <Route path="/news/:id" element={<ArticleScreen />} />
@@ -136,6 +144,9 @@ const Shell: React.FC = () => {
           <Route path="/race-timer" element={<RaceTimerScreen />} />
           <Route path="/weather" element={<WeatherScreen />} />
           <Route path="/tasks" element={<TasksScreen />} />
+          <Route path="/tasks/new" element={<TaskFormScreen />} />
+          <Route path="/tasks/:id" element={<TaskDetailScreen />} />
+          <Route path="/tasks/:id/edit" element={<TaskFormScreen />} />
           <Route path="/settings/*" element={<SettingsScreen />} />
           <Route path="/choose-club" element={<ChooseClubScreen />} />
           <Route path="/welcome-notifications" element={<NotificationsPromptScreen />} />
