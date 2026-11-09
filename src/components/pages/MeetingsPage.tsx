@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, Search, MapPin, Clock, Users, SquarePen as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat, Video, FileText } from 'lucide-react';
+import { Calendar, CalendarCheck, CalendarClock, CalendarPlus, Plus, Search, MapPin, Clock, Users, SquarePen as Edit2, Trash2, ChevronRight, TriangleAlert as AlertTriangle, Check, Shield, Repeat, Video, FileText, X } from 'lucide-react';
 import { AAvatar } from '../alfie/Kit';
 import { useAuth } from '../../contexts/AuthContext';
 import { Meeting } from '../../types/meeting';
 import { getMeetings, deleteMeeting, updateMeetingStatus, duplicateMeeting } from '../../utils/meetingStorage';
-import { formatDate } from '../../utils/date';
 import { MeetingForm } from '../meetings/MeetingForm';
 import { MeetingDetails } from '../meetings/MeetingDetails';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -23,7 +22,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeView, setActiveView] = useState<'upcoming' | 'past'>('upcoming');
+  const [activeView, setActiveView] = useState<'overview' | 'upcoming' | 'past'>('overview');
   const [showForm, setShowForm] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
@@ -217,35 +216,29 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     }
   };
 
-  // Filter meetings based on search term and active view
-  const filteredMeetings = meetings.filter(meeting => {
-    const matchesSearch = 
-      meeting.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (meeting.location && meeting.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (meeting.description && meeting.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const meetingDate = new Date(meeting.date);
-    meetingDate.setHours(0, 0, 0, 0);
-    
-    const isPast = meetingDate < today || meeting.status === 'completed' || meeting.status === 'cancelled';
-    
-    return matchesSearch && (
-      (activeView === 'upcoming' && !isPast) ||
-      (activeView === 'past' && isPast)
-    );
-  });
+  const todayStart = (() => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; })();
+  const dayOf = (m: Meeting) => { const d = new Date(m.date); d.setHours(0, 0, 0, 0); return d; };
+  const isPastMeeting = (m: Meeting) => dayOf(m) < todayStart || m.status === 'completed' || m.status === 'cancelled';
+  const byDateAsc = (a: Meeting, b: Meeting) => dayOf(a).getTime() - dayOf(b).getTime() || (a.start_time || '').localeCompare(b.start_time || '');
+  const term = searchTerm.trim().toLowerCase();
+  const matches = (m: Meeting) => !term ||
+    m.name.toLowerCase().includes(term) ||
+    (m.location || '').toLowerCase().includes(term) ||
+    (m.description || '').toLowerCase().includes(term);
 
-  // Group meetings by month and year
+  const upcomingMeetings = meetings.filter(m => !isPastMeeting(m)).sort(byDateAsc);
+  const pastMeetings = meetings.filter(m => isPastMeeting(m)).sort((a, b) => byDateAsc(b, a));
+
+  // The list shown on the Upcoming / Past tabs (search looks across everything)
+  const filteredMeetings = term
+    ? meetings.filter(matches).sort((a, b) => byDateAsc(b, a))
+    : activeView === 'past' ? pastMeetings : upcomingMeetings;
+
+  // Group meetings by month and year (keeps the list's order)
   const groupedMeetings = filteredMeetings.reduce((acc, meeting) => {
     const date = new Date(meeting.date);
     const monthYear = `${date.toLocaleString('default', { month: 'long' })} ${date.getFullYear()}`;
-    
-    if (!acc[monthYear]) {
-      acc[monthYear] = [];
-    }
-    
+    if (!acc[monthYear]) acc[monthYear] = [];
     acc[monthYear].push(meeting);
     return acc;
   }, {} as Record<string, Meeting[]>);
@@ -290,33 +283,112 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     );
   }
 
-  const upcomingCount = meetings.filter(m => {
-    const d = new Date(m.date); d.setHours(0, 0, 0, 0);
-    const t = new Date(); t.setHours(0, 0, 0, 0);
-    return !(d < t || m.status === 'completed' || m.status === 'cancelled');
-  }).length;
+  const upcomingCount = upcomingMeetings.length;
   const MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const dateChip = (m: Meeting, big?: boolean) => {
     const d = new Date(m.date);
-    const tone = m.status === 'cancelled' ? 'a-dc-past' : m.status === 'completed' || activeView === 'past' ? 'a-dc-past' : 'a-dc-meet';
     return (
-      <div className={`a-dc ${tone}`} style={big ? { width: 72, padding: '10px 0' } : undefined}>
+      <div className={`a-dc ${isPastMeeting(m) ? 'a-dc-past' : 'a-dc-meet'}`} style={big ? { width: 64, padding: '9px 0' } : undefined}>
         <b>{MON[d.getMonth()]}</b>
-        <span style={big ? { fontSize: 30 } : undefined}>{d.getDate()}</span>
+        <span style={big ? { fontSize: 26 } : undefined}>{d.getDate()}</span>
         <i>{DOW[d.getDay()]}</i>
       </div>
     );
   };
-  const timeOf = (m: Meeting) => (m.start_time && m.end_time ? `${m.start_time.substring(0, 5)} – ${m.end_time.substring(0, 5)}` : 'Time not set');
+  const timeOf = (m: Meeting) => (m.start_time && m.end_time ? `${m.start_time.substring(0, 5)} – ${m.end_time.substring(0, 5)}` : m.start_time ? m.start_time.substring(0, 5) : 'Time not set');
   const catChip = (m: Meeting) => m.meeting_category && (
     <span className="a-lb-fmt"><span className="inline-block w-[7px] h-[7px] rounded-full" style={{ background: m.meeting_category === 'committee' ? '#FFB340' : '#2E7BFF' }} />{m.meeting_category === 'committee' ? 'Committee' : 'General'}</span>
   );
   const recurLabel = (r?: string) => r === 'monthly_nth' ? 'Repeats monthly' : r === 'fortnightly' ? 'Repeats fortnightly' : `Repeats ${r}`;
-  const person = (p?: { first_name: string; last_name: string; avatar_url?: string | null }) => p && <AAvatar url={p.avatar_url} first={p.first_name} last={p.last_name} size={32} />;
-  const heroMeeting = activeView === 'upcoming' && !searchTerm ? filteredMeetings[0] : undefined;
-  const daysUntil = heroMeeting ? Math.round((new Date(new Date(heroMeeting.date).toDateString()).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000) : 0;
   const attendingOf = (id: string) => (meetingAttendance[id] || []).filter(a => a.status === 'attending');
+  const daysFrom = (m: Meeting) => Math.round((dayOf(m).getTime() - todayStart.getTime()) / 86400000);
+  const whenLabel = (m: Meeting) => {
+    const n = daysFrom(m);
+    if (n === 0) return 'today';
+    if (n === 1) return 'tomorrow';
+    if (n === -1) return 'yesterday';
+    return n > 0 ? `in ${n} days` : `${-n} days ago`;
+  };
+  // Status shown on a meeting row: cancelled, or for held meetings where the minutes are up to
+  const statusChip = (m: Meeting) => {
+    if (m.status === 'cancelled') return <span className="a-st text-[12.5px]"><span className="a-light a-light-r" />Cancelled</span>;
+    if (!isPastMeeting(m)) return null;
+    if (m.minutes_status === 'completed') return <span className="a-st a-txt-g text-[12.5px]"><span className="a-light a-light-g" />Minutes done</span>;
+    if (m.minutes_status === 'in_progress') return <span className="a-st a-txt-a text-[12.5px]"><span className="a-light a-light-a" />Minutes in progress</span>;
+    return <span className="a-st a-txt-a text-[12.5px]"><span className="a-ring-dot a-ring-dot-a" />Minutes to write</span>;
+  };
+  const faces = (id: string, size = 28) => {
+    const att = attendingOf(id);
+    if (!att.length) return null;
+    return (
+      <div className="max-md:hidden flex items-center gap-2" title={`${att.length} attending`}>
+        <span className="inline-flex">
+          {att.slice(0, 4).map((a, idx) => (
+            <span key={idx} style={{ marginLeft: idx ? -8 : 0 }} className="a-av-ring inline-flex rounded-full">
+              <AAvatar url={a.member?.avatar_url} first={a.member?.first_name} last={a.member?.last_name} size={size} />
+            </span>
+          ))}
+        </span>
+        <span className="a-dim text-[12px]">{att.length} attending</span>
+      </div>
+    );
+  };
+  const meetingRow = (meeting: Meeting, compact = false) => {
+    const editable = !isPastMeeting(meeting) && meeting.status === 'upcoming';
+    return (
+      <div key={meeting.id} onClick={() => handleViewMeeting(meeting)} className="a-mr group" role="button" tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleViewMeeting(meeting); }}>
+        {dateChip(meeting)}
+        {!compact && <span className="a-tile" style={{ width: 40, height: 40 }}>{meeting.meeting_category === 'committee' ? <Shield size={18} /> : <Users size={18} />}</span>}
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className="a-ink text-[15px] font-semibold truncate">{meeting.name}</div>
+          <div className="flex gap-x-3.5 gap-y-1 items-center flex-wrap">
+            <span className="a-meta" style={{ fontSize: 13 }}><Clock size={14} />{timeOf(meeting)}</span>
+            {!compact && meeting.location && <span className="a-meta" style={{ fontSize: 13 }}><MapPin size={14} />{meeting.location}</span>}
+            {catChip(meeting)}
+            {!compact && meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
+              <span className="a-lb-fmt"><Repeat size={12} />{recurLabel(meeting.recurrence_type)}</span>
+            )}
+            {statusChip(meeting)}
+          </div>
+        </div>
+        {!compact && faces(meeting.id)}
+        {!compact && editable && can('meetings.create') && (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }} className="a-ib" aria-label="Edit meeting" title="Edit meeting">
+              <Edit2 size={17} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(meeting); }} className="a-ib a-ib-d" aria-label="Delete meeting" title="Delete meeting">
+              <Trash2 size={17} />
+            </button>
+          </>
+        )}
+        <ChevronRight size={17} className="a-dim flex-shrink-0" />
+      </div>
+    );
+  };
+
+  // Overview figures
+  const year = new Date().getFullYear();
+  const heldThisYear = pastMeetings.filter(m => m.status !== 'cancelled' && dayOf(m).getFullYear() === year);
+  const minutesOutstanding = pastMeetings.filter(m => m.status !== 'cancelled' && m.minutes_status !== 'completed');
+  const nextMeeting = upcomingMeetings[0];
+  const lastHeld = pastMeetings.find(m => m.status !== 'cancelled');
+  // Minutes card: the most recent held meeting still needing minutes (last 90 days), otherwise the last meeting
+  const minutesDue = minutesOutstanding.find(m => daysFrom(m) >= -90);
+  const followUp = minutesDue || lastHeld;
+  const showOverview = activeView === 'overview' && !term;
+
+  const sectionHead = (title: string, sub: string, view: 'upcoming' | 'past', count: number) => (
+    <div className="flex items-center gap-3" style={{ padding: '16px 16px 10px' }}>
+      <div className="flex-1 min-w-0">
+        <h2 className="a-display a-ink m-0 text-[18px] font-semibold">{title}</h2>
+        <p className="a-dim m-0 mt-0.5 text-[12.5px]">{sub}</p>
+      </div>
+      {count > 0 && <button className="a-btn a-btn-sm a-btn-q" onClick={() => setActiveView(view)}>View all<ChevronRight size={14} /></button>}
+    </div>
+  );
 
   return (
     <div className="h-full overflow-y-auto">
@@ -325,27 +397,40 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           <span className="a-tile a-tile-rim" style={{ width: 52, height: 52 }}><Calendar size={24} /></span>
           <div className="flex-1 min-w-[220px]">
             <h1 className="a-display a-ink m-0 text-[30px] font-bold leading-[1.1]">{currentOrganization ? 'Association meetings' : 'Club meetings'}</h1>
-            <p className="a-mute mt-1 text-[14.5px]">Committee meetings, agendas and minutes</p>
+            <p className="a-mute mt-1 text-[14.5px]">
+              {loading ? 'Committee meetings, agendas and minutes' : `${upcomingCount} upcoming · ${heldThisYear.length} held in ${year}`}
+            </p>
           </div>
-          <label className="a-field" style={{ width: 240 }}>
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Search meetings"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </label>
-          <div className="a-seg" role="tablist">
-            <button onClick={() => setActiveView('upcoming')} className={`a-seg-i ${activeView === 'upcoming' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeView === 'upcoming'}>
-              Upcoming{upcomingCount > 0 && <span className="a-cnt">{upcomingCount}</span>}
-            </button>
-            <button onClick={() => setActiveView('past')} className={`a-seg-i ${activeView === 'past' ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeView === 'past'}>
-              Past
-            </button>
+          <div className="a-tbar">
+            {showSearch || term ? (
+              <div className="a-field" style={{ height: 36, width: 230 }}>
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search all meetings"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onBlur={() => !searchTerm && setShowSearch(false)}
+                  autoFocus
+                />
+                {searchTerm && <button onClick={() => { setSearchTerm(''); setShowSearch(false); }} className="a-dim flex" aria-label="Clear search"><X size={14} /></button>}
+              </div>
+            ) : (
+              <button onClick={() => setShowSearch(true)} className="a-tb-btn" style={{ width: 36, padding: 0, justifyContent: 'center' }} title="Search meetings" aria-label="Search meetings">
+                <Search size={17} />
+              </button>
+            )}
+            <span className="a-tb-sep" />
+            <div className="a-seg" role="tablist" style={{ padding: 2, borderRadius: 10 }}>
+              {([['overview', 'Overview'], ['upcoming', 'Upcoming'], ['past', 'Past']] as const).map(([v, label]) => (
+                <button key={v} onClick={() => { setActiveView(v); setSearchTerm(''); }} className={`a-seg-i ${activeView === v && !term ? 'a-seg-on' : ''}`} role="tab" aria-selected={activeView === v && !term} style={{ height: 30, borderRadius: 8 }}>
+                  {label}{v === 'upcoming' && upcomingCount > 0 && <span className="a-cnt">{upcomingCount}</span>}
+                </button>
+              ))}
+            </div>
           </div>
           {can('meetings.create') && (
-            <button onClick={handleCreateMeeting} className="a-btn a-btn-p" style={{ height: 42, borderRadius: 13 }}>
+            <button onClick={handleCreateMeeting} className="a-btn a-btn-p" style={{ height: 44, borderRadius: 13 }}>
               <Plus size={17} />
               New meeting
             </button>
@@ -371,59 +456,113 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
             <p className="a-dim text-[13.5px]">Loading meetings…</p>
           </div>
+        ) : meetings.length === 0 ? (
+          <div className="a-card a-empty text-center py-14">
+            <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
+            <h3 className="a-ink text-[16px] font-semibold mb-1">No meetings yet</h3>
+            <p className="a-dim text-[13.5px] mb-5">Schedule committee and general meetings, share agendas and keep the minutes here.</p>
+            {can('meetings.create') && (
+              <button onClick={handleCreateMeeting} className="a-btn a-btn-p mx-auto"><Plus size={16} />Schedule a meeting</button>
+            )}
+          </div>
+        ) : showOverview ? (
+          <>
+            {(nextMeeting || followUp) && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {nextMeeting ? (
+                  <div className="a-card flex items-center gap-4 cursor-pointer" style={{ padding: '16px 18px' }} onClick={() => handleViewMeeting(nextMeeting)}>
+                    {dateChip(nextMeeting, true)}
+                    <div className="flex-1 min-w-0">
+                      <p className="a-cap a-txt-b m-0">Next meeting · {whenLabel(nextMeeting)}</p>
+                      <p className="a-ink m-0 mt-1 text-[16px] font-semibold truncate">{nextMeeting.name}</p>
+                      <p className="a-dim m-0 mt-0.5 text-[12.5px] truncate">{timeOf(nextMeeting)}{nextMeeting.location ? ` · ${nextMeeting.location}` : ''}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      {nextMeeting.conferencing_url && (
+                        <a href={nextMeeting.conferencing_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="a-btn"><Video size={16} />Join</a>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); handleViewMeeting(nextMeeting); }} className="a-btn a-btn-p"><FileText size={16} />Agenda</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="a-card flex items-center gap-4" style={{ padding: '16px 18px' }}>
+                    <span className="a-tile" style={{ width: 52, height: 52 }}><CalendarPlus size={22} /></span>
+                    <div className="flex-1 min-w-0">
+                      <p className="a-cap m-0">Next meeting</p>
+                      <p className="a-ink m-0 mt-1 text-[15px] font-semibold">Nothing scheduled yet</p>
+                    </div>
+                    {can('meetings.create') && <button onClick={handleCreateMeeting} className="a-btn a-btn-p"><Plus size={16} />Schedule</button>}
+                  </div>
+                )}
+                {followUp && (
+                  <div className="a-card flex items-center gap-4 cursor-pointer" style={{ padding: '16px 18px', ...(minutesDue ? { borderColor: 'rgba(255,179,64,0.3)' } : {}) }} onClick={() => handleViewMeeting(followUp)}>
+                    {dateChip(followUp, true)}
+                    <div className="flex-1 min-w-0">
+                      <p className={`a-cap m-0 ${minutesDue ? 'a-txt-a' : 'a-txt-g'}`}>
+                        {minutesDue ? `Minutes to ${minutesDue.minutes_status === 'in_progress' ? 'finish' : 'write'} · held ${whenLabel(followUp)}` : `Last meeting · ${whenLabel(followUp)}`}
+                      </p>
+                      <p className="a-ink m-0 mt-1 text-[16px] font-semibold truncate">{followUp.name}</p>
+                      <p className="a-dim m-0 mt-0.5 text-[12.5px] truncate">
+                        {followUp.minute_taker ? `Minutes · ${followUp.minute_taker.first_name} ${followUp.minute_taker.last_name}` : timeOf(followUp)}
+                      </p>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); handleViewMeeting(followUp); }} className={`a-btn flex-shrink-0 ${minutesDue ? 'a-btn-p' : ''}`}>
+                      <FileText size={16} />{minutesDue ? 'Open minutes' : 'View minutes'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+              {[
+                { icon: <CalendarClock size={18} />, label: 'Upcoming', value: upcomingCount, sub: nextMeeting ? `Next ${whenLabel(nextMeeting)}` : 'None scheduled' },
+                { icon: <CalendarCheck size={18} />, label: `Held in ${year}`, value: heldThisYear.length, sub: lastHeld ? `Last ${whenLabel(lastHeld)}` : 'None yet' },
+                { icon: <FileText size={18} />, label: 'Minutes outstanding', value: minutesOutstanding.length, sub: minutesOutstanding.length ? 'Held, minutes not finished' : 'All up to date' },
+                { icon: <Users size={18} />, label: 'Going to the next one', value: nextMeeting ? attendingOf(nextMeeting.id).length : 0, sub: nextMeeting ? nextMeeting.name : 'No meeting scheduled' },
+              ].map(s => (
+                <div key={s.label} className="a-card flex items-center gap-3.5" style={{ padding: '14px 16px' }}>
+                  <span className="a-tile" style={{ width: 44, height: 44 }}>{s.icon}</span>
+                  <div className="min-w-0">
+                    <div className="a-mute text-[12.5px]">{s.label}</div>
+                    <div className="a-display a-num a-ink text-[24px] font-semibold leading-[1.15]">{s.value}</div>
+                    <div className="a-dim text-[12px] truncate">{s.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+              <section className="a-card overflow-hidden">
+                {sectionHead('Coming up', upcomingCount ? `${upcomingCount} scheduled` : 'Nothing scheduled', 'upcoming', upcomingCount)}
+                {upcomingMeetings.length ? upcomingMeetings.slice(0, 5).map(m => meetingRow(m, true)) : (
+                  <div className="a-dim text-[13.5px] text-center" style={{ padding: '18px 16px 26px' }}>
+                    No upcoming meetings.{can('meetings.create') && <> <button className="a-txt-b font-semibold" onClick={handleCreateMeeting}>Schedule one</button></>}
+                  </div>
+                )}
+              </section>
+              <section className="a-card overflow-hidden">
+                {sectionHead('Recently held', pastMeetings.length ? 'Agendas, attendance and minutes' : 'No meetings held yet', 'past', pastMeetings.length)}
+                {pastMeetings.length ? pastMeetings.slice(0, 5).map(m => meetingRow(m, true)) : (
+                  <div className="a-dim text-[13.5px] text-center" style={{ padding: '18px 16px 26px' }}>Meetings appear here once they’ve been held.</div>
+                )}
+              </section>
+            </div>
+          </>
         ) : Object.keys(groupedMeetings).length === 0 ? (
           <div className="a-card a-empty text-center py-14">
             <span className="a-tile mx-auto mb-3" style={{ width: 52, height: 52 }}><Calendar size={22} /></span>
             <h3 className="a-ink text-[16px] font-semibold mb-1">No meetings found</h3>
             <p className="a-dim text-[13.5px] mb-5">
-              {activeView === 'upcoming' ? 'No upcoming meetings scheduled' : 'No past meetings found'}
+              {term ? 'No meetings match your search' : activeView === 'upcoming' ? 'No upcoming meetings scheduled' : 'No past meetings yet'}
             </p>
-            {can('meetings.create') && (
-              <button onClick={handleCreateMeeting} className="a-btn a-btn-p mx-auto">
-                <Plus size={16} />
-                Schedule a meeting
-              </button>
+            {can('meetings.create') && activeView === 'upcoming' && !term && (
+              <button onClick={handleCreateMeeting} className="a-btn a-btn-p mx-auto"><Plus size={16} />Schedule a meeting</button>
             )}
           </div>
         ) : (
           <>
-            {heroMeeting && (
-              <div className="a-card a-spec-card flex flex-wrap items-center gap-5 cursor-pointer" style={{ padding: 22 }} onClick={() => handleViewMeeting(heroMeeting)}>
-                {dateChip(heroMeeting, true)}
-                <div className="flex-1 min-w-[220px] flex flex-col gap-2">
-                  <span className="a-st a-txt-g text-[12.5px]"><span className="a-light a-light-g" />Next meeting · {daysUntil <= 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`}</span>
-                  <div className="a-display a-ink text-[23px] font-semibold">{heroMeeting.name}</div>
-                  <div className="flex gap-4 flex-wrap items-center">
-                    <span className="a-meta" style={{ fontSize: 13 }}><Clock size={14} />{timeOf(heroMeeting)}</span>
-                    {heroMeeting.location && <span className="a-meta" style={{ fontSize: 13 }}><MapPin size={14} />{heroMeeting.location}</span>}
-                    {catChip(heroMeeting)}
-                  </div>
-                </div>
-                {(heroMeeting.chairperson || heroMeeting.minute_taker) && (
-                  <div className="a-hero-people flex items-center gap-2.5">
-                    <span className="inline-flex">
-                      {person(heroMeeting.chairperson)}
-                      {heroMeeting.minute_taker && <span style={{ marginLeft: heroMeeting.chairperson ? -8 : 0 }}>{person(heroMeeting.minute_taker)}</span>}
-                    </span>
-                    <div className="text-[12.5px]">
-                      {heroMeeting.chairperson && <div className="a-ink">Chair · {heroMeeting.chairperson.first_name} {heroMeeting.chairperson.last_name}</div>}
-                      {heroMeeting.minute_taker && <div className="a-dim">Minutes · {heroMeeting.minute_taker.first_name} {heroMeeting.minute_taker.last_name}</div>}
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  {heroMeeting.conferencing_url && (
-                    <a href={heroMeeting.conferencing_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="a-btn a-btn-p">
-                      <Video size={16} />Join
-                    </a>
-                  )}
-                  <button onClick={(e) => { e.stopPropagation(); handleViewMeeting(heroMeeting); }} className="a-btn">
-                    <FileText size={16} />Agenda
-                  </button>
-                </div>
-              </div>
-            )}
-
+            {term && <div className="a-dim text-[13px] -mb-2">{filteredMeetings.length} {filteredMeetings.length === 1 ? 'meeting matches' : 'meetings match'} “{searchTerm.trim()}”</div>}
             <div className="a-card overflow-hidden">
               {Object.entries(groupedMeetings).map(([monthYear, monthMeetings]) => {
                 const [mName, mYear] = monthYear.split(' ');
@@ -433,62 +572,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
                       <span className="a-display a-ink text-[16px] font-semibold">{mName}</span>
                       <span className="a-dim text-[13px]">{mYear}</span>
                     </div>
-                    {monthMeetings.map((meeting) => {
-                      const att = attendingOf(meeting.id);
-                      return (
-                        <div key={meeting.id} onClick={() => handleViewMeeting(meeting)} className="a-mr group">
-                          {dateChip(meeting)}
-                          <span className="a-tile" style={{ width: 40, height: 40 }}>{meeting.meeting_category === 'committee' ? <Shield size={18} /> : <Users size={18} />}</span>
-                          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-                            <div className="a-ink text-[15.5px] font-semibold truncate">{meeting.name}</div>
-                            <div className="flex gap-3.5 items-center flex-wrap">
-                              <span className="a-meta" style={{ fontSize: 13 }}><Clock size={14} />{timeOf(meeting)}</span>
-                              {meeting.location && <span className="a-meta" style={{ fontSize: 13 }}><MapPin size={14} />{meeting.location}</span>}
-                              {catChip(meeting)}
-                              {meeting.recurrence_type && meeting.recurrence_type !== 'none' && (
-                                <span className="a-lb-fmt"><Repeat size={12} />{recurLabel(meeting.recurrence_type)}</span>
-                              )}
-                              {meeting.status !== 'upcoming' && (
-                                <span className="a-st text-[12.5px]"><span className={`a-light ${meeting.status === 'completed' ? 'a-light-g' : 'a-light-r'}`} />{meeting.status === 'completed' ? 'Completed' : 'Cancelled'}</span>
-                              )}
-                            </div>
-                          </div>
-                          {att.length > 0 && (
-                            <div className="max-md:hidden flex items-center gap-2" title={`${att.length} attending`}>
-                              <span className="inline-flex">
-                                {att.slice(0, 4).map((a, idx) => (
-                                  <span key={idx} style={{ marginLeft: idx ? -8 : 0 }} className="a-av-ring inline-flex rounded-full">
-                                    <AAvatar url={a.member?.avatar_url} first={a.member?.first_name} last={a.member?.last_name} size={28} />
-                                  </span>
-                                ))}
-                              </span>
-                              <span className="a-dim text-[12px]">{att.length} attending</span>
-                            </div>
-                          )}
-                          {meeting.status === 'upcoming' && (
-                            <>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }}
-                                className="a-ib"
-                                aria-label="Edit meeting"
-                                title="Edit meeting"
-                              >
-                                <Edit2 size={17} />
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(meeting); }}
-                                className="a-ib a-ib-d"
-                                aria-label="Delete meeting"
-                                title="Delete meeting"
-                              >
-                                <Trash2 size={17} />
-                              </button>
-                            </>
-                          )}
-                          <ChevronRight size={17} className="a-dim flex-shrink-0" />
-                        </div>
-                      );
-                    })}
+                    {monthMeetings.map(m => meetingRow(m))}
                   </React.Fragment>
                 );
               })}
