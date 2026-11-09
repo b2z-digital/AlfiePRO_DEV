@@ -413,6 +413,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     }
   };
   const roundRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -952,18 +953,15 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
     setError(null);
 
     if (!clashAcknowledged && !isEditing) {
-      const eventDate = type === 'quick' ? formData.raceDate : (formData.rounds[0]?.date || '');
-      let eventEndDate: string | null = null;
+      // A series is checked round by round: each round is its own day, not one event spanning the season
+      const checks: { start: string; end: string | null }[] = type === 'quick'
+        ? (formData.raceDate ? [{ start: formData.raceDate, end: formData.isMultiDay && formData.endDate ? formData.endDate : null }] : [])
+        : [...new Set(formData.rounds.filter(r => !r.cancelled).map(r => r.date).filter(Boolean))].map(d => ({ start: d, end: null }));
 
-      if (type === 'quick' && formData.isMultiDay && formData.endDate) {
-        eventEndDate = formData.endDate;
-      } else if (type === 'series' && formData.rounds.length > 0) {
-        const allDates = formData.rounds.map(r => r.date).filter(Boolean).sort();
-        eventEndDate = allDates[allDates.length - 1] || null;
-      }
-
-      if (eventDate) {
-        const clashes = await checkEventDateClashes(eventDate, eventEndDate, undefined, formData.clubId || currentClub?.clubId);
+      if (checks.length > 0) {
+        const clubForCheck = formData.clubId || currentClub?.clubId;
+        const found = (await Promise.all(checks.map(c => checkEventDateClashes(c.start, c.end, undefined, clubForCheck)))).flat();
+        const clashes = found.filter((c, i) => found.findIndex(x => x.id === c.id) === i);
         if (clashes.length > 0) {
           setClashingEvents(clashes);
           setShowClashWarning(true);
@@ -1585,7 +1583,7 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          <form onSubmit={handleSubmit} className="p-8 space-y-6">
+          <form ref={formRef} onSubmit={handleSubmit} className="p-8 space-y-6">
             {currentStep === 'details' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {type === 'quick' ? (
@@ -3817,10 +3815,8 @@ export const CreateRaceModal: React.FC<CreateRaceModalProps> = ({
           onProceed={() => {
             setShowClashWarning(false);
             setClashAcknowledged(true);
-            setTimeout(() => {
-              const form = document.querySelector<HTMLFormElement>('form');
-              if (form) form.requestSubmit();
-            }, 0);
+            // Submit this form (not the first form on the page) once the acknowledgement has rendered
+            setTimeout(() => formRef.current?.requestSubmit(), 0);
           }}
           onCancel={() => {
             setShowClashWarning(false);
