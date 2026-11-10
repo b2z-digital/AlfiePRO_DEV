@@ -9,6 +9,7 @@ import { bearing, dir, dist, dot, n180, n360, sub } from '../math';
 import { bankAhead, hullGap } from '../physics';
 import { easedSheet } from '../ai';
 import { PlanFn, SceneDef, Step, closeHauled, hold, onTack, running, until, when } from '../scene';
+import { dhypot } from '../dmath';
 import {
   SceneSpec, answersHail, cleanFor, contact, fouled, hailed, hailsRoomToTack, lost, penaltyTurn, protestHail,
   recallAndRestart, rule14, startFacts, timedStart, won,
@@ -71,7 +72,7 @@ const duckRole = (role: string, after: PlanFn, gapL = 1.15, fromL = 3.4): PlanFn
   const behind = dot(rel, dir(o.hdg)) < 0;
   if ((side !== me.memo.side0 && behind) || hullGap(b, o) > (fromL + 1.5) * L) { me.memo.ducked = 1; return after(t, b, race, me); }
   // Aim behind where her stern will be when we get there.
-  const lead = Math.min(4, Math.hypot(rel.x, rel.y) / Math.max(0.3, b.spd)) * 0.8;
+  const lead = Math.min(4, dhypot(rel.x, rel.y) / Math.max(0.3, b.spd)) * 0.8;
   const ov = dir(o.hdg), back = dir(o.hdg + 180);
   const aim = { x: o.x + ov.x * o.spd * lead + back.x * gapL * L, y: o.y + ov.y * o.spd * lead + back.y * gapL * L };
   const up = vmgAngles(b.cls, b.tws).up + 1.5;

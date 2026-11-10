@@ -9,6 +9,7 @@
 
 import type { V2 } from './math';
 import type { Course } from './course';
+import { dcos, dhypot, dsin } from './dmath';
 
 export type FeatureKind = 'park' | 'wood' | 'pier' | 'road' | 'path' | 'bld' | 'pitch' | 'playground' | 'parking' | 'pond';
 export interface Feature { kind: FeatureKind; name?: string; pts: V2[] }
@@ -122,7 +123,7 @@ export interface Frame {
 
 export function frameAt(rot: number, S: V2): Frame {
   const a = (rot * Math.PI) / 180;
-  return { rot, S, u: { x: Math.sin(a), y: Math.cos(a) }, r: { x: Math.cos(a), y: -Math.sin(a) } };
+  return { rot, S, u: { x: dsin(a), y: dcos(a) }, r: { x: dcos(a), y: -dsin(a) } };
 }
 export function toRace(f: Frame, g: V2): V2 {
   const dx = g.x - f.S.x, dy = g.y - f.S.y;
@@ -151,7 +152,7 @@ const mid = (s: [V2, V2]): V2 => ({ x: (s[0].x + s[1].x) / 2, y: (s[0].y + s[1].
 /** Distance from a point to a rectangle (0 inside). */
 function rectDist(p: V2, x0: number, y0: number, x1: number, y1: number): number {
   const dx = Math.max(x0 - p.x, 0, p.x - x1), dy = Math.max(y0 - p.y, 0, p.y - y1);
-  return Math.hypot(dx, dy);
+  return dhypot(dx, dy);
 }
 
 /** The water the fleet races on, in the race frame (the course frame at a venue, where the axis is 0). */
@@ -181,7 +182,7 @@ export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
   const must: V2[] = [];
   for (const m of c.marks) {
     must.push(m.p);
-    for (let k = 0; k < 8; k++) must.push({ x: m.p.x + Math.cos((k * Math.PI) / 4) * 4 * L, y: m.p.y + Math.sin((k * Math.PI) / 4) * 4 * L });
+    for (let k = 0; k < 8; k++) must.push({ x: m.p.x + dcos((k * Math.PI) / 4) * 4 * L, y: m.p.y + dsin((k * Math.PI) / 4) * 4 * L });
   }
   for (let i = 0; i <= 6; i++) for (let j = 0; j <= 8; j++) must.push({ x: area.x0 + ((area.x1 - area.x0) * i) / 6, y: area.y0 + ((area.y1 - area.y0) * j) / 8 });
   // The rest of the pond: better mostly water, but the near bank can cut into it.
@@ -229,7 +230,7 @@ export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
       const g = geoOf(best.S, m.p);
       if (!wetIn(rings, g.x, g.y)) return false;
       for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-        if (segD2(g.x, g.y, r[j].x, r[j].y, r[i].x, r[i].y)[0] < (3.6 * L) ** 2) return false;
+        if (segD2(g.x, g.y, r[j].x, r[j].y, r[i].x, r[i].y)[0] < 3.6 * L * (3.6 * L)) return false;
       }
       return true;
     });

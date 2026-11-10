@@ -5,6 +5,7 @@
 // Every number here is a starting point to tune against real tracks later.
 
 import { clamp, KN } from './math';
+import { datan, dcos, dexp, dpow, dsin } from './dmath';
 
 export type ClassId = 'IOM' | 'DF95' | 'DF65' | '10R' | 'M';
 
@@ -59,7 +60,7 @@ export function heelForce(absTwa: number, sheet: number, tws: number): number {
   const a = clamp(absTwa, 0, 180);
   const ng = noGoAngle(tws);
   if (a < ng - 4) return 0.05;
-  const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 110 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.12 + 0.78 * Math.cos(((a - 110) / 70) * (Math.PI / 2));
+  const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 110 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.12 + 0.78 * dcos(((a - 110) / 70) * (Math.PI / 2));
   const fill = clamp((a - (ng - 4)) / 10, 0, 1);
   // Pinching above her best close-hauled angle the sails start to lift and lose their power.
   const luff = 1 - 0.6 * clamp((upAngle(tws) - a) / 18, 0, 1);
@@ -74,7 +75,7 @@ export function heelForce(absTwa: number, sheet: number, tws: number): number {
  */
 export function heelFor(q: number): number {
   if (q <= 1e-6) return 0;
-  return Math.min(85, (Math.atan(q) * 180) / Math.PI);
+  return Math.min(85, (datan(q) * 180) / Math.PI);
 }
 
 /** Best close-hauled true wind angle (deg) for a wind speed in m/s. */
@@ -94,8 +95,8 @@ function angleFactor(a: number, tws: number): number {
   if (a < ng) return 0;
   // Pinching: she slows steadily as she points above her best angle, to nothing head to wind.
   if (a < up) return 0.78 * ((a - ng) / (up - ng));
-  if (a < 95) return 0.78 + 0.22 * Math.sin(((a - up) / (95 - up)) * Math.PI / 2);
-  if (a < 140) return 1 - 0.12 * Math.pow((a - 95) / 45, 1.5);
+  if (a < 95) return 0.78 + 0.22 * dsin(((a - up) / (95 - up)) * Math.PI / 2);
+  if (a < 140) return 1 - 0.12 * dpow((a - 95) / 45, 1.5);
   const drop = 0.16 - 0.1 * clamp((kn - 4) / 10, 0, 1);
   return 0.88 - drop * ((a - 140) / 40);
 }
@@ -103,7 +104,7 @@ function angleFactor(a: number, tws: number): number {
 /** Target boat speed (m/s) for a class, true wind speed (m/s) and |true wind angle| (deg). */
 export function polarSpeed(c: ClassDef, tws: number, absTwa: number): number {
   const kn = tws / KN;
-  const base = 1 - Math.exp(-kn / 6);
+  const base = 1 - dexp(-kn / 6);
   let v = c.hullSpeed * base * angleFactor(absTwa, tws) * 1.15 * c.eff;
   if (absTwa > 110 && kn > 12) v *= 1 + 0.25 * clamp((kn - 12) / 8, 0, 1); // surfing in breeze
   return v;
@@ -121,12 +122,12 @@ export function vmgAngles(c: ClassDef, twsIn: number): VmgAngles {
   const tws = q / 4; // computed at the cached wind speed, so results never depend on call order
   let up = 45, upV = 0, upS = 0, dn = 170, dnV = 0, dnS = 0;
   for (let a = 25; a <= 80; a += 0.5) {
-    const s = polarSpeed(c, tws, a), v = s * Math.cos(a * Math.PI / 180);
+    const s = polarSpeed(c, tws, a), v = s * dcos(a * Math.PI / 180);
     if (v > upV) { upV = v; up = a; upS = s; }
   }
   // Never dead downwind: a boat running needs a definite gybe (and boom side) to be on.
   for (let a = 120; a <= 165; a += 0.5) {
-    const s = polarSpeed(c, tws, a), v = -s * Math.cos(a * Math.PI / 180);
+    const s = polarSpeed(c, tws, a), v = -s * dcos(a * Math.PI / 180);
     if (v > dnV) { dnV = v; dn = a; dnS = s; }
   }
   const r = { up, down: dn, upVmg: upV, downVmg: dnV, upSpeed: upS, downSpeed: dnS };

@@ -20,6 +20,10 @@ export interface RaceSettings {
   venue?: string;
   /** Who's sailing: the member's name and their sail number in this class (from their boats). */
   player?: { name: string; sail: string };
+  /** A live race: everyone racing from their own device, in seat order. Each sails one of the boats. */
+  crew?: CrewMember[];
+  /** Which seat in the crew is sailing on this device. */
+  seat?: number;
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length
@@ -38,6 +42,17 @@ export interface RaceSettings {
   flatWind?: boolean;
   /** Flat water (default), chop or rough water. */
   seaState?: 'flat' | 'chop' | 'rough';
+}
+
+/** Someone in a live race, sailing their boat from their own device. */
+export interface CrewMember {
+  /** Their user id. */
+  id: string;
+  name: string;
+  /** Their sail number in this class. */
+  sail: string;
+  /** Their sail trims itself (each person's own choice, the same on every device). */
+  autoTrim?: boolean;
 }
 
 export interface Persona {
@@ -69,6 +84,8 @@ export interface Boat {
   name: string;
   color: string;
   isPlayer: boolean;
+  /** A person sails her (the player, or anyone in a live race's crew), not an AI skipper. */
+  human?: boolean;
   cls: ClassDef;
   persona?: Persona;
 

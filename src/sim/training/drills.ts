@@ -5,6 +5,7 @@ import { Rng } from '../math';
 import type { SceneBoat, SceneDef } from '../scene';
 import { hold } from '../scene';
 import type { GoalCtx, Outcome } from './common';
+import { dhypot } from '../dmath';
 import {
   SceneSpec, fouled, holdForLine, linePoint, lost, overEarly, pctText, recallAndRestart, rule14, secText, starsFor, startFacts, timedStart, won,
 } from './common';
@@ -70,7 +71,7 @@ export const DRILLS: Drill[] = [
         if (f) return f;
         const T = g.race.gunT - g.race.t;
         const spot = linePoint(g.race, 0.5, 1.6);
-        if (T <= 40 && T > 10 && Math.hypot(g.player.x - spot.x, g.player.y - spot.y) <= g.player.cls.loa) g.memo.inside = ((g.memo.inside as number) ?? 0) + 0.05;
+        if (T <= 40 && T > 10 && dhypot(g.player.x - spot.x, g.player.y - spot.y) <= g.player.cls.loa) g.memo.inside = ((g.memo.inside as number) ?? 0) + 0.05;
         return null;
       },
       final: g => {

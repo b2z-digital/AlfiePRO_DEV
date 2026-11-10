@@ -28,6 +28,8 @@ import { Challenge, ChallengeEntry, createChallenge, entryLog, listChallenges, s
 import SimChallenge from './SimChallenge';
 import { raceFacts, writeUp } from './writeup';
 import { SimSequence, chosenSequence, loadClubSequences } from './startbox';
+import { ChannelTransport, ClubRooms, LiveRace, LiveRoom, OpenRoom, RoomSettings, cleanCode, newCode, roomChannel } from './live';
+import SimLive, { roomTitle } from './SimLive';
 
 interface RaceSimulatorPageProps {
   darkMode: boolean;
@@ -75,7 +77,7 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
   };
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief' | 'challenge';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief' | 'challenge' | 'live';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
@@ -112,6 +114,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     challenge?: Challenge; ghost?: { log: RaceLog; settings: RaceSettings; label: string };
     /** The StartBox sequence to play with the countdown. */
     sequence?: SimSequence | null;
+    /** A live race against other members, and its room code. */
+    live?: LiveRace; liveCode?: string;
   } | null>(null);
   const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary; moments: Moment[]; challenge?: Challenge } | null>(null);
   // Challenges you can see, the one open, and how your last go at one went.
@@ -157,6 +161,59 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return () => { live = false; };
   }, [clubId]);
   const startSeq = chosenSequence(sequences, setup.startSeq);
+
+  // Live races: the room you're in, and your club's open rooms.
+  const [room, setRoom] = useState<LiveRoom | null>(null);
+  const [openRooms, setOpenRooms] = useState<OpenRoom[]>([]);
+  const [clubRooms, setClubRooms] = useState<ClubRooms | null>(null);
+  useEffect(() => {
+    if (!userId || !clubId) return;
+    const c = new ClubRooms(clubId);
+    const off = c.subscribe(() => setOpenRooms(c.rooms));
+    setClubRooms(c);
+    return () => { off(); c.close(); setClubRooms(null); };
+  }, [userId, clubId]);
+  const liveMe = useCallback(() => ({ id: userId ?? 'guest', name: me?.short ?? me?.name ?? 'Sailor', sails: me?.sails ?? {}, autoTrim: setup.autoTrim }), [userId, me, setup.autoTrim]);
+  const openLive = useCallback(() => {
+    const seq = chosenSequence(sequences, setup.startSeq);
+    const full = toSettings(setup, 'race', todayWind, null, seq);
+    const { seed: _seed, player: _player, ...rs } = full;
+    void _seed; void _player;
+    const code = newCode();
+    setRoom(new LiveRoom(code, liveMe(), true, rs as RoomSettings, new ChannelTransport(roomChannel(code))));
+    setWhere('live');
+  }, [sequences, setup, todayWind, liveMe]);
+  const joinLive = useCallback((code: string) => {
+    const c = cleanCode(code);
+    if (c.length !== 6) return;
+    setRoom(new LiveRoom(c, liveMe(), false, null, new ChannelTransport(roomChannel(c))));
+    setWhere('live');
+  }, [liveMe]);
+  const leaveRoom = useCallback(() => {
+    room?.leave();
+    clubRooms?.advertise(null);
+    setRoom(null);
+  }, [room, clubRooms]);
+  // In the room: advertise it at the club while it waits (the host), and go to the race together
+  // the moment the host starts it.
+  useEffect(() => {
+    if (!room) return;
+    const sync = () => {
+      if (room.race && where === 'live') {
+        clubRooms?.advertise(null);
+        const settings = room.race.race.settings;
+        setRun({ settings, mode: 'race', key: Date.now(), live: room.race, liveCode: room.code, sequence: startSeq && startSeq.seconds === settings.sequenceSeconds ? startSeq : null });
+        setRunView(setup.view);
+        setWhere('race');
+        return;
+      }
+      if (room.isHost && room.settings && !room.race) {
+        clubRooms?.advertise({ code: room.code, host: me?.short ?? 'A member', title: roomTitle(room.settings), people: room.people.length, at: Date.now() });
+      }
+    };
+    sync();
+    return room.subscribe(sync);
+  }, [room, where, clubRooms, me, startSeq, setup.view]);
   const refreshChallenges = useCallback(() => {
     if (!userId) return;
     void listChallenges().then(cs => setChallenges(cs));
@@ -201,6 +258,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
     setProfile(saveRace(sum));
+    // A live race: done with the room (once your boat has finished, the others don't wait for you).
+    if (run?.live) leaveRoom();
     const ch = run?.challenge;
     if (userId) {
       const a = { userId, clubId };
@@ -218,7 +277,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     }
     setDebrief({ race, sum, moments, challenge: ch });
     setWhere('debrief');
-  }, [userId, clubId, run, me]);
+  }, [userId, clubId, run, me, leaveRoom]);
 
   // Sail a challenge, against nobody or against an entry's ghost.
   const sailChallenge = useCallback(async (c: Challenge, ghostOf: ChallengeEntry | null) => {
@@ -277,8 +336,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   const leaveRace = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    if (run?.live) leaveRoom();
     setWhere(run?.scene ? GROUP_PAGE[run.scene.group] : run?.challenge ? 'challenge' : 'home');
-  }, [run]);
+  }, [run, leaveRoom]);
 
   // Racing fills the window: no page scrolling underneath it.
   useEffect(() => {
@@ -310,6 +370,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
           resume={run.resume}
           ghost={run.ghost}
           sequence={run.sequence ?? null}
+          live={run.live}
+          liveCode={run.liveCode}
         />
       </div>,
       document.body,
@@ -319,9 +381,17 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'debrief' && debrief) {
     return (
       <div className="h-full overflow-y-auto">
-        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={takeOver}
+        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={debrief.race.live ? undefined : takeOver}
           challenge={debrief.challenge ? { title: debrief.challenge.title, note: chNote, onOpen: () => { setOpenCh(debrief.challenge!); setWhere('challenge'); } } : null}
           onWriteUp={userId ? () => writeUp(raceFacts(debrief.sum, debrief.moments, debrief.race.gunT, debrief.race.venue ? `${debrief.race.venue.def.name}, ${debrief.race.venue.def.place}` : 'the practice pond'), clubId) : undefined} />
+      </div>
+    );
+  }
+
+  if (where === 'live' && room) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <SimLive room={room} myId={userId ?? ''} onLeave={() => { leaveRoom(); setWhere('home'); }} />
       </div>
     );
   }
@@ -368,7 +438,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
         training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
-        sequences={sequences} startSeq={startSeq} />
+        sequences={sequences} startSeq={startSeq}
+        live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null} />
     </div>
   );
 }
