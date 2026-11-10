@@ -3,7 +3,7 @@
 // collisions → start/rounding/finish progress → referee → recording.
 
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
-import { CLASSES, bestSheet, rigPower, vmgAngles } from './classes';
+import { CLASSES, bestSheet, overpowerEase, rigPower, vmgAngles } from './classes';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
 import { KN, Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
 import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, settleHeel, stern } from './physics';
@@ -443,7 +443,8 @@ export class Race implements AiHost {
     }
     // Penalties are the skipper's own: she sails her turn herself (the referee sees it done).
     p.rudder = rudder;
-    const best = bestSheet(Math.abs(p.twa));
+    // Auto-trim: right in upwind (a touch off in very light air), and eased a touch when a gust lays her over.
+    const best = bestSheet(Math.abs(p.twa), p.tws) - overpowerEase(p.heel);
     p.sheet = input.autoTrim ? Math.min(best, input.sheet >= 0.98 ? best : input.sheet) : input.sheet;
     return assist && this.t < assist.until ? assist : null;
   }

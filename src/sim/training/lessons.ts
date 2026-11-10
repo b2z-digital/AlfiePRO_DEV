@@ -611,7 +611,7 @@ const m4: RulesModule = {
           final: () => lost('Not started', 'Cross the line between the marks to start.'),
         },
         solution: timedStart({ margin: 0.4 }),
-        mistake: (t, b, race) => (t < 3 ? { hdg: 100, sheet: 0.5 } : { hdg: bearing(b, race.course.start.stbd) }),
+        mistake: (t, b, race) => (t < 3 ? { hdg: 100 } : { hdg: bearing(b, race.course.start.stbd) }),
         mistakeRule: '31',
       },
     },

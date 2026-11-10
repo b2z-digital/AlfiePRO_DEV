@@ -107,7 +107,7 @@ describe('Gusts', () => {
   it('brings big gusts through the fleet on a fresh, puffy day, and they lay boats nearly flat', () => {
     const f = felt('fresh', 'puffy', 12);
     expect(f.gust).toBeGreaterThan(1.7);
-    expect(f.heel).toBeGreaterThan(65);
+    expect(f.heel).toBeGreaterThan(60); // (she eases a touch when overpowered, so a little less)
   });
 
   it('keeps them on their feet in a moderate, shifty breeze', () => {

@@ -133,7 +133,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   const ng = noGoAngle(b.tws);
   const perfect = polarSpeed(c, b.tws, a);
   b.targetSpd = perfect;
-  let target = perfect * trimEfficiency(b.sheet, a);
+  let target = perfect * trimEfficiency(b.sheet, a, b.tws);
   const drag = 1 - 0.3 * b.rudder * b.rudder * clamp(b.spd / c.hullSpeed, 0, 1);
   target *= drag;
   // Laid over too far she slows: more drag, less drive, and nearly stopped when she's knocked flat.
