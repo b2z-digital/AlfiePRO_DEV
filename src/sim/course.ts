@@ -4,6 +4,7 @@
 // the boat's track goes round the mark the right way (the string test of Rule 28).
 
 import { V2, add, bearing, dir, mul, n360, sub, dot } from './math';
+import type { Shore } from './venue';
 
 export type Side = 'port' | 'stbd';
 export type MarkKind = 'windward' | 'offset' | 'gate-port' | 'gate-stbd' | 'pin' | 'start-stbd';
@@ -53,6 +54,10 @@ export interface Course {
   bounds: { alongMin: number; alongMax: number; across: number };
   origin: V2;
   beat: number;           // metres from the start line to the windward mark
+  /** Compass bearing of the world's +y: 0 on the practice pond; at a venue, the wind at the start. */
+  rot: number;
+  /** At a venue: the real water's edge near the course. */
+  shore?: Shore;
 }
 
 function rounding(markId: string, side: Side, from: V2, at: V2, to: V2): Rounding {
@@ -115,6 +120,7 @@ export function buildCourse(axis: number, L: number, s: CourseSettings): Course 
     bounds: { alongMin: (-runDown - 9) * L, alongMax: (beatUp + 9) * L, across: across * L },
     origin: O,
     beat: beatUp * L,
+    rot: 0,
   };
 }
 

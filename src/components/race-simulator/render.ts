@@ -3,10 +3,13 @@
 // (zone, laylines, time to the line, who has right of way). Draws one frame; owns no state.
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
+import type { WorldOverlay } from '@/sim/scene';
 import { vmgAngles, noGoAngle } from '@/sim/classes';
 import { dir, n180 } from '@/sim/math';
 import { keepClear } from '@/sim/referee';
 import { hullGap } from '@/sim/physics';
+import { drawVenueLand, waterPath } from './venueMap';
+import { drawCredit } from './bankVenue';
 
 export interface Camera { x: number; y: number; scale: number } // world metres at screen centre, px per metre
 
@@ -24,7 +27,15 @@ export interface ViewOptions {
   preStart: boolean;
   /** Next mark for the player (or null). */
   next: { x: number; y: number; name: string; upwind: boolean } | null;
+  /** Teaching marks for a drill or lesson (target rings, lines). */
+  overlays?: WorldOverlay[];
+  /** Label other boats by name ("Orange") as well as sail number, as in a lesson. */
+  names?: boolean;
+  /** A ghost to race: another member's boat from their own race, drawn faint (no one hits her). */
+  ghost?: { b: Boat; label: string } | null;
 }
+
+const TONE = { blue: ['rgba(77,163,255,0.85)', 'rgba(77,163,255,0.10)', '#9CCBFF'], orange: ['rgba(255,159,67,0.85)', 'rgba(255,159,67,0.10)', '#FFCB96'], green: ['rgba(52,211,153,0.85)', 'rgba(52,211,153,0.10)', '#A7F3D0'] } as const;
 
 const FONT = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
@@ -44,7 +55,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
 
   // ── Water ──
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#0A1830'); g.addColorStop(1, '#0E2644');
+  g.addColorStop(0, '#11294A'); g.addColorStop(1, '#173764');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
@@ -54,48 +65,121 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   const wd = dir(twd + 180); // direction the wind blows towards
 
   // Puffs (darker, rippled water) and lulls (glassy patches), rolling down the course.
+  // A puff is darker, rippled water: the stronger it is, the darker. Lulls are glassy and pale.
   for (const p of race.wind.puffs) {
     const life = Math.sin(Math.PI * Math.min(1, Math.max(0, p.age / p.life)));
-    const a = Math.min(1, Math.abs(p.strength) * 2.2) * life;
-    if (a < 0.02) continue;
+    const a = Math.min(1, Math.abs(p.strength) * 3 + 0.2) * life;
+    if (a < 0.03) continue;
     const px = X(p.x), py = Y(p.y), r = p.r * s;
     if (px < -r * 2 || px > w + r * 2 || py < -r * 2 || py > h + r * 2) continue;
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate((twd * Math.PI) / 180);
     ctx.scale(1, 1.5);
-    const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
-    if (p.strength > 0) { rg.addColorStop(0, `rgba(2,8,20,${0.55 * a})`); rg.addColorStop(1, 'rgba(2,8,20,0)'); }
-    else { rg.addColorStop(0, `rgba(170,205,255,${0.07 * a})`); rg.addColorStop(1, 'rgba(170,205,255,0)'); }
+    const rg = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r);
+    if (p.strength > 0) { rg.addColorStop(0, `rgba(3,10,24,${0.72 * a})`); rg.addColorStop(0.65, `rgba(3,10,24,${0.5 * a})`); rg.addColorStop(1, 'rgba(3,10,24,0)'); }
+    else { rg.addColorStop(0, `rgba(190,215,255,${0.13 * a})`); rg.addColorStop(1, 'rgba(190,215,255,0)'); }
     ctx.fillStyle = rg;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    if (p.strength > 0 && r > 18) {
+      // Cat's paws: short ripples across the wind inside the puff.
+      ctx.strokeStyle = `rgba(150,185,235,${0.16 * a})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const n = Math.min(40, Math.round(r / 7));
+      for (let k = 0; k < n; k++) {
+        const u = hash(p.id, k) * 2 - 1, v = hash(k, p.id + 3) * 2 - 1;
+        if (u * u + v * v > 0.7) continue;
+        const qx = u * r, qy = v * r, len = 3 + hash(p.id + k, 9) * 5;
+        ctx.moveTo(qx - len, qy); ctx.lineTo(qx + len, qy);
+      }
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
-  // Wind streaks drifting downwind.
+  // Wind streaks drifting downwind. Laid out along and across the wind; each one fades in, drifts a
+  // cell's length and fades out, so nothing ever jumps back.
   const G = Math.max(2.4 * L, 46 / s);
-  const drift = (t * Math.max(0.25, tws * 0.12)) % G;
-  const x0 = cam.x - w / 2 / s - G, x1 = cam.x + w / 2 / s + G;
-  const y0 = cam.y - h / 2 / s - G, y1 = cam.y + h / 2 / s + G;
+  const across = { x: wd.y, y: -wd.x };
   const seg = Math.min(14, 0.55 * L * s);
-  ctx.strokeStyle = 'rgba(180,205,255,0.10)';
+  const rv = Math.hypot(w, h) / 2 / s + G;
+  const ca = cam.x * wd.x + cam.y * wd.y, cc = cam.x * across.x + cam.y * across.y;
+  const flow = t * Math.max(0.25, tws * 0.12) / G;
   ctx.lineWidth = 1.2;
   ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (let i = Math.floor(x0 / G); i <= Math.ceil(x1 / G); i++) {
-    for (let j = Math.floor(y0 / G); j <= Math.ceil(y1 / G); j++) {
-      const hx = hash(i, j), hy = hash(j + 7, i - 3);
-      const bx = i * G + hx * G + wd.x * drift, by = j * G + hy * G + wd.y * drift;
-      const sx = X(bx), sy = Y(by);
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + wd.x * seg, sy - wd.y * seg);
+  for (const pass of [0, 1]) {
+    ctx.strokeStyle = pass ? 'rgba(180,205,255,0.13)' : 'rgba(180,205,255,0.06)';
+    ctx.beginPath();
+    for (let i = Math.floor((ca - rv) / G); i <= Math.ceil((ca + rv) / G); i++) {
+      for (let j = Math.floor((cc - rv) / G); j <= Math.ceil((cc + rv) / G); j++) {
+        const ph = (flow + hash(i, j)) % 1;
+        const fade = Math.sin(Math.PI * ph);
+        if ((fade > 0.55 ? 1 : 0) !== pass || fade < 0.15) continue;
+        const u = (i + ph) * G, v = (j + hash(j + 7, i - 3)) * G;
+        const sx = X(wd.x * u + across.x * v), sy = Y(wd.y * u + across.y * v);
+        if (sx < -20 || sx > w + 20 || sy < -20 || sy > h + 20) continue;
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx + wd.x * seg, sy - wd.y * seg);
+      }
+    }
+    ctx.stroke();
+  }
+
+  // Waves: crests across the wind, rolling downwind (the same waves the boats feel).
+  if (race.sea) {
+    const sea = race.sea, wv = dir(sea.from + 180), crossV = { x: wv.y, y: -wv.x };
+    const rough = sea.kind === 'rough';
+    const cs = cam.x * wv.x + cam.y * wv.y, cw = cam.x * crossV.x + cam.y * crossV.y;
+    const n0 = Math.floor((cs - rv) / sea.length), n1 = Math.ceil((cs + rv) / sea.length);
+    if ((n1 - n0) < 260) {
+      ctx.strokeStyle = rough ? 'rgba(200,225,255,0.13)' : 'rgba(200,225,255,0.08)';
+      ctx.lineWidth = rough ? 1.6 : 1.1;
+      ctx.beginPath();
+      for (let n = n0; n <= n1; n++) {
+        const sAlong = sea.length * (n + 0.25 + t / sea.period);
+        for (let k = -6; k <= 6; k++) {
+          const off = (k + hash(n, k) * 0.6) * 3.2 * sea.length;
+          const cx0 = wv.x * sAlong + crossV.x * (cw + off), cy0 = wv.y * sAlong + crossV.y * (cw + off);
+          const half = sea.length * (0.8 + hash(k, n) * 1.2);
+          const ax = X(cx0 - crossV.x * half), ay = Y(cy0 - crossV.y * half), bx = X(cx0 + crossV.x * half), by = Y(cy0 + crossV.y * half);
+          if (Math.max(ax, bx) < -10 || Math.min(ax, bx) > w + 10 || Math.max(ay, by) < -10 || Math.min(ay, by) > h + 10) continue;
+          ctx.moveTo(ax, ay); ctx.quadraticCurveTo((ax + bx) / 2 + wd.x * 2, (ay + by) / 2 - wd.y * 2, bx, by);
+        }
+      }
+      ctx.stroke();
+      if (rough) {
+        // Whitecaps on some crests.
+        ctx.fillStyle = 'rgba(235,245,255,0.35)';
+        for (let n = n0; n <= n1; n++) for (let k = -6; k <= 6; k++) {
+          if (hash(n * 3 + k, k - n) > 0.12) continue;
+          const sAlong = sea.length * (n + 0.25 + t / sea.period);
+          const off = (k + hash(n, k) * 0.6) * 3.2 * sea.length;
+          const qx = X(wv.x * sAlong + crossV.x * (cw + off)), qy = Y(wv.y * sAlong + crossV.y * (cw + off));
+          if (qx < 0 || qx > w || qy < 0 || qy > h) continue;
+          ctx.beginPath(); ctx.ellipse(qx, qy, 4, 1.6, -Math.atan2(-crossV.y, crossV.x), 0, Math.PI * 2); ctx.fill();
+        }
+      }
     }
   }
-  ctx.stroke();
 
-  // ── The bank: everything outside the pond is land ──
+  // ── The bank: everything outside the pond is land (at a venue, outside the real shoreline) ──
   const c = race.course;
-  {
+  if (race.venue) {
+    const T = (x: number, y: number): [number, number] => [X(x), Y(y)];
+    drawVenueLand(ctx, race.venue, T, s, w, h, true);
+    // The course area: as far as the boats can go out on the open lake.
+    const B = c.bounds;
+    const corner = (a: number, x: number) => ({ x: c.origin.x + c.up.x * a + c.right.x * x, y: c.origin.y + c.up.y * a + c.right.y * x });
+    const q = [corner(B.alongMin, -B.across), corner(B.alongMax, -B.across), corner(B.alongMax, B.across), corner(B.alongMin, B.across)];
+    ctx.save();
+    waterPath(ctx, race.venue, T); ctx.clip('evenodd');
+    ctx.setLineDash([3, 7]);
+    ctx.strokeStyle = 'rgba(235,240,255,0.16)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(X(q[0].x), Y(q[0].y)); for (let k = 1; k < 4; k++) ctx.lineTo(X(q[k].x), Y(q[k].y)); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  } else {
     const B = c.bounds;
     const corner = (a: number, x: number) => ({ x: c.origin.x + c.up.x * a + c.right.x * x, y: c.origin.y + c.up.y * a + c.right.y * x });
     const q = [corner(B.alongMin, -B.across), corner(B.alongMax, -B.across), corner(B.alongMax, B.across), corner(B.alongMin, B.across)];
@@ -206,6 +290,23 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     label(ctx, `${v.ttl.s.toFixed(1)} s to the line`, tx, ty - 12, '#9CCBFF', 12.5, 'center', 600);
   }
 
+  // Teaching overlays.
+  for (const ov of v.overlays ?? []) {
+    const [stroke, fill, text] = TONE[ov.tone];
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = stroke;
+    if (ov.kind === 'ring') {
+      ctx.fillStyle = fill;
+      ctx.beginPath(); ctx.arc(X(ov.x), Y(ov.y), Math.max(6, ov.r * s), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (ov.label) label(ctx, ov.label, X(ov.x), Y(ov.y) - Math.max(6, ov.r * s) - 9, text, 12, 'center', 600);
+    } else {
+      ctx.beginPath(); ctx.moveTo(X(ov.x1), Y(ov.y1)); ctx.lineTo(X(ov.x2), Y(ov.y2)); ctx.stroke();
+      if (ov.label) label(ctx, ov.label, (X(ov.x1) + X(ov.x2)) / 2, (Y(ov.y1) + Y(ov.y2)) / 2 - 10, text, 12, 'center', 600);
+    }
+    ctx.setLineDash([]);
+  }
+
   // ── Wakes ──
   const back = Math.max(0, v.back | 0);
   race.boats.forEach((b, i) => {
@@ -228,6 +329,14 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
 
   // ── Boats ──
   const Lpx = Math.max(18, L * s);
+  // The ghost first, under everyone.
+  if (v.ghost && !back) {
+    const g = v.ghost.b, gx = X(g.x), gy = Y(g.y);
+    if (gx > -60 && gx < w + 60 && gy > -60 && gy < h + 60) {
+      drawBoat(ctx, gx, gy, g.hdg, n180(g.twd - g.hdg), g.sheet, Lpx, '#E8F1FF', false, false, 0.38);
+      label(ctx, v.ghost.label, gx + Lpx * 0.75 + 8, gy - Lpx * 0.4, 'rgba(232,241,255,0.7)', 11.5, 'left', 600);
+    }
+  }
   const order = race.boats.map((_, i) => i).sort((a, bb) => (race.boats[a].isPlayer ? 1 : 0) - (race.boats[bb].isPlayer ? 1 : 0));
   for (const i of order) {
     const b = race.boats[i];
@@ -245,12 +354,13 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
       ctx.beginPath(); ctx.arc(sx, sy, Lpx * 0.95 + 4, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
-    drawBoat(ctx, sx, sy, bh, twa, b.sheet, Lpx, b.color, b.isPlayer, Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1);
+    drawBoat(ctx, sx, sy, bh, twa, b.disabled ? 0 : b.sheet, Lpx, b.color, b.isPlayer, b.disabled || Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1);
     // Label.
     if (b.isPlayer) label(ctx, 'You', sx + Lpx * 0.75 + 8, sy - Lpx * 0.4, '#FFFFFF', 12.5, 'left', 700);
-    else label(ctx, b.sail, sx, sy + Lpx * 0.62 + 12, 'rgba(235,240,255,0.78)', 11.5, 'center', 600);
+    else label(ctx, v.names && b.name && b.name !== b.sail ? `${b.name} · ${b.sail}` : b.sail, sx, sy + Lpx * 0.62 + 12, 'rgba(235,240,255,0.78)', 11.5, 'center', 600);
     // Status badges.
-    if (b.ocs && !b.started) badge(ctx, 'OCS', sx + Lpx * 0.6, sy + Lpx * 0.25, '#F87171');
+    if (b.disabled) badge(ctx, 'Out of control', sx + Lpx * 0.6, sy + Lpx * 0.25, '#94A3B8');
+    else if (b.ocs && !b.started) badge(ctx, 'OCS', sx + Lpx * 0.6, sy + Lpx * 0.25, '#F87171');
     else if (b.penalty.owed > 0) badge(ctx, b.penalty.active ? 'Turning' : 'Penalty', sx + Lpx * 0.6, sy + Lpx * 0.25, '#FF9F43');
     // Hail bubble.
     if (b.hail && race.t - b.hail.t < 2.6 && back === 0) bubble(ctx, b.hail.text, sx, sy - Lpx * 0.8 - 10, /protest/i.test(b.hail.text));
@@ -294,15 +404,19 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), r, 0, Math.PI * 2); ctx.stroke();
   }
+  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
-/** One boat: hull, sail set to the wind and sheet, mast. Lpx = hull length on screen. */
+/** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on
+ *  screen. Both sails come off the one sheet, as on a radio yacht; running deep, the jib swings out
+ *  on the other side (goose-winged). */
 export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, hdg: number, twa: number, sheet: number, Lpx: number, color: string, isPlayer: boolean, luffing: boolean, alpha = 1) {
   const k = Lpx / 24;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(sx, sy);
   ctx.rotate((hdg * Math.PI) / 180);
+  // Hull, with a soft shadow on the water.
   ctx.save();
   ctx.scale(k * 0.78, k);
   ctx.beginPath();
@@ -311,35 +425,51 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   ctx.lineTo(-3.8, 11);
   ctx.bezierCurveTo(-5, 1.5, -4.2, -7.5, 0, -13);
   ctx.closePath();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 1.5; ctx.shadowOffsetY = 1.5;
   ctx.fillStyle = color;
   ctx.fill();
+  ctx.shadowColor = 'transparent';
   ctx.lineWidth = (isPlayer ? 1.3 : 1) / k;
   ctx.strokeStyle = isPlayer ? '#E8F2FF' : '#0A1830';
   ctx.stroke();
+  // Deck highlight.
+  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(0, 9); ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 0.9 / k; ctx.stroke();
   ctx.restore();
-  // Sail: boom angle from the sheet, unless the sail is luffing in line with the wind.
+  // Sails: the boom angle comes from the sheet, unless the sail is luffing in line with the wind.
   const a = Math.abs(twa);
-  const maxBoom = 8 + (1 - Math.min(1, Math.max(0, sheet))) * 82;
+  const ease = 1 - Math.min(1, Math.max(0, sheet));
+  const maxBoom = 8 + ease * 82;
   const natural = Math.min(88, Math.max(0, a - 4));
   const boom = Math.min(maxBoom, natural);
   const flapping = luffing || maxBoom > natural + 6;
-  const side = twa >= 0 ? -1 : 1; // starboard tack: sail to port
-  const mx = 0, my = -3.9 * k;
-  const len = 11.5 * k;
-  const r = (boom * Math.PI) / 180;
-  const ex = mx + side * Math.sin(r) * len, ey = my + Math.cos(r) * len;
-  const midx = (mx + ex) / 2, midy = (my + ey) / 2;
-  const nx = (ey - my) / len, ny = -(ex - mx) / len; // perpendicular
-  const belly = flapping ? 0 : 0.17 * len * side; // bellies out to leeward
+  const side = twa >= 0 ? -1 : 1; // starboard tack: sails to port
+  const sail = (mx: number, my: number, len: number, ang: number, sd: number, flap: boolean, width: number) => {
+    const r = (ang * Math.PI) / 180;
+    const ex = mx + sd * Math.sin(r) * len, ey = my + Math.cos(r) * len;
+    const midx = (mx + ex) / 2, midy = (my + ey) / 2;
+    const nx = (ey - my) / len, ny = -(ex - mx) / len;
+    const belly = flap ? 0 : 0.17 * len * sd;
+    ctx.lineWidth = width;
+    if (flap) ctx.setLineDash([2, 1.6]);
+    ctx.beginPath();
+    ctx.moveTo(mx, my);
+    ctx.quadraticCurveTo(midx + nx * belly, midy + ny * belly, ex, ey);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = Math.max(1.4, 1.8 * k * 0.55);
   ctx.lineCap = 'round';
-  if (flapping) ctx.setLineDash([2, 1.6]);
-  ctx.beginPath();
-  ctx.moveTo(mx, my);
-  ctx.quadraticCurveTo(midx + nx * belly, midy + ny * belly, ex, ey);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  // Jib: forward of the mast. Running deep with the sheet eased it goose-wings to the other side.
+  const goose = a > 156 && ease > 0.6 && !luffing;
+  const jibAng = goose ? Math.min(85, maxBoom) : Math.min(maxBoom * 1.08 + 2, natural + 2);
+  ctx.globalAlpha = alpha * 0.95;
+  sail(0, -11.6 * k, 7 * k, jibAng, goose ? -side : side, flapping && !goose, Math.max(1.2, 1.5 * k * 0.55));
+  ctx.globalAlpha = alpha;
+  // Mainsail.
+  sail(0, -3.9 * k, 11.5 * k, boom, side, flapping, Math.max(1.4, 1.8 * k * 0.55));
+  // Mast.
+  ctx.fillStyle = '#E9EEF8';
+  ctx.beginPath(); ctx.arc(0, -3.9 * k, Math.max(1, 0.9 * k), 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -410,21 +540,35 @@ function bubble(ctx: CanvasRenderingContext2D, text: string, x: number, y: numbe
 }
 
 /** Debrief map: the course and full tracks from the 5 Hz recording, boats at frame f. */
-export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: number, h: number, dpr: number, frame: number, focus: string[]) {
-  const c = race.course;
-  // Fit the marks and every track into the canvas, with a margin.
+/** The part of the water a replay shows: x0..x1, y0..y1 in metres. */
+export interface ReplayBox { x0: number; y0: number; x1: number; y1: number }
+
+/** Everywhere the race went: the marks and every boat's track. */
+export function raceBox(race: Race): ReplayBox {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   const grow = (x: number, y: number) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
-  for (const m of c.marks) grow(m.p.x, m.p.y);
+  for (const m of race.course.marks) grow(m.p.x, m.p.y);
   for (let k = 0; k < race.track.length; k += 3) { const d = race.track[k].d; for (let i = 0; i < race.boats.length; i++) grow(d[i * 5], d[i * 5 + 1]); }
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * The replay: tracks up to the frame (the boats in focus bright, the rest faint with a short tail),
+ * the boats as they were and the wind then, within `box` (the whole race by default), with the
+ * names of the boats in focus.
+ */
+export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: number, h: number, dpr: number, frame: number, focus: string[], box?: ReplayBox) {
+  const c = race.course;
+  const B = box ?? raceBox(race);
   const pad = 2 * c.L;
-  const s = Math.min(w / (x1 - x0 + 2 * pad), h / (y1 - y0 + 2 * pad));
-  const cam = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+  const s = Math.min(w / (B.x1 - B.x0 + 2 * pad), h / (B.y1 - B.y0 + 2 * pad));
+  const cam = { x: (B.x0 + B.x1) / 2, y: (B.y0 + B.y1) / 2 };
   const X = (x: number) => w / 2 + (x - cam.x) * s;
   const Y = (y: number) => h / 2 - (y - cam.y) * s;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#0B1A31';
   ctx.fillRect(0, 0, w, h);
+  if (race.venue) drawVenueLand(ctx, race.venue, (x, y) => [X(x), Y(y)], s, w, h, s > 6);
   // Line and marks.
   ctx.setLineDash([5, 4]);
   ctx.strokeStyle = '#FFB340';
@@ -432,18 +576,20 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
   ctx.beginPath(); ctx.moveTo(X(c.start.pin.x), Y(c.start.pin.y)); ctx.lineTo(X(c.start.stbd.x), Y(c.start.stbd.y)); ctx.stroke();
   ctx.setLineDash([]);
   for (const m of c.marks) {
+    const r = Math.max(4.5, m.r * s);
     ctx.fillStyle = '#FF9F43';
-    ctx.beginPath(); ctx.arc(X(m.p.x), Y(m.p.y), 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(m.p.x), Y(m.p.y), r, 0, Math.PI * 2); ctx.fill();
+    if (s > 5) label(ctx, m.kind === 'pin' ? 'Pin' : m.kind === 'start-stbd' ? 'S' : m.label === '1' ? 'Mark 1' : m.label, X(m.p.x), Y(m.p.y) - r - 7, 'rgba(235,240,255,0.7)', 11.5, 'center', 600);
   }
   const T = race.track;
   if (!T.length) return;
   const n = race.boats.length;
   const f = Math.max(0, Math.min(T.length - 1, frame | 0));
-  // Tracks up to the frame: focused boats bright, the rest faint.
+  // Tracks up to the frame: focused boats bright, the rest faint, with a brighter last 10 s.
   race.boats.forEach((b, i) => {
     const hot = focus.includes(b.id);
     ctx.strokeStyle = b.color;
-    ctx.globalAlpha = hot ? 0.9 : 0.16;
+    ctx.globalAlpha = hot ? 0.9 : 0.14;
     ctx.lineWidth = hot ? (b.isPlayer ? 2.4 : 2) : 1.2;
     ctx.beginPath();
     for (let k = 0; k <= f; k += 2) {
@@ -452,13 +598,33 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
+    if (!hot) {
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      for (let k = Math.max(0, f - 50); k <= f; k++) { const d = T[k].d; const x = X(d[i * 5]), y = Y(d[i * 5 + 1]); if (k === Math.max(0, f - 50)) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
   });
   ctx.globalAlpha = 1;
-  // Boats at the frame.
+  // Boats at the frame, big enough to read when zoomed in.
   const d = T[f].d;
+  const Lpx = Math.max(14, Math.min(40, c.L * s));
   for (let i = 0; i < n; i++) {
     const b = race.boats[i];
     const x = X(d[i * 5]), y = Y(d[i * 5 + 1]), hd = d[i * 5 + 2];
-    drawBoat(ctx, x, y, hd, n180(T[f].twd - hd), 0.7, 14, b.color, b.isPlayer, false, focus.includes(b.id) ? 1 : 0.6);
+    const hot = focus.includes(b.id);
+    drawBoat(ctx, x, y, hd, n180(T[f].twd - hd), 0.7, Lpx, b.color, b.isPlayer, false, hot ? 1 : 0.6);
+    if (hot || s > 8) label(ctx, b.isPlayer ? 'You' : b.sail, x + Lpx * 0.55 + 4, y - Lpx * 0.4, b.isPlayer ? '#FFFFFF' : 'rgba(235,240,255,0.8)', b.isPlayer ? 12.5 : 11.5, 'left', b.isPlayer ? 700 : 600);
   }
+  // The wind at that moment.
+  {
+    const wd = dir(T[f].twd + 180), cx = w - 30, cy = 30;
+    ctx.strokeStyle = 'rgba(156,203,255,0.9)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - wd.x * 11, cy + wd.y * 11); ctx.lineTo(cx + wd.x * 11, cy - wd.y * 11);
+    const ax = cx + wd.x * 11, ay = cy - wd.y * 11, pxv = { x: wd.y, y: wd.x };
+    ctx.moveTo(ax, ay); ctx.lineTo(ax - wd.x * 6 + pxv.x * 5, ay + wd.y * 6 + pxv.y * 5);
+    ctx.moveTo(ax, ay); ctx.lineTo(ax - wd.x * 6 - pxv.x * 5, ay + wd.y * 6 - pxv.y * 5);
+    ctx.stroke();
+  }
+  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }

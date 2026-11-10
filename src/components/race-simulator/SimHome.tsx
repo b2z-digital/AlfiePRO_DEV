@@ -1,25 +1,45 @@
-// Simulator home: set up a quick race, practise starts, and see your skipper profile
-// (kept on this device for now).
+// Simulator home: set up a quick race, open the Start Trainer, Rules Academy or Scenario Lab, and
+// see your skipper profile (kept on this device for now).
 import React, { useMemo, useState } from 'react';
 import type { ClassId } from '@/sim/classes';
 import type { SkipperLevel } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
 import type { CourseLength } from '@/sim/course';
 import type { CoachMode } from './coach';
+import type { SeaKind } from '@/sim/sea';
+import { LAB } from '@/sim/training';
 import { Profile, clearProfile, skills } from './profile';
-import { Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, cx, ordinal } from './ui';
+import { TrainingProgress, drillStars, licence } from './progress';
+import type { SimView } from './SimRace';
+import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, compassName, cx, ordinal } from './ui';
+import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
+import type { VenueWind } from './venueWind';
+import type { SimIdentity } from './identity';
+import { Challenge, closesText, isOpen } from './challenges';
+import { challengeLine } from './SimChallenge';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
   windStrength: WindStrength; windCharacter: WindCharacter;
   laps: number; length: CourseLength; sequenceSeconds: number;
   coach: CoachMode; autoTrim: boolean; forgetfulSkippers: boolean;
+  seaState: SeaKind; view: SimView;
+  /** A venue id, or 'pond' for the practice pond. */
+  venue: string;
+  /** At a venue: its usual breeze, today's wind there, or any direction. */
+  windDir: 'usual' | 'today' | 'any';
 }
 
+/** The default race: an IOM against 8 State-level skippers at Lake Macquarie RYC in its sea breeze,
+ *  on choppy water, seen from the club's control area, with the 1-minute scratch sequence clubs use
+ *  in StartBox and the sails on your stick (no auto-trim). */
 export const DEFAULT_SETUP: Setup = {
   classId: 'IOM', fleetSize: 8, level: 'state', windStrength: 'medium', windCharacter: 'oscillating',
-  laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'full', autoTrim: true, forgetfulSkippers: false,
+  laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'full', autoTrim: false, forgetfulSkippers: false,
+  seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
+
+const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
 
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
   club: 'Learning the ropes: late starts, wide roundings, and the odd foul you can protest.',
@@ -35,7 +55,7 @@ function minutes(s: Setup) {
   return Math.round(perLap * s.laps * cls * wind + 0.6);
 }
 
-function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
+function Field({ label, children, hint }: { label: React.ReactNode; children: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
       <Cap>{label}</Cap>
@@ -72,26 +92,83 @@ function SkillBar({ label, v }: { label: string; v: number }) {
   );
 }
 
-function TrainCard({ title, text, icon, action, soon }: { title: string; text: string; icon: React.ReactNode; action?: () => void; soon?: boolean }) {
+function TrainCard({ title, text, icon, action, actionLabel, soon, badge }: { title: string; text: string; icon: React.ReactNode; action?: () => void; actionLabel?: string; soon?: boolean; badge?: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
       <div className="flex items-center gap-2.5">
         <Tile size={36}>{icon}</Tile>
         <p className="m-0 text-[15px] font-semibold">{title}</p>
-        {soon && <Chip className="ml-auto">Coming next</Chip>}
+        {soon ? <Chip className="ml-auto">Coming next</Chip> : badge ? <span className="ml-auto">{badge}</span> : null}
       </div>
       <p className="m-0 flex-1 text-[13.5px] leading-normal" style={{ color: C.mute }}>{text}</p>
-      {action && <div><Btn small onClick={action}>Practise starts</Btn></div>}
+      {action && <div><Btn small primary onClick={action}>{actionLabel ?? 'Open'}</Btn></div>}
     </div>
   );
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared }: {
+/** Set a challenge: a title, a line about it, when it closes, and (super admins) who it's for. Uses the setup above. */
+function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean; onCreate: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>; onDone: () => void }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [days, setDays] = useState<number>(7);
+  const [everyone, setEveryone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const field = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[14px] text-[#F1F4FA] placeholder:text-[rgba(235,240,255,0.4)] focus:border-[rgba(77,163,255,0.6)] focus:outline-none';
+  return (
+    <form className="flex flex-col gap-3 rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-4" onSubmit={async e => {
+      e.preventDefault();
+      if (title.trim().length < 3) { setErr('Give it a title of at least three letters.'); return; }
+      setBusy(true); setErr(null);
+      const r = await onCreate({ title, description, days: days || null, everyone });
+      setBusy(false);
+      if (r) setErr(r); else onDone();
+    }}>
+      <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>The challenge is the race set up above (class, fleet, skippers, venue and wind), with its own shifts that everyone gets the same.</p>
+      <label className="flex flex-col gap-1.5"><Cap>Title</Cap><input className={field} value={title} onChange={e => setTitle(e.target.value)} maxLength={120} placeholder="Sunday sea breeze, IOM" /></label>
+      <label className="flex flex-col gap-1.5"><Cap>About it (optional)</Cap><textarea className={cx(field, 'min-h-[64px]')} value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} placeholder="Practise the start before Sunday's racing." /></label>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5"><Cap>Open for</Cap><Seg size="sm" label="Open for" value={days} onChange={setDays} options={[{ value: 3, label: '3 days' }, { value: 7, label: 'A week' }, { value: 14, label: 'Two weeks' }, { value: 0, label: 'No end' }]} /></div>
+        {canEveryone && <div className="flex flex-col gap-1.5"><Cap>For</Cap><Seg size="sm" label="Who it's for" value={everyone ? 'all' : 'club'} onChange={v => setEveryone(v === 'all')} options={[{ value: 'club', label: 'This club' }, { value: 'all', label: 'Every club' }]} /></div>}
+        <span className="ml-auto" />
+        <Btn type="button" quiet onClick={onDone}>Cancel</Btn>
+        <Btn type="submit" primary disabled={busy}>{busy ? 'Setting it…' : 'Set the challenge'}</Btn>
+      </div>
+      {err && <p className="m-0 text-[13px] text-[#FCA5A5]">{err}</p>}
+    </form>
+  );
+}
+
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
+  /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
+  today: VenueWind | 'loading' | 'failed' | null;
+  /** The signed-in member: their name and sail numbers. */
+  me?: SimIdentity | null;
+  /** Races and training are being kept in the member's account. */
+  synced?: boolean;
+  /** Challenges you can see (null when you're not signed in, or they couldn't be loaded). */
+  challenges?: Challenge[] | null;
+  onChallenge?: (c: Challenge) => void;
+  /** Can you set challenges, and for every club? */
+  canSet?: { everyone: boolean } | null;
+  onCreateChallenge?: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>;
 }) {
+  const [setting, setSetting] = useState(false);
+  const stars = drillStars(training);
+  const lic = licence(training);
+  const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
+  const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
+  const windHint = !venue ? null
+    : s.windDir === 'usual' ? `The club's usual breeze, from ${String(venue.usualWind).padStart(3, '0')}°.`
+      : s.windDir === 'any' ? 'A different direction every race, so you learn the whole lake.'
+        : today === 'loading' ? 'Getting the wind at the club now…'
+          : today === 'failed' || !today ? `Couldn't get today's wind, so it's the ${venue.usualWindName} for now.`
+            : `Now at the club: ${Math.round(today.kn)} kn from the ${compassName(today.from)} (${String(Math.round(today.from)).padStart(3, '0')}°). It sets the wind strength too.`;
   const weakest = sk ? (Object.entries({ starts: sk.starts, upwind: sk.upwind, roundings: sk.roundings, downwind: sk.downwind, rules: sk.rules }) as [string, number][]).sort((a, b) => a[1] - b[1])[0] : null;
 
   const surprise = () => {
@@ -129,6 +206,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Every skipper in the fleet has a game plan, a personality and the rules in their head. Pick who you race and in what.</p>
             </div>
             <div className="grid gap-5 md:grid-cols-2">
+              <Field label="Where" hint={venue ? `${venue.place}, from the club's control area. The course is laid for the wind, with every mark well off the bank. Map data ${venue.credit}.` : 'A sheltered practice pond, lined with trees.'}>
+                <Seg label="Where" value={s.venue} onChange={v => set({ venue: v })} options={[...Object.values(VENUES).map(d => ({ value: d.id, label: d.short })), { value: 'pond', label: 'Practice pond' }]} />
+              </Field>
+              {venue ? (
+                <Field label="Wind direction" hint={windHint}>
+                  <Seg label="Wind direction" value={s.windDir} onChange={v => set({ windDir: v })} options={[{ value: 'usual', label: `${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}` }, { value: 'today', label: "Today's wind" }, { value: 'any', label: 'Any direction' }]} />
+                </Field>
+              ) : <div className="hidden md:block" />}
               <Field label="Class">
                 <Seg label="Class" value={s.classId} onChange={v => set({ classId: v })} options={[{ value: 'IOM', label: 'IOM' }, { value: 'DF95', label: 'DF95' }, { value: 'DF65', label: 'DF65' }, { value: '10R', label: '10 Rater' }, { value: 'M', label: 'Marblehead' }]} />
               </Field>
@@ -148,15 +233,21 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <Seg label="Course length" value={s.length} onChange={v => set({ length: v })} options={[{ value: 'short', label: 'Short' }, { value: 'medium', label: 'Medium' }, { value: 'long', label: 'Long' }]} />
                 </div>
               </Field>
-              <Field label="Start" hint="Calls each minute, every 10 s in the last minute and every second in the last 10 s (Appendix E)">
+              <Field label="Water" hint={s.seaState === 'flat' ? 'Glassy water and clear reflections.' : s.seaState === 'chop' ? 'Waves 4 cm high: a little slower upwind, a little surfing downwind.' : 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'}>
+                <Seg label="Water" value={s.seaState} onChange={v => set({ seaState: v })} options={[{ value: 'flat', label: 'Flat' }, { value: 'chop', label: 'Choppy' }, { value: 'rough', label: 'Rough' }]} />
+              </Field>
+              <Field label="Start" hint="The 1-minute scratch sequence from StartBox: calls each minute, every 10 s in the last minute and every second in the last 10 s (Appendix E)">
                 <Seg label="Start sequence" value={s.sequenceSeconds} onChange={v => set({ sequenceSeconds: v })} options={[{ value: 60, label: '1 minute' }, { value: 120, label: '2 minutes' }, { value: 180, label: '3 minutes' }]} />
               </Field>
-              <Field label="Coaching" hint={s.coach === 'full' ? 'Advice as you sail, and the race pauses to explain any rules incident you are in.' : s.coach === 'hints' ? 'Advice as you sail; rules incidents show as a banner without pausing.' : 'No coach. Incidents still show briefly.'}>
-                <Seg label="Coaching" value={s.coach} onChange={v => set({ coach: v })} options={[{ value: 'full', label: 'Full coach' }, { value: 'hints', label: 'Hints only' }, { value: 'off', label: 'Off' }]} />
+              <Field label="View" hint={s.view === 'bank' ? 'From the control area on the bank, the way you see a race. Press V to switch.' : 'From above, with laylines. Press V to switch.'}>
+                <Seg label="View" value={s.view} onChange={v => set({ view: v })} options={[{ value: 'bank', label: 'From the bank' }, { value: 'top', label: 'From above' }]} />
+              </Field>
+              <Field label={<span className="inline-flex items-center gap-2"><AlfieOrb size={18} />Alfie's coaching</span>} hint={s.coach === 'full' ? 'Alfie talks you through the race as you sail, and pauses it to explain any rules incident you are in.' : s.coach === 'hints' ? 'Alfie gives tips as you sail; rules incidents show as a banner without pausing.' : 'No tips. Incidents still show briefly.'}>
+                <Seg label="Alfie's coaching" value={s.coach} onChange={v => set({ coach: v })} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints only' }, { value: 'off', label: 'Off' }]} />
               </Field>
               <div className="flex flex-col gap-2">
                 <Cap>Options</Cap>
-                <Toggle on={s.autoTrim} onChange={v => set({ autoTrim: v })} label="Auto-trim" text="The sail trims itself when the stick is fully in. Ease it to slow down." />
+                <Toggle on={s.autoTrim} onChange={v => set({ autoTrim: v })} label="Auto-trim" text="Off: the sails go where your stick puts them, like the real thing. On: they trim themselves with the stick right in." />
                 <Toggle on={s.forgetfulSkippers} onChange={v => set({ forgetfulSkippers: v })} label="Forgetful skippers" text="Some skippers forget their penalty, so hail a protest when they foul you." />
               </div>
             </div>
@@ -173,10 +264,17 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <div className="flex items-center gap-2.5">
                 <Tile size={36}><CoachGlyph size={18} /></Tile>
                 <div className="min-w-0">
-                  <h2 id="pf-title" className="m-0 text-[16px] font-semibold">Your skipper profile</h2>
-                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''} on this device` : 'Kept on this device'}</p>
+                  <h2 id="pf-title" className="m-0 text-[16px] font-semibold">{me ? me.name : 'Your skipper profile'}</h2>
+                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
                 </div>
               </div>
+              {me && (
+                <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                  {me.sails[s.classId]
+                    ? <>You're sailing <b className="text-[#F1F4FA]">{CLASS_LABEL[s.classId]} {me.sails[s.classId]}</b>, from your boats in My Garage.</>
+                    : <>Add your {CLASS_LABEL[s.classId]} in My Garage to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.</>}
+                </p>
+              )}
               {!sk ? (
                 <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Sail a race and your profile starts here: starts, upwind, roundings, downwind and rules, worked out from how you race.</p>
               ) : (
@@ -209,19 +307,50 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           </aside>
         </div>
 
+        {challenges && (challenges.length > 0 || canSet) && (
+          <section className="flex flex-col gap-3.5" aria-labelledby="ch-title">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="ch-title" className="m-0 font-display text-[22px] font-bold">Challenges</h2>
+                <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>The same race for everyone, with a leaderboard. Race the leader's ghost to find the time.</p>
+              </div>
+              {canSet && !setting && <Btn onClick={() => setSetting(true)}>Set a challenge</Btn>}
+            </div>
+            {setting && canSet && onCreateChallenge && <SetChallenge canEveryone={canSet.everyone} onCreate={onCreateChallenge} onDone={() => setSetting(false)} />}
+            {challenges.length === 0 && !setting && <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>No challenges yet. Set the first one from the race you've set up above.</p>}
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
+              {challenges.slice(0, 6).map(c => (
+                <button key={c.id} type="button" onClick={() => onChallenge?.(c)} className="flex cursor-pointer flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 text-left hover:bg-white/[0.05]">
+                  <div className="flex items-center gap-2">
+                    <Cap>{c.club_id ? 'Club challenge' : 'Open challenge'}</Cap>
+                    <Chip tone={isOpen(c) ? 'blue' : 'plain'} className="ml-auto">{closesText(c)}</Chip>
+                  </div>
+                  <p className="m-0 text-[16px] font-semibold text-[#F1F4FA]">{c.title}</p>
+                  <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{challengeLine(c)}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="flex flex-col gap-3.5" aria-labelledby="train-title">
           <div>
             <h2 id="train-title" className="m-0 font-display text-[22px] font-bold">Train</h2>
             <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Short, focused sessions. Each one feeds your skipper profile.</p>
           </div>
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))' }}>
-            <TrainCard title="Start Trainer" text="The pre-start and the first seconds of the race against your chosen fleet, then a start report: how late, how fast, and how far from the favoured end." action={() => onStart('start', s)}
+            <TrainCard title="Start Trainer" text="Twelve start drills: time on distance, the favoured end, port-tack starts, crowded lines and getting back after a recall." action={() => onOpen('trainer')} actionLabel="Open the drills"
+              badge={<Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} stars</Chip>}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>} />
-            <TrainCard title="Rules Academy" soon text="Every Part 2 rule, played out on the water, with the radio sailing changes from Appendix E."
+            <TrainCard title="Rules Academy" text="Six modules and 26 situations from the Racing Rules of Sailing with Appendix E. Answer each one, then sail it." action={() => onOpen('academy')} actionLabel="Open the Academy"
+              badge={<Chip tone={lic.level ? 'blue' : 'plain'}>Licence level {lic.level} of 6</Chip>}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zM4 19a2 2 0 012-2h13" /></svg>} />
-            <TrainCard title="Scenario Lab" soon text="Port-tack approaches, crowded roundings, gate choices. Replay a situation until you win it."
+            <TrainCard title="Scenario Lab" text="Port-tack approaches, crowded roundings, gate choices. Replay a moment until you win it." action={() => onOpen('lab')} actionLabel="Open the Lab"
+              badge={<Chip tone={labWon ? 'blue' : 'plain'}>{labWon} of {LAB.length} won</Chip>}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 001.3 2h13.4a1.5 1.5 0 001.3-2L14 9V3" /></svg>} />
-            <TrainCard title="Venue practice" soon text="Your club's course in today's forecast, so you can rehearse the shifts before you get to the pond."
+            <TrainCard title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water from the control area, in the wind blowing there today. Rehearse the shifts before you get to the club.`}
+              action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today' }); document.getElementById('qr-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} actionLabel="Use today's wind"
+              badge={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? <Chip tone="blue">Set up</Chip> : undefined}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>} />
           </div>
         </section>

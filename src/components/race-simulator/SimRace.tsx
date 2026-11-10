@@ -1,34 +1,70 @@
 // The race screen: runs the engine at a fixed 20 Hz, draws the water every frame, and floats the
 // HUD over it (wind, clock, line or course, fleet, coach, boat strip, sticks). Rules moments pause
 // the race in full-coach mode. Keyboard, transmitter and on-screen sticks all steer.
+// The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Race } from '@/sim/engine';
+import { Race, RaceLog } from '@/sim/engine';
 import { LEVELS, PERSONAS, Skipper } from '@/sim/ai';
 import { Rng } from '@/sim/math';
 import type { Boat, Incident, RaceSettings } from '@/sim/types';
-import { DT, hullGap } from '@/sim/physics';
+import { DT } from '@/sim/physics';
 import { dir, dist, n180 } from '@/sim/math';
-import { keepClear, spellSail } from '@/sim/referee';
+import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
+import type { SceneSpec } from '@/sim/training';
 import { CoachMode, Cue, LineInfo, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
 import { Camera, drawRace } from './render';
+import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
 import { RaceAudio } from './audio';
-import { PlayerLog, RaceSummary, summarize } from './stats';
+import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { Moment, findMoments } from './moments';
 import {
-  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, HintBanner, LineCard, ReplayBar,
-  ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, Toast, Toasts, WindCard,
+  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, LineCard, ReplayBar,
+  ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, SceneResult, Toast, Toasts, WindCard,
 } from './hud';
 import GamepadModal from './GamepadModal';
-import { Btn, C, Chip, Hud, Seg, clock, ordinal } from './ui';
+import CourseMap from './CourseMap';
+import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, compassName, ordinal } from './ui';
+
+export type SimView = 'bank' | 'top';
+
+const NO_OVERLAYS: WorldOverlay[] = [];
+
+/** A drill, lesson or lab moment to play. */
+export interface ActiveScene {
+  spec: SceneSpec;
+  seed: number;
+  /** Your boat is sailed the right way, for you to watch. */
+  watch: boolean;
+  group: 'Start Trainer' | 'Rules Academy' | 'Scenario Lab';
+  higherIsBetter?: boolean;
+  scoreText?: (v: number) => string;
+  best?: string | null;
+  nextLabel?: string;
+  /** Your auto-trim setting from the home screen (scenes are set up with it on). */
+  autoTrim?: boolean;
+}
 
 export interface SimRaceProps {
-  settings: RaceSettings;
-  mode: 'race' | 'start';
+  settings?: RaceSettings;
+  scene?: ActiveScene;
+  mode: 'race' | 'start' | 'scene';
   coach: CoachMode;
   onCoachChange: (m: CoachMode) => void;
+  /** From the bank, the way you see a race from the control area, or from above. */
+  view: SimView;
+  onViewChange: (v: SimView) => void;
   onHome: () => void;
-  onDebrief: (race: Race, sum: RaceSummary) => void;
+  onDebrief?: (race: Race, sum: RaceSummary, moments: Moment[]) => void;
+  /** Sail a race again from its log up to a step, then take over from there. */
+  resume?: { log: RaceLog; step: number };
+  /** Race another member's ghost: their race sails again alongside yours, and their boat is drawn faint in yours. */
+  ghost?: { log: RaceLog; settings: RaceSettings; label: string };
   onAgain: () => void;
+  /** Scenes: a result to record, watch the right way, the next one. */
+  onSceneResult?: (o: Outcome) => void;
+  onSceneWatch?: () => void;
+  onSceneNext?: () => void;
 }
 
 interface HudState {
@@ -40,6 +76,7 @@ interface HudState {
   boat: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string };
   rudder: number; sheet: number; twa: number;
   owed: boolean; finished: boolean;
+  goal: { progress: string | null; timeLeft: number | null } | null;
 }
 
 const KN = 0.514444;
@@ -65,8 +102,40 @@ function nextTarget(race: Race, p: Boat): { x: number; y: number; name: string; 
   return { x: (c.finish.pin.x + c.finish.stbd.x) / 2, y: (c.finish.pin.y + c.finish.stbd.y) / 2, name: 'the finish', upwind: true, isMark: false };
 }
 
-export default function SimRace({ settings, mode, coach, onCoachChange, onHome, onDebrief, onAgain }: SimRaceProps) {
-  const race = useMemo(() => new Race(settings), [settings]);
+/** How urgent a coaching line is: rule risks first, then start timing near the gun, then the rest. */
+function urgency(c: Cue, T: number): number {
+  if (c.tone === 'warn' || c.topic === 'Rules') return 3;
+  if (c.topic === 'The start' && T < 30) return 2;
+  return 1;
+}
+
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost }: SimRaceProps) {
+  const built = useMemo(() => {
+    if (!scene) return null;
+    const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
+    // Sail it your way: the sails follow your stick unless you've turned auto-trim on.
+    if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
+    return b;
+  }, [scene]);
+  const race = useMemo(() => {
+    if (built) return built.race;
+    const r = new Race(settings!);
+    // Taking over from a moment: the race sails itself again exactly as it went, up to there.
+    if (resume) r.followLog(resume.log, resume.step);
+    return r;
+  }, [built, settings, resume]);
+  // The ghost's own race, a step behind nobody: it steps with yours.
+  const ghostRace = useMemo(() => {
+    if (!ghost) return null;
+    const g = new Race(ghost.settings);
+    g.followLog(ghost.log);
+    return g;
+  }, [ghost]);
+  // While it catches up, how far it has to go; then a word before you take the helm.
+  const [catchUp, setCatchUp] = useState<{ to: number; at: number } | null>(() => (resume ? { to: resume.step, at: 0 } : null));
+  const [tookOver, setTookOver] = useState<number | null>(null);
+  // Stable when there are none: a new [] each render would restart the race loop every frame.
+  const overlays: WorldOverlay[] = built?.overlays ?? NO_OVERLAYS;
   useEffect(() => {
     // Development only: let a test or the console reach the race, and hand the player's boat to an AI helm.
     if (!import.meta.env.DEV) return;
@@ -87,16 +156,20 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
   const mem = useRef(new WindMemory()).current;
   const log = useRef(new PlayerLog()).current;
   const cam = useRef<Camera>({ x: 0, y: -4, scale: 30 }).current;
+  const bcam = useRef<BankCam>(newBankCam()).current;
   const size = useRef({ w: 800, h: 600, dpr: 1 }).current;
   const flashes = useRef<{ x: number; y: number; t: number }[]>([]).current;
+  const goalMemo = useRef<GoalCtx['memo']>({}).current;
 
   const [hud, setHud] = useState<HudState | null>(null);
   const [cue, setCue] = useState<Cue | null>(null);
   const [paused, setPaused] = useState(false);
+  useEffect(() => { if (!paused) setTookOver(null); }, [paused]);
   const [moment, setMoment] = useState<Incident | null>(null);
   const [banner, setBanner] = useState<Incident | null>(null);
   const [replay, setReplay] = useState<{ back: number; playing: boolean } | null>(null);
   const [results, setResults] = useState<{ rows: ResultRowView[]; live: boolean; title: string } | null>(null);
+  const [sceneOut, setSceneOut] = useState<Outcome | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [padOpen, setPadOpen] = useState(false);
   const [mapping, setMapping] = useState<GamepadMapping>(loadMapping);
@@ -106,12 +179,15 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
   const [fast, setFast] = useState(false);
   const [laylines, setLaylines] = useState(true);
   const [follow, setFollow] = useState(true);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(scene ? 1.25 : 1);
+  const [glance, setGlance] = useState(false);
+  const [full, setFull] = useState(false);
 
   // Mirrors of state for the animation loop.
-  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, resultsAt: -9 });
+  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
   R.current.paused = paused; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
   R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
+  R.current.view = view; R.current.glance = glance;
   useEffect(() => { audio.muted = muted; if (muted) audio.stop(); }, [muted, audio]);
   useEffect(() => {
     if (!banner) return;
@@ -152,10 +228,11 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
       return;
     }
     const m = R.current.coach;
-    if (m === 'full') { R.current.paused = true; setPaused(true); setMoment(inc); }
-    else if (m === 'hints') setBanner(inc);
+    // In a drill or lesson the goal decides what happens next; incidents show as a banner.
+    if (m === 'full' && mode !== 'scene') { R.current.paused = true; setPaused(true); setMoment(inc); }
+    else if (m !== 'off' || mode === 'scene') setBanner(inc);
     else toast(inc.kind === 'ocs' ? 'Recall: you were over at the gun' : mine ? `Rule ${inc.rule}: you owe a One-Turn Penalty` : `Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes you a penalty`, 'warn');
-  }, [race, toast, flashes]);
+  }, [race, toast, flashes, mode]);
 
   const handleEvents = useCallback(() => {
     const p = race.player;
@@ -176,6 +253,12 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
           if (p && b !== p && dist(b, p) < 8 * p.cls.loa) audio.say(e.text, true);
           break;
         }
+        case 'room-to-tack':
+          if (p && e.to === p.id) toast(`${race.boatById(e.from).sail} hails for room to tack: tack now (T), or reply "You tack" (H)`, 'warn');
+          break;
+        case 'you-tack':
+          if (p && e.to === p.id) toast(`${race.boatById(e.from).sail} replied "You tack": tack as soon as you can (T)`, 'warn');
+          break;
         case 'incident': onIncident(e.incident); break;
         case 'penalty-done': if (p && e.boat === p.id) { R.current.penaltyAssist = false; toast('Penalty done. Back to racing.', 'good'); } break;
         case 'rounded': if (p && e.boat === p.id) toast(`${legLabel(race, e.leg)} done · ${ordinal(e.place)}`); break;
@@ -203,23 +286,30 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
     const status = p.ocs && !p.started && race.t >= race.gunT ? 'Recall' : p.penalty.owed > 0 ? 'Penalty' : null;
     const fleet: FleetRow[] = race.boats.map((b, i) => ({
       id: b.id, sail: b.sail, color: b.color, isPlayer: b.isPlayer,
-      name: b.isPlayer ? 'You' : b.persona?.name ?? '',
-      intent: b.isPlayer ? (pre ? 'Your start' : b.finished ? 'Finished' : legLabel(race, b.legIndex)) : race.skippers[i]?.intent ?? '',
+      name: b.isPlayer ? 'You' : scene ? b.name : b.persona?.name ?? '',
+      intent: b.isPlayer ? (pre ? 'Your start' : b.finished ? 'Finished' : legLabel(race, b.legIndex)) : b.disabled ? 'Out of control' : race.skippers[i]?.intent ?? '',
       place: race.livePlace(b),
       flag: b.ocs && !b.started && race.t >= race.gunT ? 'OCS' : b.penalty.owed > 0 ? 'P' : b.finished ? '✓' : null,
     }));
     fleet.sort((a, z) => (pre ? (a.isPlayer ? -1 : z.isPlayer ? 1 : a.sail.localeCompare(z.sail)) : a.place - z.place));
+    let goal: HudState['goal'] = null;
+    if (scene && built) {
+      const g = goalCtx(race, built.t0, goalMemo);
+      goal = { progress: scene.spec.goal.progress?.(g) ?? null, timeLeft: scene.spec.goal.seconds - g.t };
+    }
     return {
       T, raceT: Math.max(0, -T), preStart: pre,
-      wind: { kn: ws.tws / KN, from: ws.twd, spark, swing: mem.swing(40) },
+      // At a venue the race frame turns with the wind: show the real compass direction.
+      wind: { kn: ws.tws / KN, from: (ws.twd + race.course.rot) % 360, spark, swing: mem.swing(40) },
       line,
       course: { leg: p.finished ? 'Finished' : legLabel(race, p.started ? p.legIndex : 0), legNo: (p.started ? p.legIndex : 0) + 1, legs, next: nx ? `To ${nx.name}` : '', distL: nx && !p.finished ? Math.round(dist(nx, p) / p.cls.loa) : null, place, of: race.boats.length, status },
       fleet,
       boat: { tack: p.tack === 'stbd' ? 'Starboard' : 'Port', pos: pointOfSail(p), spdPct: p.targetSpd > 0.05 * p.cls.hullSpeed ? Math.min(1.25, p.spd / p.targetSpd) : 0, kn: p.spd / KN, trim: trimAdvice(p) },
       rudder: ctl.rudder, sheet: ctl.sheet, twa: p.twa,
       owed: p.penalty.owed > 0, finished: p.finished,
+      goal,
     };
-  }, [race, mem, ctl]);
+  }, [race, mem, ctl, scene, built, goalMemo]);
 
   // ── The loop ──
   useEffect(() => {
@@ -232,32 +322,55 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
       return { x: race.course.origin.x + race.course.up.x * mid, y: race.course.origin.y + race.course.up.y * mid, scale: s };
     };
     const frame = (now: number) => {
-      const dtReal = Math.min(0.1, (now - last) / 1000);
+      // The frame's timestamp can be a little before the moment the loop started: never negative.
+      const dtReal = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const st = R.current;
       ctl.update(dtReal, st.mapping);
       const p = race.player;
-      if (!st.paused && !st.replay && !st.ended) {
+      if (race.replaying) {
+        // Sailing back to the moment you chose: as fast as the frame allows, quietly. The old
+        // events are history, but the wind graph and your log keep up.
+        const until = performance.now() + 22;
+        while (race.replaying && performance.now() < until) {
+          race.step();
+          if (ghostRace && !ghostRace.ended) ghostRace.step();
+          if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
+        }
+        st.evIdx = race.events.length;
+        acc = 0;
+        if (race.replaying) setCatchUp({ to: resume?.step ?? 0, at: race.step_ });
+        else { setCatchUp(null); setTookOver(race.t); st.paused = true; setPaused(true); }
+      } else if (!st.paused && !st.replay && !st.ended) {
         acc += dtReal * (st.fast ? 2.5 : 1);
         let n = 0;
         while (acc >= DT && n < 10) {
           race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim, penaltyAssist: st.penaltyAssist };
           race.step();
+          if (ghostRace && !ghostRace.ended) ghostRace.step();
           handleEvents();
           if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
           acc -= DT; n++;
+          // A drill, lesson or lab moment: has the goal been met, or missed?
+          if (scene && built && p) {
+            const g = goalCtx(race, built.t0, goalMemo);
+            const o = scene.spec.goal.check?.(g) ?? (g.t >= scene.spec.goal.seconds || race.ended ? scene.spec.goal.final(g) : null);
+            if (o) { st.ended = true; setSceneOut(o); setBanner(null); if (!scene.watch) onSceneResult?.(o); break; }
+          }
           if (st.paused) { acc = 0; break; }
         }
         if (n >= 10) acc = 0;
-        // The end.
-        const startDone = mode === 'start' && race.t > race.gunT + 12;
-        const playerDone = mode === 'race' && st.playerDoneAt > 0 && race.t > st.playerDoneAt + 3;
-        if ((race.ended || startDone || playerDone) && race.t - st.resultsAt > 0.5) {
-          st.resultsAt = race.t;
-          const mine = p ? race.results().find(r => r.boat === p) : null;
-          const title = mode === 'start' ? 'Start report' : mine && mine.status === 'finished' ? `You finished ${ordinal(mine.place)}` : 'Results';
-          setResults({ rows: resultRows(), live: !race.ended && mode === 'race', title });
-          if (race.ended || startDone) st.ended = true;
+        // The end of a race or start practice.
+        if (!scene) {
+          const startDone = mode === 'start' && race.t > race.gunT + 12;
+          const playerDone = mode === 'race' && st.playerDoneAt > 0 && race.t > st.playerDoneAt + 3;
+          if ((race.ended || startDone || playerDone) && race.t - st.resultsAt > 0.5) {
+            st.resultsAt = race.t;
+            const mine = p ? race.results().find(r => r.boat === p) : null;
+            const title = mode === 'start' ? 'Start report' : mine && mine.status === 'finished' ? `You finished ${ordinal(mine.place)}` : 'Results';
+            setResults({ rows: resultRows(), live: !race.ended && mode === 'race', title });
+            if (race.ended || startDone) st.ended = true;
+          }
         }
       }
       // Instant replay playback.
@@ -273,9 +386,38 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
         const k = H.x.length - 1 - back;
         const px = back && k >= 0 ? H.x[k] : p.x, py = back && k >= 0 ? H.y[k] : p.y;
         const lead = dir(p.hdg);
-        const tgt = st.follow ? { x: px + lead.x * p.spd * 1.2, y: py + lead.y * p.spd * 1.2, scale: (Math.min(size.w, size.h * 1.5) / (30 * L)) * st.zoom } : fitCourse();
+        let tgt = fitCourse();
+        if (st.follow) {
+          let scale = (Math.min(size.w, size.h * 1.5) / (30 * L)) * st.zoom;
+          let cx = px + lead.x * p.spd * 1.2, cy = py + lead.y * p.spd * 1.2;
+          // Keep what you're sailing to in view: the start line before you've started, then the next
+          // mark. Zoom out as far as that needs (to the whole course at most), leaving room for the panels.
+          const c = race.course;
+          const pts = !p.started ? [c.start.pin, c.start.stbd] : (() => { const nx = nextTarget(race, p); return nx ? [nx] : []; })();
+          if (pts.length && !back) {
+            const pad = 3.5 * L;
+            let minX = px, maxX = px, minY = py, maxY = py;
+            for (const q of pts) { minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y); }
+            minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+            const need = Math.min((size.w * (size.w > 1024 ? 0.6 : 0.9)) / (maxX - minX), (size.h * 0.72) / (maxY - minY));
+            if (need < scale) {
+              scale = Math.max(need, tgt.scale);
+              cx += ((minX + maxX) / 2 - cx) * 0.8; cy += ((minY + maxY) / 2 - cy) * 0.8;
+            }
+          }
+          tgt = { x: cx, y: cy, scale };
+        }
         const k1 = Math.min(1, dtReal * 2.6), k2 = Math.min(1, dtReal * 4);
         cam.x += (tgt.x - cam.x) * k1; cam.y += (tgt.y - cam.y) * k1; cam.scale += (tgt.scale - cam.scale) * k2;
+        // From the bank: walk the control area with her and turn to keep her in view, glancing
+        // towards the next mark (or the line before the start). Holding M looks straight at the mark.
+        if (st.view === 'bank') {
+          const c = race.course;
+          const nx = nextTarget(race, p);
+          const look = !p.started ? { x: (c.start.pin.x + c.start.stbd.x) / 2, y: (c.start.pin.y + c.start.stbd.y) / 2 } : nx ? { x: nx.x, y: nx.y } : null;
+          const aim = st.glance && look ? look : { x: px, y: py };
+          followCam(bcam, race, aim, dtReal, st.zoom, st.glance ? null : look, size.w);
+        }
       }
       // Draw.
       const cv = canvasRef.current;
@@ -284,23 +426,46 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
         const T = race.gunT - race.t;
         const li = T > 0 ? lineInfo(race, p) : null;
         const nx = nextTarget(race, p);
-        drawRace(ctx, race, {
-          w: size.w, h: size.h, dpr: size.dpr, cam,
-          showLaylines: st.laylines && T <= 0, showZones: T <= 0 && !!nx?.isMark,
-          back: st.replay ? Math.round(st.replay.back) : 0,
-          ttl: li && li.ttl !== null && li.to ? { s: li.ttl, to: li.to } : null,
-          flashes, preStart: T > 0,
-          next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
-        });
+        if (st.view === 'bank') {
+          drawBank(ctx, race, {
+            w: size.w, h: size.h, dpr: size.dpr, cam: bcam,
+            next: nx ? { x: nx.x, y: nx.y, name: nx.name } : null,
+            showZones: T <= 0 && !!nx?.isMark, preStart: T > 0, flashes, overlays, names: !!scene,
+            back: st.replay ? Math.round(st.replay.back) : 0,
+            ghost: ghostRace?.player ? { race: ghostRace, b: ghostRace.player, label: ghost!.label } : null,
+          });
+        } else {
+          drawRace(ctx, race, {
+            w: size.w, h: size.h, dpr: size.dpr, cam,
+            showLaylines: st.laylines && T <= 0, showZones: T <= 0 && !!nx?.isMark,
+            back: st.replay ? Math.round(st.replay.back) : 0,
+            ttl: li && li.ttl !== null && li.to ? { s: li.ttl, to: li.to } : null,
+            flashes, preStart: T > 0,
+            next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
+            overlays, names: !!scene,
+            ghost: ghostRace?.player ? { b: ghostRace.player, label: ghost!.label } : null,
+          });
+        }
       }
-      // HUD at 10 Hz; the coach line changes at most every 1.5 s so it can be read.
+      // HUD at 10 Hz. The coach line changes at most every 6 s unless something more urgent comes up
+      // (a rule risk, or start timing near the gun, which updates every 1.5 s); the rule watch keeps up.
       if (now - hudAt > 100) {
         hudAt = now;
         const hs = makeHud();
         if (hs) setHud(hs);
-        if (p && race.t - st.cueAt > 1.5) {
+        if (p && race.t - st.cueAt > 0.5) {
           st.cueAt = race.t;
-          setCue(coachCue(race, p, mem, lineInfo(race, p)));
+          const T = race.gunT - race.t;
+          const next = coachCue(race, p, mem, lineInfo(race, p));
+          const cur = st.cue;
+          const since = race.t - st.cueChangedAt;
+          const u = urgency(next, T);
+          if (!cur || u > urgency(cur, T) || since >= 6 || (u >= 2 && since >= 1.5) || (cur.topic !== next.topic && since >= 2.5)) {
+            if (!cur || cur.text !== next.text) st.cueChangedAt = race.t;
+            st.cue = next; setCue(next);
+          } else if (next.watch !== cur.watch) {
+            st.cue = { ...cur, watch: next.watch }; setCue(st.cue);
+          }
         }
         if (st.resultsAt > 0 && !st.ended && mode === 'race') setResults(r => (r ? { ...r, rows: resultRows(), live: !race.ended } : r));
       }
@@ -308,7 +473,7 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, size, flashes, handleEvents, makeHud, resultRows, mode]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume]);
 
   // ── Canvas size ──
   useEffect(() => {
@@ -327,15 +492,27 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
     return () => ro.disconnect();
   }, [size]);
 
+  // ── Full screen (the browser's own, on top of the simulator filling the window) ──
+  useEffect(() => {
+    const on = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  const canFull = typeof document !== 'undefined' && !!document.fullscreenEnabled;
+  const toggleFull = useCallback(() => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  }, []);
+
   // ── Actions ──
   const togglePause = useCallback(() => {
-    if (moment || results) return;
+    if (moment || results || sceneOut) return;
     setPaused(v => { R.current.paused = !v; return !v; });
-  }, [moment, results]);
+  }, [moment, results, sceneOut]);
 
   const doTack = useCallback(() => {
     const p = race.player; if (!p) return;
-    race.requestManeuver(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
+    race.act(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
   }, [race]);
 
   const doPenalty = useCallback(() => {
@@ -344,33 +521,13 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
     toast('Turning: one tack and one gybe');
   }, [race, toast]);
 
+  // Hails: the race works out what she calls (answer a room-to-tack hail, protest, room to tack at
+  // the bank, mark-room, right of way), so a replay calls the same; here we say it and show it.
   const doHail = useCallback(() => {
-    const p = race.player; if (!p) return;
-    const L = p.cls.loa;
-    const recent = [...race.incidents].reverse().find(i => i.victim === p.id && race.t - i.t < 12);
-    if (recent) {
-      const o = race.boatById(recent.offender);
-      race.hail(p, `Protest, ${spellSail(o.sail)}`);
-      audio.say(`Protest, ${spellSail(o.sail)}`, true);
-      if (race.forgot.has(o.id)) { race.forgot.delete(o.id); toast(`${o.sail} heard your protest and will take her turn`, 'good'); }
-      recent.resolved = recent.resolved === 'pending' ? 'protested' : recent.resolved;
-      return;
-    }
-    const pi = race.boats.indexOf(p);
-    for (let j = 0; j < race.boats.length; j++) {
-      const mr = race.referee.markRoom(pi, j);
-      if (mr?.iEntitled) { race.hail(p, 'Room!'); audio.say('Room', true); return; }
-    }
-    let best: Boat | null = null, bg = 3 * L;
-    for (const o of race.boats) { if (o === p || o.finished) continue; const g = hullGap(p, o); if (g < bg) { bg = g; best = o; } }
-    if (best) {
-      const kc = keepClear(p, best, race.t);
-      if (kc.keeper === 1) {
-        const text = kc.rule === '10' ? 'Starboard!' : kc.rule === '11' ? 'Up, up!' : 'Keep clear!';
-        race.hail(p, text); audio.say(text.replace(/!/g, ''), true); return;
-      }
-    }
-    toast('Nothing to hail: you only hail when you have rights, need room, or protest');
+    const r = race.act('hail');
+    if (!r) return;
+    if (r.text) audio.say(r.text.replace(/!/g, ''), true);
+    if (r.note) toast(r.note, r.noteTone ?? 'plain');
   }, [race, audio, toast]);
 
   const closeMoment = useCallback((takePenalty: boolean) => {
@@ -391,8 +548,8 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
   }, [moment]);
 
   const finish = useCallback(() => {
-    const sum = summarize(race, log, mode);
-    onDebrief(race, sum);
+    const sum = summarize(race, log, mode === 'start' ? 'start' : 'race');
+    onDebrief?.(race, sum, findMoments(race, log, sum));
   }, [race, log, mode, onDebrief]);
 
   // ── Keyboard ──
@@ -411,6 +568,8 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
       else if (k === 'p') { if (!e.repeat) doPenalty(); }
       else if (k === ' ' || k === 'escape') { if (!e.repeat) togglePause(); }
       else if (k === 'l') { if (!e.repeat) setLaylines(v => !v); }
+      else if (k === 'v') { if (!e.repeat) onViewChange(R.current.view === 'bank' ? 'top' : 'bank'); }
+      else if (k === 'm') { if (!e.repeat) setGlance(true); }
       else if (k === 'c') { if (!e.repeat) setFollow(v => !v); }
       else if (k === 'f') { if (!e.repeat) setFast(v => !v); }
       else if (k === '+' || k === '=') setZoom(z => Math.min(3, z * 1.15));
@@ -424,33 +583,51 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
       else if (k === 'arrowright' || k === 'd') ctl.right = false;
       else if (k === 'arrowup' || k === 'w') ctl.down = false;
       else if (k === 'arrowdown' || k === 's') ctl.up = false;
+      else if (k === 'm') setGlance(false);
     };
     const blur = () => { ctl.left = ctl.right = ctl.up = ctl.down = false; };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
-  }, [ctl, doTack, doHail, doPenalty, togglePause]);
+  }, [ctl, doTack, doHail, doPenalty, togglePause, onViewChange]);
 
   const s = race.settings;
-  const sub = `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind, ${s.windCharacter}`;
+  const windText = s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind`;
+  const sub = scene
+    ? `${scene.group} · ${scene.spec.brief}`
+    : race.venue
+      ? `${race.venue.def.short} · ${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText} from the ${compassName(race.course.rot)}, ${s.windCharacter}`
+      : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText}, ${s.windCharacter}`;
+  const title = scene ? scene.spec.title : mode === 'start' ? 'Start practice' : 'Quick race';
   const p = race.player;
   const otherSail = moment ? (() => { const id = moment.offender === p?.id ? moment.victim : moment.offender; return id ? race.boatById(id).sail : null; })() : null;
-  const showCoach = coach !== 'off' && !coachHidden && !moment && !results;
+  const showCoach = coach !== 'off' && !coachHidden && !moment && !results && !sceneOut;
+  const watching = !!scene?.watch;
+  const outRule = sceneOut?.incident?.rule;
+  const backLabel = scene ? `Back to the ${scene.group}` : 'Simulator home';
 
   return (
     <div className="flex h-full min-h-[560px] flex-col text-[14px] text-[#F1F4FA]" style={{ background: C.bg, fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-2.5 sm:px-5" style={{ background: C.head }}>
-        <Btn onClick={onHome} aria-label="Back to the simulator home">
+        <Btn onClick={onHome} aria-label={scene ? `Back to the ${scene.group}` : 'Main Menu'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-          <span className="hidden sm:inline">Back</span>
+          <span className="hidden sm:inline">{scene ? scene.group : 'Main Menu'}</span>
         </Btn>
-        <div className="min-w-0">
-          <p className="m-0 text-[15px] font-semibold">{mode === 'start' ? 'Start practice' : 'Quick race'}{paused && !moment && <Chip tone="warn" className="ml-2">Paused</Chip>}</p>
-          <p className="m-0 mt-0.5 hidden truncate text-[12.5px] sm:block" style={{ color: C.mute }}>{sub}</p>
+        <div className="min-w-0 flex-1">
+          <p className="m-0 truncate text-[15px] font-semibold">{title}{paused && !moment && <Chip tone="warn" className="ml-2">Paused</Chip>}{watching && <Chip tone="blue" className="ml-2">Watching</Chip>}</p>
+          <p className="m-0 mt-0.5 hidden truncate text-[12.5px] sm:block" style={{ color: C.mute }} title={sub}>{sub}</p>
         </div>
         <span className="ml-auto hidden text-[12.5px] 2xl:inline" style={{ color: C.mute }}>← → steer · ↑ ↓ sail out / in · T tack · H hail · P penalty · Space pause</span>
-        <Seg size="sm" label="Coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full coach' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="ml-auto 2xl:ml-0" />
+        <div className="ml-auto flex items-center gap-2 2xl:ml-0">
+          <Seg size="sm" label="View" value={view} onChange={onViewChange} options={[{ value: 'bank', label: 'Bank view', title: 'From the control area on the bank (V)' }, { value: 'top', label: 'Top view', title: 'From above (V)' }]} />
+          <span className="hidden h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/10 bg-white/[0.08] px-1.5 text-[11.5px] font-bold text-white/85 lg:inline-flex" title="Switch view">V</span>
+        </div>
+        <div className="hidden items-center gap-1.5 rounded-xl bg-black/30 py-[3px] pl-2 shadow-[inset_0_1px_2px_rgba(0,0,0,0.45)] md:flex" title="Alfie's coaching">
+          <AlfieOrb size={20} />
+          <span className="pr-0.5 text-[13px] font-semibold">Alfie</span>
+          <Seg size="sm" label="Alfie's coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="!bg-transparent !shadow-none" />
+        </div>
         <Btn icon aria-label={fast ? 'Normal speed' : 'Speed up'} aria-pressed={fast} onClick={() => setFast(v => !v)} title="Speed up (F)"><span className="text-[12px] font-bold">{fast ? '2.5×' : '1×'}</span></Btn>
         <Btn icon aria-label={muted ? 'Sound on' : 'Mute'} onClick={() => { audio.unlock(); setMuted(v => !v); }}>
           {muted
@@ -460,6 +637,11 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
         <Btn icon aria-label="Transmitter set-up" onClick={() => setPadOpen(true)} title="Transmitter">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
         </Btn>
+        {canFull && (
+          <Btn icon aria-label={full ? 'Leave full screen' : 'Full screen'} aria-pressed={full} onClick={toggleFull} className={full ? '!bg-white/[0.12]' : ''}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg>
+          </Btn>
+        )}
         <Btn icon aria-label={paused ? 'Resume' : 'Pause'} onClick={togglePause}>
           {paused
             ? <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
@@ -472,20 +654,22 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
 
       <main ref={wrapRef} className="relative min-h-0 flex-1 overflow-hidden" onPointerDown={() => audio.unlock()}
         onWheel={e => setZoom(z => Math.max(0.35, Math.min(3, z * Math.exp(-e.deltaY * 0.0012))))}>
-        <canvas ref={canvasRef} className="absolute inset-0 block" role="img" aria-label="The race course, seen from above, with your boat in the middle" />
+        <canvas ref={canvasRef} className="absolute inset-0 block" role="img" aria-label={view === 'bank' ? 'The race seen from the control area on the bank, turning to follow your boat' : 'The race course, seen from above, with your boat in the middle'} />
 
         {hud && (
           <>
             {/* Top row */}
-            <div className="absolute left-6 top-5 hidden md:block"><WindCard {...hud.wind} /></div>
-            <div className="absolute left-3 top-3 hidden sm:block md:hidden"><WindCard {...hud.wind} compact /></div>
+            <div className="absolute left-6 top-5 hidden flex-col gap-4 md:flex">
+              {scene ? <GoalCard group={scene.group} title={scene.spec.title} goal={scene.spec.goal.text} progress={hud.goal?.progress ?? null} timeLeft={hud.preStart ? null : hud.goal?.timeLeft ?? null} watching={watching} /> : <WindCard {...hud.wind} />}
+            </div>
+            <div className="absolute left-3 top-3 hidden sm:block md:hidden">{scene ? <div className="w-[240px]"><GoalCard compact group={scene.group} title={scene.spec.title} goal={scene.spec.goal.text} progress={hud.goal?.progress ?? null} timeLeft={null} watching={watching} /></div> : <WindCard {...hud.wind} compact />}</div>
             <div className="absolute left-1/2 top-3 hidden -translate-x-1/2 sm:block sm:top-4">
               <ClockCard preStart={hud.preStart} T={hud.T} seq={race.settings.sequenceSeconds} raceT={hud.raceT}
-                sub={hud.finished ? 'Finished' : `${ordinal(hud.course.place)} of ${hud.course.of} · leg ${Math.min(hud.course.legNo, hud.course.legs)} of ${hud.course.legs}`} />
+                sub={hud.finished ? 'Finished' : scene ? (hud.goal?.progress ?? scene.spec.goal.text) : `${ordinal(hud.course.place)} of ${hud.course.of} · leg ${Math.min(hud.course.legNo, hud.course.legs)} of ${hud.course.legs}`} />
             </div>
             <div className="absolute left-3 top-3 flex items-start gap-2 sm:hidden">
               <ClockCard compact preStart={hud.preStart} T={hud.T} seq={race.settings.sequenceSeconds} raceT={hud.raceT}
-                sub={hud.finished ? 'Finished' : `${ordinal(hud.course.place)} of ${hud.course.of}`} />
+                sub={hud.finished ? 'Finished' : scene ? (hud.goal?.progress ?? '') : `${ordinal(hud.course.place)} of ${hud.course.of}`} />
               <Hud className="flex flex-col items-center gap-1 px-3 py-2.5">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CCBFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: `rotate(${hud.wind.from + 180}deg)` }}><path d="M12 4v16M6 10l6-6 6 6" /></svg>
                 <span className="font-display text-[18px] font-bold tabular-nums">{hud.wind.kn.toFixed(1)}</span>
@@ -493,7 +677,7 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
               </Hud>
             </div>
             <div className="absolute bottom-[236px] right-6 top-5 hidden flex-col gap-4 lg:flex">
-              {hud.line ? <LineCard line={hud.line} /> : <CourseCard {...hud.course} />}
+              {hud.line ? <LineCard line={hud.line} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} /> : <CourseCard {...hud.course} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} />}
               <FleetCard rows={hud.fleet} preStart={hud.preStart} />
             </div>
 
@@ -501,12 +685,21 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
             <Hud className="absolute left-3 top-1/2 hidden -translate-y-1/2 flex-col gap-1.5 p-1.5 sm:left-6 md:flex">
               <Btn icon small aria-label="Zoom in" onClick={() => setZoom(z => Math.min(3, z * 1.25))}>+</Btn>
               <Btn icon small aria-label="Zoom out" onClick={() => setZoom(z => Math.max(0.35, z / 1.25))}>−</Btn>
-              <Btn icon small aria-label={follow ? 'Show the whole course' : 'Follow my boat'} aria-pressed={!follow} onClick={() => setFollow(v => !v)} title="Course view (C)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
-              </Btn>
-              <Btn icon small aria-label="Laylines" aria-pressed={laylines} onClick={() => setLaylines(v => !v)} title="Laylines (L)" className={laylines ? '!bg-white/[0.12]' : ''}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray="3 3" aria-hidden="true"><path d="M12 4L4 20M12 4l8 16" /></svg>
-              </Btn>
+              {view === 'bank' ? (
+                <Btn icon small aria-label="Glance at the next mark" aria-pressed={glance} title="Glance at the next mark (hold M)"
+                  onPointerDown={() => setGlance(true)} onPointerUp={() => setGlance(false)} onPointerLeave={() => setGlance(false)} className={glance ? '!bg-white/[0.12]' : ''}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                </Btn>
+              ) : (
+                <>
+                  <Btn icon small aria-label={follow ? 'Show the whole course' : 'Follow my boat'} aria-pressed={!follow} onClick={() => setFollow(v => !v)} title="Course view (C)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+                  </Btn>
+                  <Btn icon small aria-label="Laylines" aria-pressed={laylines} onClick={() => setLaylines(v => !v)} title="Laylines (L)" className={laylines ? '!bg-white/[0.12]' : ''}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeDasharray="3 3" aria-hidden="true"><path d="M12 4L4 20M12 4l8 16" /></svg>
+                  </Btn>
+                </>
+              )}
             </Hud>
 
             {/* Bottom row */}
@@ -521,23 +714,25 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
                 <BoatStrip {...hud.boat} auto={race.settings.autoTrim} />
               </div>
             )}
-            <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6">
-              <ControlsCard
-                rudder={hud.rudder} sheet={hud.sheet}
-                onRudder={v => { ctl.touchRudder = v; }} onRudderEnd={() => { ctl.touchRudder = null; }}
-                onSheet={v => { ctl.sheet = v; }}
-                onTack={doTack} onHail={doHail} tackLabel={Math.abs(hud.twa) < 90 ? 'Tack' : 'Gybe'}
-                penalty={hud.owed && !R.current.penaltyAssist} onPenalty={doPenalty}
-              />
-            </div>
+            {!watching && (
+              <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6">
+                <ControlsCard
+                  rudder={hud.rudder} sheet={hud.sheet}
+                  onRudder={v => { ctl.touchRudder = v; }} onRudderEnd={() => { ctl.touchRudder = null; }}
+                  onSheet={v => { ctl.sheet = v; }}
+                  onTack={doTack} onHail={doHail} tackLabel={Math.abs(hud.twa) < 90 ? 'Tack' : 'Gybe'}
+                  penalty={hud.owed && !R.current.penaltyAssist} onPenalty={doPenalty}
+                />
+              </div>
+            )}
           </>
         )}
 
         {/* Toasts */}
         <div className="pointer-events-none absolute left-1/2 top-[168px] -translate-x-1/2"><Toasts items={toasts} /></div>
 
-        {/* Hints-mode banner */}
-        {banner && !moment && (
+        {/* Hints-mode banner (and every incident in a drill or lesson) */}
+        {banner && !moment && !sceneOut && (
           <div className="absolute left-1/2 top-[168px] -translate-x-1/2">
             <HintBanner inc={banner} mine={banner.offender === p?.id} onOpen={() => { setMoment(banner); setBanner(null); setPaused(true); R.current.paused = true; }} onClose={() => setBanner(null)} />
           </div>
@@ -561,12 +756,31 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
         )}
 
         {/* Paused (not for a rules moment) */}
-        {paused && !moment && !results && !replay && (
+        {catchUp && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <Hud className="flex w-[320px] flex-col items-center gap-3 px-7 py-6 text-center">
+              <p className="m-0 font-display text-[20px] font-bold">Sailing back to your moment</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#4DA3FF]" style={{ width: `${Math.round((100 * catchUp.at) / Math.max(1, catchUp.to))}%` }} /></div>
+              <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>The same race, the same wind, every boat sailing it again</p>
+            </Hud>
+          </div>
+        )}
+        {paused && !moment && !results && !replay && !sceneOut && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <Hud className="flex flex-col items-center gap-3 px-8 py-6 text-center">
-              <p className="m-0 font-display text-[26px] font-bold">Paused</p>
-              <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>Press Space to carry on</p>
-              <div className="flex gap-2.5"><Btn primary onClick={togglePause}>Resume</Btn><Btn onClick={startReplay}>Replay the last 10 s</Btn></div>
+              {tookOver !== null ? (
+                <>
+                  <div className="flex items-center gap-2.5"><AlfieOrb size={30} /><p className="m-0 font-display text-[24px] font-bold">Back at {tookOver < race.gunT ? `${fmt(race.gunT - tookOver)} to the start` : fmt(tookOver - race.gunT)}</p></div>
+                  <p className="m-0 max-w-[360px] text-[13.5px] leading-normal" style={{ color: C.mute }}>Every boat is where it was, in the same wind. From here she's yours: sail it the better way.</p>
+                  <div className="flex gap-2.5"><Btn primary onClick={() => { setTookOver(null); togglePause(); }}>Take the helm</Btn></div>
+                </>
+              ) : (
+                <>
+                  <p className="m-0 font-display text-[26px] font-bold">Paused</p>
+                  <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>Press Space to carry on</p>
+                  <div className="flex gap-2.5"><Btn primary onClick={togglePause}>Resume</Btn><Btn onClick={startReplay}>Replay the last 10 s</Btn></div>
+                </>
+              )}
             </Hud>
           </div>
         )}
@@ -577,10 +791,20 @@ export default function SimRace({ settings, mode, coach, onCoachChange, onHome, 
           </div>
         )}
 
+        {sceneOut && scene && !replay && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/35 p-4">
+            <SceneResult pass={sceneOut.pass} title={sceneOut.title} text={sceneOut.text} stars={sceneOut.pass ? sceneOut.stars : undefined}
+              best={scene.best} watching={watching}
+              onAgain={onAgain} onWatch={scene.spec.solution && onSceneWatch ? onSceneWatch : undefined}
+              onNext={onSceneNext} nextLabel={scene.nextLabel} onBack={onHome} backLabel={backLabel}
+              rule={outRule} onRule={outRule ? () => setRuleSheet(outRule) : undefined} />
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2"><Btn small onClick={startReplay}>Replay the last 10 s</Btn></div>
+          </div>
+        )}
+
         {ruleSheet && <RuleSheet rule={ruleSheet} onClose={() => setRuleSheet(null)} />}
         {padOpen && <GamepadModal mapping={mapping} onSave={m => { setMapping(m); saveMapping(m); }} onClose={() => setPadOpen(false)} />}
       </main>
     </div>
   );
 }
-

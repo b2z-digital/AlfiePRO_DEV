@@ -1,6 +1,7 @@
 // Shared look for the race simulator: a dark, on-the-water screen whatever the app theme.
 // Panels float over the water with a blurred glass background, like the design board.
 import React from 'react';
+import { AlfieMark } from '../brand/AlfieMark';
 
 export const C = {
   bg: '#060B16',
@@ -112,6 +113,11 @@ export function Chip({ tone = 'plain', children, className }: { tone?: 'plain' |
   return <span className={cx('inline-flex h-[26px] items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold', tones[tone], className)}>{children}</span>;
 }
 
+/** Alfie, the coach: the same orb as Ask Alfie, so tips and rulings read as coming from Alfie. */
+export function AlfieOrb({ size = 32, title }: { size?: number; title?: string }) {
+  return <AlfieMark size={size} title={title} />;
+}
+
 /** Coach icon (compass rose). */
 export function CoachGlyph({ size = 17 }: { size?: number }) {
   return (
@@ -135,6 +141,12 @@ export function InfoGlyph() {
       <circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.01" />
     </svg>
   );
+}
+
+/** 075 → "ENE". */
+export function compassName(deg: number): string {
+  const n = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return n[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 }
 
 /** "0:06", "2:30", "-0:04" */

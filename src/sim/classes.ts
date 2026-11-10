@@ -25,9 +25,10 @@ function mk(id: ClassId, name: string, loa: number, beam: number, lwl: number, e
 }
 
 export const CLASSES: Record<ClassId, ClassDef> = {
-  IOM: mk('IOM', 'IOM', 1.0, 0.18, 0.98, 1.0),
-  M: mk('M', 'Marblehead', 1.29, 0.22, 1.25, 1.0),
-  '10R': mk('10R', '10 Rater', 1.6, 0.2, 1.55, 1.0),
+  // From the class plans: the LM3 IOM (beam 173.5 mm), the Gothic M and the GothiX 10r (1225 mm waterline).
+  IOM: mk('IOM', 'IOM', 1.0, 0.1735, 0.98, 1.0),
+  M: mk('M', 'Marblehead', 1.27, 0.16, 1.22, 1.0),
+  '10R': mk('10R', '10 Rater', 1.6, 0.18, 1.225, 1.0),
   DF95: mk('DF95', 'DF95', 0.95, 0.19, 0.9, 0.9),
   DF65: mk('DF65', 'DF65', 0.65, 0.16, 0.62, 0.88),
 };

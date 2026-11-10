@@ -7,7 +7,7 @@
 import { accelTau, noGoAngle, polarSpeed, trimEfficiency, upAngle, vmgAngles, bestSheet } from './classes';
 import { Course, Leg, Rounding, roundingPoint } from './course';
 import { Rng, V2, bearing, clamp, dir, dist, lerp, n180, n360, sub, dot, cross } from './math';
-import { bow, capsule, closest, hullGap, lineSide, stern } from './physics';
+import { bankAhead, bow, capsule, closest, hullGap, lineSide, stern } from './physics';
 import { keepClear, Referee } from './referee';
 import type { Boat, Persona, SkipperLevel } from './types';
 import type { WindField } from './wind';
@@ -40,6 +40,17 @@ export const PERSONAS: Persona[] = [
 
 export interface Perceived { x: number; y: number; hdg: number; spd: number; rot: number }
 
+/** Anything that can sail a boat: an AI skipper, or a script in a drill or lesson. */
+export interface Helm {
+  decide(h: AiHost): void;
+  helm(h: AiHost, dt: number): void;
+  intent: string;
+  lastAvoid: { t: number; hdg: number; tag: string };
+  gate?: 0 | 1 | null;
+  /** Another boat hailed this one for room to tack, or replied "You tack" (Rule 20). */
+  onHail?(h: AiHost, from: Boat, kind: 'room-to-tack' | 'you-tack'): void;
+}
+
 export interface AiHost {
   t: number;
   gunT: number;
@@ -50,13 +61,15 @@ export interface AiHost {
   perceived(i: number, delaySteps: number): Perceived;
   hail(b: Boat, text: string): void;
   forgot: Set<string>;
+  /** Rule 20: hail a boat to windward for room to tack. */
+  hailRoomToTack(from: Boat, to: Boat): void;
 }
 
 interface Plan { hdg: number; sheet: number; intent: string; maneuver?: 'tack' | 'gybe' | 'penalty' | null; rounding?: { mark: V2; side: 'port' | 'stbd' } }
 
 const ANGLES = [0, -7, 7, -14, 14, -24, 24, -38, 38, -55, 55, -80, 80];
 
-export class Skipper {
+export class Skipper implements Helm {
   meanTwd: number;
   private ou = 0;
   private ouTrim = 0;
@@ -82,6 +95,45 @@ export class Skipper {
   private pendingAvoid: { t: number; hdg: number; tag: string } | null = null;
   /** Cost the tactics put on simply following the plan last time (contact predicted is 1100+). */
   private planCost = 0;
+  /** Rule 20: a boat to leeward hailed us for room to tack, or we hailed one to windward. */
+  private giveRoom: { from: Boat; t: number } | null = null;
+  private wantRoom: { to: Boat; t: number; go: boolean } | null = null;
+
+  onHail(h: AiHost, from: Boat, kind: 'room-to-tack' | 'you-tack') {
+    if (kind === 'room-to-tack') this.giveRoom = { from, t: h.t };
+    else if (this.wantRoom && this.wantRoom.to === from) this.wantRoom.go = true;
+  }
+
+  /** Pinned against the bank on a beat by a boat to windward: hail for room to tack, then tack when she has. */
+  private roomToTackPlan(h: AiHost): Plan | null {
+    const b = this.b, L = b.cls.loa;
+    if (this.wantRoom) {
+      const w = this.wantRoom, o = w.to;
+      if (w.go || o.lastHtwT > w.t || o.tack !== b.tack || h.t - w.t > 7) {
+        this.wantRoom = null;
+        return { hdg: this.closeHauled(b.tack === 'stbd' ? 'port' : 'stbd', b.twd, b.tws), sheet: bestSheet(45), intent: 'Tacking away from the bank', maneuver: 'tack' };
+      }
+      // Waiting for her: pinch and slow down a little.
+      const ch = this.closeHauled(b.tack, b.twd, b.tws);
+      return { hdg: n360(b.tack === 'stbd' ? ch + 6 : ch - 6), sheet: easedSheet(40, 0.6), intent: `Waiting for room to tack from ${o.sail}` };
+    }
+    if (!b.started || Math.abs(b.twa) > vmgAngles(b.cls, b.tws).up + 12) return null;
+    if (bankAhead(b, h.course) > 3 * L) return null;
+    const right = { x: Math.cos((b.hdg * Math.PI) / 180), y: -Math.sin((b.hdg * Math.PI) / 180) };
+    const wSide = b.tack === 'stbd' ? 1 : -1;
+    let blocker: Boat | null = null, bg = 1.8 * L;
+    for (const o of h.boats) {
+      if (o === b || o.finished || o.retired || o.tack !== b.tack) continue;
+      const rel = sub(o, b);
+      if (dot(rel, right) * wSide <= 0) continue; // not to windward
+      const g = hullGap(b, o);
+      if (g < bg) { bg = g; blocker = o; }
+    }
+    if (!blocker) return null;
+    h.hailRoomToTack(b, blocker);
+    this.wantRoom = { to: blocker, t: h.t, go: false };
+    return null;
+  }
 
   constructor(public b: Boat, public lv: LevelParams, public persona: Persona, private rng: Rng, public idx: number) {
     this.meanTwd = b.twd;
@@ -104,6 +156,13 @@ export class Skipper {
 
     let plan: Plan;
     const owes = b.penalty.owed > 0 && !h.forgot.has(b.id);
+    // Hailed for room to tack: tack as soon as possible (Rule 20.2(c)).
+    if (this.giveRoom && !this.maneuver) {
+      const g = this.giveRoom;
+      if (b.lastHtwT > g.t || h.t - g.t > 6 || b.tack !== g.from.tack) this.giveRoom = null;
+      else if (Math.abs(b.twa) < 100) { this.beginManeuver(h, 'tack'); this.giveRoom = null; this.intent = `Tacking: room to tack for ${g.from.sail}`; }
+    }
+    const r2t = this.maneuver ? null : this.roomToTackPlan(h);
     const man = this.maneuverPlan(h);
     // Penalty: as soon as she's in clear water (before the start too, if there's time to spare),
     // pausing if someone is coming, since a boat turning must keep clear of everyone (Rule 21).
@@ -113,6 +172,7 @@ export class Skipper {
     const ok = owes && canTurn && clearOfMarks && (b.penalty.active ? !this.trafficNear(h, 2 * L0, 3) : this.clearOfOthers(h, 4) && !this.trafficNear(h, 2.5 * L0, 5));
     if (ok) { plan = this.penaltyPlan(h); this.maneuver = null; }
     else if (man) plan = man;
+    else if (r2t) plan = r2t;
     else if (h.t < h.gunT || !b.started) plan = this.startPlan(h);
     else plan = this.racePlan(h);
     if (plan !== man && (plan.maneuver === 'tack' || plan.maneuver === 'gybe')) this.beginManeuver(h, plan.maneuver);
@@ -129,6 +189,7 @@ export class Skipper {
 
     this.pendingAvoid = null;
     let final = plan.maneuver === 'penalty' ? plan : this.tactics(h, plan);
+    if (h.course.shore && !man) final = this.keepOffShore(h, final);
     // Abort a tack to avoid a foul only at its very start; once turning, finish it.
     if (man && this.maneuver && h.t - this.maneuver.t0 < 0.4 && final !== plan && Math.abs(n180(final.hdg - plan.hdg)) > 30) this.maneuver = null;
     else if (man && final !== plan) {
@@ -140,6 +201,25 @@ export class Skipper {
     if (!man && final.maneuver === 'tack' && plan.maneuver !== 'tack') this.beginManeuver(h, 'tack');
     this.intent = final.intent;
     this.push(h.t, final.hdg, final.sheet);
+  }
+
+  /** At a real venue: if the course she wants runs onto the bank within a few lengths, bear off or
+   *  luff onto the nearest course that's clear (upwind, tack instead if that's the way out). */
+  private keepOffShore(h: AiHost, plan: Plan): Plan {
+    const b = this.b, L = b.cls.loa;
+    if (bankAhead(b, h.course, plan.hdg) > 2.6 * L) return plan;
+    const ng = noGoAngle(b.tws);
+    for (const a of [15, -15, 30, -30, 45, -45, 60, -60, 80, -80, 100, -100, 130, -130]) {
+      const hd = n360(plan.hdg + a);
+      const twa = Math.abs(n180(b.twd - hd));
+      if (twa < ng + 2) continue;
+      if (bankAhead(b, h.course, hd) > 4.5 * L) {
+        // Crossing the wind to get there is a tack.
+        const flips = Math.sign(n180(b.twd - hd)) !== Math.sign(n180(b.twd - b.hdg)) && twa < 100;
+        return { hdg: hd, sheet: bestSheet(twa), intent: 'Keeping off the bank', maneuver: flips ? 'tack' : plan.maneuver };
+      }
+    }
+    return plan;
   }
 
   private beginManeuver(h: AiHost, kind: 'tack' | 'gybe') {
@@ -525,6 +605,8 @@ export class Skipper {
     const off = dot(sub(b, h.course.origin), h.course.right);
     const outward = (onStbd ? dot(dir(hs), h.course.right) : dot(dir(hp), h.course.right));
     if (!tack && Math.abs(off) > B.across * 0.82 && Math.sign(outward) === Math.sign(off)) { tack = true; why = 'Tacking away from the bank'; }
+    // At a real venue the shore can come first.
+    if (!tack && h.course.shore && bankAhead(b, h.course, onStbd ? hs : hp) < 3.6 * L && bankAhead(b, h.course, onStbd ? hp : hs) > 4 * L) { tack = true; why = 'Tacking away from the bank'; }
     if (tack && sinceTack < this.lv.minTack * (1.2 - 0.4 * this.persona.risk)) tack = false;
     if (tack) {
       this.lastTackT = h.t;
@@ -626,7 +708,8 @@ export class Skipper {
     const stbdNear = inZone && b.tack === 'port' && others.some(ot => ot.o.tack === 'stbd' && Math.hypot(ot.p.x - b.x, ot.p.y - b.y) < 5.5 * L && dist(zoneMark!.p, ot.o) < 6 * L);
     if (plan.maneuver !== 'tack' && Math.abs(b.twa) < 90 && h.t > h.gunT) {
       const other = this.closeHauled(b.tack === 'stbd' ? 'port' : 'stbd', b.twd, b.tws);
-      cands.push({ hdg: other, sheet: bestSheet(45), extra: b.spd < 0.3 * b.cls.hullSpeed ? 220 : 26, tag: 'tack' });
+      // Tacking gives up right of way (Rule 13), so a boat with right of way near her doesn't tack to dodge.
+      cands.push({ hdg: other, sheet: bestSheet(45), extra: (b.spd < 0.3 * b.cls.hullSpeed ? 220 : 26) + (rowNear ? 90 : 0), tag: 'tack' });
     }
 
     let best = cands[0], bestCost = Infinity, bestNote = '';
@@ -674,8 +757,10 @@ export class Skipper {
         // Already touching: what matters is getting apart, so judge by the gap a second from now.
         if (ot.g0 < 0.05 * L) { min = g1; tMin = 1; }
         const urgency = tMin <= 1.5 ? 1 : 0.45;
-        // Rule 14: avoid contact whatever the rights (a skipper who misjudged it only sees it late).
-        if (min < 0.03 * L && (!fooled || tMin <= 0.75)) cost += 1100;
+        // Rule 14: avoid contact whatever the rights (a skipper who misjudged it only sees it late). A
+        // right-of-way boat need not act until it's clear the other isn't keeping clear: against you
+        // she holds her course until about 2 s out; with each other the AI skippers give way early.
+        if (min < 0.03 * L && (iKeep || (mr && mr.iOwes) ? (!fooled || tMin <= 0.75) : (!ot.o.isPlayer || tMin <= 2.0))) cost += 1100;
         if (mr && mr.iOwes) {
           if (min < 0.6 * L) cost += 300 * (0.6 * L - min) / L + 60;
           continue;
@@ -686,7 +771,7 @@ export class Skipper {
           // Right of way: hold course and let her keep clear; act only when contact is close (Rule 14),
           // and any change of course near her must leave her room (Rule 16.1).
           const dh = Math.abs(n180(c.hdg - b.hdg));
-          if (min < 0.02 * L) cost += tMin <= 1.4 ? (dh < 4 ? 1400 : 1600) : 140;
+          if (min < 0.02 * L) cost += tMin <= 1.4 ? (dh < 4 ? 1400 : 1600) : tMin <= 2.4 || !ot.o.isPlayer ? 140 : 0;
           else if (!plan.rounding && dh > 6 && ot.g0 < 2.5 * L && min < 0.6 * L) cost += 60 + 200 * (1 - min / (0.6 * L));
         }
       }

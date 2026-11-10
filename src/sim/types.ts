@@ -13,7 +13,13 @@ export interface RaceSettings {
   windStrength: WindStrength;
   windCharacter: WindCharacter;
   windKnots?: number;         // venue practice
-  windFrom?: number;          // compass degrees; default 0 so the course runs up the screen
+  /** Compass degrees the wind comes from. On the practice pond it's the course axis (default 0, so the
+   *  course runs up the screen); at a venue it's the real direction (default the venue's usual breeze). */
+  windFrom?: number;
+  /** A real venue (see src/sim/venues): the course is laid on its water for the day's wind. */
+  venue?: string;
+  /** Who's sailing: the member's name and their sail number in this class (from their boats). */
+  player?: { name: string; sail: string };
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length
@@ -24,6 +30,14 @@ export interface RaceSettings {
   forgetfulSkippers?: boolean;
   /** No player: every boat is AI (tests and replays). */
   noPlayer?: boolean;
+  /** Start line bias in degrees (+ = the pin end set upwind, so favoured); random within ±3.5° when not set. */
+  lineBias?: number;
+  /** Scripted shifts: at race time t (s) the wind turns `deg` degrees (+ = clockwise) over `over` seconds. */
+  windShifts?: { t: number; deg: number; over: number }[];
+  /** A perfectly steady breeze with no puffs (rules lessons). */
+  flatWind?: boolean;
+  /** Flat water (default), chop or rough water. */
+  seaState?: 'flat' | 'chop' | 'rough';
 }
 
 export interface Persona {
@@ -91,6 +105,8 @@ export interface Boat {
   finishTime: number;
   dsq: boolean;
   retired: boolean;
+  /** Lost control and drifting (Appendix E: unable to continue in the heat). Others must avoid her (Rule 22). */
+  disabled?: boolean;
   penalty: PenaltyState;
   contactWith: Record<string, number>; // other id -> time contact started
   roundedAt: number[];           // time each leg was completed
@@ -101,7 +117,7 @@ export interface Boat {
   hail: { text: string; t: number } | null;
 }
 
-export type IncidentKind = 'contact' | 'forced' | 'mark-touch' | 'ocs' | 'mark-room' | 'zone-tack';
+export type IncidentKind = 'contact' | 'forced' | 'mark-touch' | 'ocs' | 'mark-room' | 'zone-tack' | 'room-to-tack';
 
 export interface Incident {
   id: number;
@@ -130,7 +146,9 @@ export type SimEvent =
   | { type: 'finish'; t: number; boat: string; place: number }
   | { type: 'hail'; t: number; boat: string; text: string }
   | { type: 'started'; t: number; boat: string; late: number }
-  | { type: 'bank'; t: number; boat: string };
+  | { type: 'bank'; t: number; boat: string }
+  | { type: 'room-to-tack'; t: number; from: string; to: string }
+  | { type: 'you-tack'; t: number; from: string; to: string };
 
 export interface Snapshot { t: number; b: Float32Array } // x,y,hdg,spd,leg per boat, recorded at 5 Hz
 

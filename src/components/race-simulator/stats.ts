@@ -3,6 +3,7 @@
 import type { Race } from '@/sim/engine';
 import type { Boat, Incident } from '@/sim/types';
 import { dist, dot, n180, sub } from '@/sim/math';
+import { MODULES } from '@/sim/training';
 
 interface Sample { t: number; leg: number; upwind: boolean; tack: 'port' | 'stbd'; shift: number; spdPct: number; shadow: number; started: boolean }
 
@@ -24,7 +25,8 @@ export class PlayerLog {
     const shift = n180(p.twd - meanTwd);
     const lifted = p.tack === 'stbd' ? shift : -shift;
     if (this.lastTack && p.tack !== this.lastTack && p.started && !p.finished) {
-      if (Math.abs(p.twa) < 100) this.tacks.push({ t: race.t, headed: -lifted, upwind });
+      // How headed she was on the tack she left: the same shift lifts the new tack by as much.
+      if (Math.abs(p.twa) < 100) this.tacks.push({ t: race.t, headed: lifted, upwind });
       else this.gybes++;
     }
     this.lastTack = p.tack;
@@ -38,7 +40,18 @@ export class PlayerLog {
   }
 }
 
-export interface Takeaway { tone: 'warn' | 'good' | 'plain'; text: string }
+/** Where a takeaway points: the drill, rules lesson or lab moment that trains it. */
+export interface TrainLink { kind: 'drill' | 'lesson' | 'lab'; id: string; label: string }
+export interface Takeaway { tone: 'warn' | 'good' | 'plain'; text: string; link?: TrainLink }
+
+/** The first Rules Academy situation about a rule that you can sail. */
+function lessonFor(rule: string): TrainLink | undefined {
+  const base = rule.replace(/\(.*$/, '');
+  for (const m of MODULES) for (const s of m.situations) {
+    if (s.play && s.rules.some(r => r === rule || r.replace(/\(.*$/, '') === base)) return { kind: 'lesson', id: `${m.id}/${s.id}`, label: `Sail Rule ${rule} in the Academy` };
+  }
+  return undefined;
+}
 
 export interface RaceSummary {
   at: number;
@@ -112,7 +125,8 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
   const sum: RaceSummary = {
     at: Date.now(), mode,
     title: mode === 'start' ? 'Start practice' : 'Quick race',
-    cls: p.cls.name, level: s.level, fleet: race.boats.length, wind: `${s.windStrength} wind, ${s.windCharacter}`,
+    cls: p.cls.name, level: s.level, fleet: race.boats.length,
+    wind: `${s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength} wind`}, ${s.windCharacter}${race.venue ? ` · ${race.venue.def.short}` : ''}`,
     status: mine.status, place: mine.status === 'finished' ? mine.place : null, of: race.boats.length,
     time: mine.time, behind: mine.time !== null && winner.time !== null ? mine.time - winner.time : null,
     late, spdAtGun: log.atGun?.spdPct ?? null, fromFavouredL, favoured,
@@ -144,20 +158,20 @@ function takeaways(s: RaceSummary): Takeaway[] {
   const myInc = s.incidents.filter(i => i.mine && i.rule !== '29.1');
   if (myInc.length) {
     const i = myInc[0];
-    out.push({ tone: 'warn', text: `${i.title} (Rule ${i.rule}) at ${fmt(i.t)} cost you a penalty. ${i.next || 'Read the situation earlier and keep clear in good time.'}` });
+    out.push({ tone: 'warn', text: `${i.title} (Rule ${i.rule}) ${i.t < 0 ? 'before the start' : `at ${fmt(i.t)}`} cost you a penalty. ${i.next || 'Read the situation earlier and keep clear in good time.'}`, link: lessonFor(i.rule) });
   }
-  if (s.ocs) out.push({ tone: 'warn', text: 'You were over the line at the gun. Judge time-to-line from where you are, and pull the trigger only when it matches the clock.' });
+  if (s.ocs) out.push({ tone: 'warn', text: 'You were over the line at the gun. Judge time-to-line from where you are, and pull the trigger only when it matches the clock.', link: { kind: 'drill', id: 'recall', label: 'Over early: the recovery drill' } });
   else if (s.late !== null) {
-    if (s.late > 3) out.push({ tone: 'warn', text: `You crossed the line ${s.late.toFixed(1)} s after the gun. Hover a length or two back and pull the trigger when time-to-line matches the clock.` });
-    else out.push({ tone: 'good', text: `Good start: ${s.late.toFixed(1)} s after the gun${s.spdAtGun !== null ? ` at ${Math.round(s.spdAtGun * 100)}% speed` : ''}.${s.fromFavouredL !== null && s.fromFavouredL > 4 ? ` The ${s.favoured} was favoured and you were ${Math.round(s.fromFavouredL)} lengths from it.` : ''}` });
+    if (s.late > 3) out.push({ tone: 'warn', text: `You crossed the line ${s.late.toFixed(1)} s after the gun. Hover a length or two back and pull the trigger when time-to-line matches the clock.`, link: { kind: 'drill', id: 'time-distance', label: 'Time on distance drill' } });
+    else out.push({ tone: 'good', text: `Good start: ${s.late.toFixed(1)} s after the gun${s.spdAtGun !== null ? ` at ${Math.round(s.spdAtGun * 100)}% speed` : ''}.${s.fromFavouredL !== null && s.fromFavouredL > 4 ? ` The ${s.favoured} was favoured and you were ${Math.round(s.fromFavouredL)} lengths from it.` : ''}`, link: s.fromFavouredL !== null && s.fromFavouredL > 4 ? { kind: 'drill', id: 'favoured-end', label: 'Find the favoured end drill' } : undefined });
   }
   if (s.mode === 'race' && s.upwind.liftedPct !== null) {
-    if (s.upwind.headers > 0 && s.upwind.headerTacks < s.upwind.headers / 2) out.push({ tone: 'plain', text: `You tacked on ${s.upwind.headerTacks} of ${s.upwind.headers} big headers upwind. Watch the wind graph and tack when you're knocked more than 5°.` });
-    else if (s.upwind.liftedPct < 0.55) out.push({ tone: 'plain', text: `Only ${Math.round(s.upwind.liftedPct * 100)}% of your beating was on the lifted tack. Stay on the tack that points you closer to the mark.` });
+    if (s.upwind.headers > 0 && s.upwind.headerTacks < s.upwind.headers / 2) out.push({ tone: 'plain', text: `You tacked on ${s.upwind.headerTacks} of ${s.upwind.headers} big headers upwind. Watch the wind graph and tack when you're knocked more than 5°.`, link: { kind: 'lab', id: 'layline', label: 'The layline call in the Lab' } });
+    else if (s.upwind.liftedPct < 0.55) out.push({ tone: 'plain', text: `Only ${Math.round(s.upwind.liftedPct * 100)}% of your beating was on the lifted tack. Stay on the tack that points you closer to the mark.`, link: { kind: 'lab', id: 'layline', label: 'The layline call in the Lab' } });
     else out.push({ tone: 'good', text: `You spent ${Math.round(s.upwind.liftedPct * 100)}% of the beats on the lifted tack. Keep it up.` });
   }
-  if (s.mode === 'race' && s.downwind.spdPct !== null && s.downwind.spdPct < 0.88) out.push({ tone: 'plain', text: `Downwind you averaged ${Math.round(s.downwind.spdPct * 100)}% of target speed. Keep the sail eased right out and avoid sailing in other boats' wind shadow.` });
-  if (s.mode === 'race' && s.roundings.gained < -1) out.push({ tone: 'plain', text: `You lost ${-s.roundings.gained} places between marks. Round wide in and tight out, and keep clear air on the exits.` });
+  if (s.mode === 'race' && s.downwind.spdPct !== null && s.downwind.spdPct < 0.88) out.push({ tone: 'plain', text: `Downwind you averaged ${Math.round(s.downwind.spdPct * 100)}% of target speed. Keep the sail eased right out and avoid sailing in other boats' wind shadow.`, link: { kind: 'lab', id: 'downwind-pass', label: 'Pass on the run in the Lab' } });
+  if (s.mode === 'race' && s.roundings.gained < -1) out.push({ tone: 'plain', text: `You lost ${-s.roundings.gained} places between marks. Round wide in and tight out, and keep clear air on the exits.`, link: { kind: 'lab', id: 'crowded-rounding', label: 'Crowded rounding in the Lab' } });
   return out.slice(0, 3);
 }
 

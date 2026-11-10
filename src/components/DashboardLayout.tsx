@@ -224,7 +224,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   });
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub, isRaceOfficer } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
-  const { isFeatureEnabled } = useFeatureAccess();
+  const { isFeatureEnabled, features: featureFlags } = useFeatureAccess();
+  // The Race Simulator: for super admins, and for clubs it's been switched on for in Feature Access.
+  // (An unknown feature counts as on, so it needs its flag to exist before anyone else sees it.)
+  const simulatorOn = isSuperAdmin || !!featureFlags.find(f => f.feature_key === 'race_simulator')?.is_enabled;
   const { canView: canViewFeature } = useCapabilities();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
@@ -1086,11 +1089,11 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           path: '/venues',
           featureKey: 'venues'
         },
-        ...(isSuperAdmin ? [{
+        ...(simulatorOn ? [{
           id: 'race-simulator',
           label: 'Race Simulator',
           icon: Rocket,
-          description: 'Interactive sailing race simulator',
+          description: 'Race AI skippers on your club\'s water, with Alfie coaching',
           path: '/race-simulator'
         }] : []),
         ...(isSuperAdmin ? [{
@@ -2176,7 +2179,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
               } />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
-              {isSuperAdmin && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} />} />}
+              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />

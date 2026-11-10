@@ -6,6 +6,8 @@ import { Course } from './course';
 import { V2, clamp, cross, dir, dot, n180, n360, sub, twaOf } from './math';
 import type { Boat } from './types';
 import type { WindField } from './wind';
+import { Sea, waveEffect } from './sea';
+import { nearestShore, shoreRay, shoreWet } from './venue';
 
 export const DT = 0.05;
 
@@ -33,7 +35,7 @@ export function localWind(boats: Boat[], wind: WindField, t: number) {
       for (let j = 0; j < boats.length; j++) {
         if (i === j) continue;
         const b = boats[j];
-        if (b.finished || b.retired) continue;
+        if (b.finished || b.retired || b.disabled) continue;
         const L = b.cls.loa;
         const d = { x: a.x - b.x, y: a.y - b.y };
         const dd = Math.hypot(d.x, d.y);
@@ -70,8 +72,19 @@ export function localWind(boats: Boat[], wind: WindField, t: number) {
 }
 
 /** Integrate one boat for one step. Returns 'tack' or 'gybe' when the boat passed through the wind. */
-export function integrate(b: Boat, dt: number, t: number): 'tack' | 'gybe' | null {
+export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null): 'tack' | 'gybe' | null {
   const c = b.cls;
+  if (b.disabled) {
+    // Out of control: the sail flaps, she stops and drifts slowly downwind.
+    b.targetSpd = 0;
+    b.spd *= Math.exp(-dt / 1.5);
+    b.rot *= Math.exp(-dt / 0.3);
+    b.hdg = n360(b.hdg + b.rot * dt);
+    const v = dir(b.hdg), dw = dir(b.twd + 180), k = 0.018 * b.tws;
+    b.x += (v.x * b.spd + dw.x * k) * dt; b.y += (v.y * b.spd + dw.y * k) * dt;
+    b.twa = twaOf(b.hdg, b.twd);
+    return null;
+  }
   const twa = twaOf(b.hdg, b.twd);
   const a = Math.abs(twa);
   const ng = noGoAngle(b.tws);
@@ -80,21 +93,35 @@ export function integrate(b: Boat, dt: number, t: number): 'tack' | 'gybe' | nul
   let target = perfect * trimEfficiency(b.sheet, a);
   const drag = 1 - 0.3 * b.rudder * b.rudder * clamp(b.spd / c.hullSpeed, 0, 1);
   target *= drag;
+  const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg) : null;
+  if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;
   b.spd += (target - b.spd) * (1 - Math.exp(-dt / tau));
   if (b.spd < 0) b.spd = 0;
 
   const steer = clamp(b.spd / (0.35 * c.hullSpeed), a < ng + 4 ? 0.32 : 0.16, 1);
-  const rotTarget = b.rudder * c.maxRot * steer;
+  let rotTarget = b.rudder * c.maxRot * steer;
+  // A slow boat near head to wind has her bow blown off the wind, so holding her there takes work.
+  const slow = 1 - clamp(b.spd / (0.45 * c.hullSpeed), 0, 1);
+  if (a < ng + 10 && slow > 0) {
+    const away = a < 2 ? (b.tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
+    rotTarget += away * 16 * slow * (1 - a / (ng + 10));
+  }
+  if (wave) rotTarget += wave.yaw * clamp(0.4 + b.spd / c.hullSpeed, 0, 1);
   b.rot += (rotTarget - b.rot) * (1 - Math.exp(-dt / 0.12));
   b.hdg = n360(b.hdg + b.rot * dt);
 
   const v = dir(b.hdg);
   let vx = v.x * b.spd, vy = v.y * b.spd;
+  const back = dir(b.twd + 180);
   if (a < ng) {
     // In irons: the wind pushes her backwards.
-    const back = dir(b.twd + 180);
     const k = 0.07 * b.tws * (1 - a / ng);
+    vx += back.x * k; vy += back.y * k;
+  }
+  // Slow or stopped, the wind on her rig and hull drifts her downwind and sideways (leeway).
+  if (slow > 0) {
+    const k = 0.03 * b.tws * slow * slow;
     vx += back.x * k; vy += back.y * k;
   }
   b.x += vx * dt; b.y += vy * dt;
@@ -162,7 +189,7 @@ export function markContacts(boats: Boat[], course: Course): { boat: number; mar
   const out: { boat: number; mark: string }[] = [];
   for (let i = 0; i < boats.length; i++) {
     const b = boats[i];
-    if (b.finished || b.retired) continue;
+    if (b.finished || b.retired || b.disabled) continue;
     for (const m of course.marks) {
       if (Math.abs(b.x - m.p.x) > b.cls.loa || Math.abs(b.y - m.p.y) > b.cls.loa) continue;
       const [c0, c1, r] = capsule(b);
@@ -200,6 +227,28 @@ export function bank(b: Boat, course: Course): boolean {
     const into = Math.max(0, (na !== along ? Math.sign(along - na) * dot(v, course.up) : 0) + (nc !== across ? Math.sign(across - nc) * dot(v, course.right) : 0));
     b.spd *= 1 - 0.5 * Math.min(1, into);
   }
+  // At a real venue: the shore. Bow, middle and stern stay half a beam off the water's edge.
+  const sh = course.shore;
+  if (sh) {
+    const v = dir(b.hdg), r = b.cls.beam / 2, half = b.cls.loa / 2 - r;
+    for (const k of [1, 0, -1]) {
+      const p = { x: b.x + v.x * half * k, y: b.y + v.y * half * k };
+      const s = nearestShore(sh, p);
+      if (!Number.isFinite(s.d) || (s.d > r + 0.3 && sh.grid.wet(p.x, p.y))) continue;
+      const wet = shoreWet(sh, p);
+      const push = wet ? r - s.d : r + s.d;
+      if (push <= 0) continue;
+      // Into the water: away from the nearest shore point if afloat, towards (and past) it if not.
+      let nx = (p.x - s.q.x) * (wet ? 1 : -1), ny = (p.y - s.q.y) * (wet ? 1 : -1);
+      const len = Math.hypot(nx, ny);
+      if (len < 1e-6) continue;
+      nx /= len; ny /= len;
+      b.x += nx * (push + 0.002); b.y += ny * (push + 0.002);
+      const into = Math.max(0, -(v.x * nx + v.y * ny));
+      b.spd *= 1 - 0.5 * Math.min(1, into);
+      hit = true;
+    }
+  }
   return hit;
 }
 
@@ -231,6 +280,22 @@ export function closest(p1: V2, q1: V2, p2: V2, q2: V2): { d: number; pa: V2; pb
 export function hullGap(a: Boat, b: Boat, ax = a.x, ay = a.y, ah = a.hdg, bx = b.x, by = b.y, bh = b.hdg): number {
   const [a0, a1, ra] = capsule(a, ax, ay, ah), [b0, b1, rb] = capsule(b, bx, by, bh);
   return closest(a0, a1, b0, b1).d - ra - rb;
+}
+
+/** Distance from the bow along the heading to the bank (the pond's edge), m. */
+export function bankAhead(b: Boat, course: Course, hdg = b.hdg): number {
+  const d = sub({ x: b.x, y: b.y }, course.origin);
+  const pa = dot(d, course.up), pc = dot(d, course.right);
+  const v = dir(hdg);
+  const va = dot(v, course.up), vc = dot(v, course.right);
+  const B = course.bounds;
+  let t = Infinity;
+  if (va > 1e-6) t = Math.min(t, (B.alongMax - pa) / va);
+  if (va < -1e-6) t = Math.min(t, (B.alongMin - pa) / va);
+  if (vc > 1e-6) t = Math.min(t, (B.across - pc) / vc);
+  if (vc < -1e-6) t = Math.min(t, (-B.across - pc) / vc);
+  if (course.shore) t = Math.min(t, shoreRay(course.shore, b, v));
+  return Math.max(0, t - b.cls.loa / 2);
 }
 
 /** Signed distance of a point from the start/finish line: positive = course side (upwind). */

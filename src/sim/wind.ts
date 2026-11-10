@@ -15,6 +15,10 @@ export interface WindSettings {
   direction: number;
   /** Optional exact speed in knots (venue practice), overrides strength. */
   knots?: number;
+  /** No shifts, gusts or puffs at all (rules lessons). */
+  flat?: boolean;
+  /** Scripted shifts on top of the natural ones. */
+  shifts?: { t: number; deg: number; over: number }[];
 }
 
 interface Osc { amp: number; period: number; phase: number }
@@ -45,6 +49,7 @@ export class WindField {
   /** Centre and size of the area puffs cover, set by the course. */
   private area: { cx: number; cy: number; halfAlong: number; halfAcross: number };
   readonly character: WindCharacter;
+  private shifts: { t: number; deg: number; over: number }[];
 
   constructor(settings: WindSettings, seed: number, area: { cx: number; cy: number; halfAlong: number; halfAcross: number }) {
     this.rng = new Rng(seed ^ 0x5eed);
@@ -74,12 +79,19 @@ export class WindField {
     this.puffStrength = settings.character === 'puffy' ? [0.18, 0.4] : [0.1, 0.25];
     // Seed the course with puffs already on the water.
     for (let i = 0; i < 6; i++) this.spawn(r.range(-1, 1));
+    this.shifts = settings.shifts ?? [];
+    if (settings.flat) {
+      for (const o of this.osc) o.amp = 0;
+      for (const g of this.gust) g.amp = 0;
+      this.drift = 0; this.sidePressure = 0; this.sideShift = 0; this.puffRate = 0; this.puffs = [];
+    }
   }
 
   /** Mean direction at time t, before local effects. */
   meanTwd(t: number): number {
     let d = this.baseTwd + this.drift * t;
     for (const o of this.osc) d += o.amp * Math.sin((2 * Math.PI * t) / o.period + o.phase);
+    for (const s of this.shifts) if (t > s.t) d += s.deg * Math.min(1, (t - s.t) / Math.max(0.1, s.over));
     return n360(d);
   }
   meanTws(t: number): number {
