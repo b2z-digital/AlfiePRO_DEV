@@ -64,7 +64,7 @@ export function heelForce(absTwa: number, sheet: number, tws: number): number {
   const fill = clamp((a - (ng - 4)) / 10, 0, 1);
   // Pinching above her best close-hauled angle the sails start to lift and lose their power.
   const luff = 1 - 0.6 * clamp((upAngle(tws) - a) / 18, 0, 1);
-  const e = sheet - bestSheet(a);
+  const e = sheet - bestSheet(a, tws);
   const trim = e < 0 ? Math.max(0.08, 1 + 2.6 * e) : 1 + Math.min(0.35, e * (a > 70 ? 1.6 : 0.5));
   return Math.max(0.05, point * fill * luff * trim);
 }
@@ -135,18 +135,36 @@ export function vmgAngles(c: ClassDef, twsIn: number): VmgAngles {
   return r;
 }
 
-/** Best sheet setting (0 = fully eased, 1 = fully in) for |true wind angle|. */
-export function bestSheet(absTwa: number): number {
+/** In very light air (under about 4½ knots) a touch off fully in gives the sail shape and power. */
+export function lightEase(tws: number): number {
+  return 0.07 * clamp((4.5 - tws / KN) / 3, 0, 1);
+}
+
+/**
+ * Overpowered: laid over past about 36° in a gust, the heel costs her more than an eased sail does,
+ * so easing a touch lets her stand up and drive. How much to ease (sheet, 0..1) for her heel.
+ */
+export function overpowerEase(heel: number): number {
+  return clamp((Math.abs(heel) - 36) * 0.007, 0, 0.14);
+}
+
+/**
+ * Best sheet setting (0 = fully eased, 1 = fully in) for |true wind angle|: right in when
+ * close-hauled, as radio sailors sail upwind (a touch off in very light air, given the wind),
+ * easing as she bears away. Overpowered in a gust she wants a touch more ease: see overpowerEase.
+ */
+export function bestSheet(absTwa: number, tws?: number): number {
   const a = clamp(absTwa, 0, 180);
-  if (a <= 45) return 0.95 - (a / 45) * 0.08;
-  if (a <= 90) return 0.87 - ((a - 45) / 45) * 0.37;
+  const top = 1 - (tws === undefined ? 0 : lightEase(tws));
+  if (a <= 50) return top;
+  if (a <= 90) return top - (top - 0.5) * ((a - 50) / 40);
   if (a <= 135) return 0.5 - ((a - 90) / 45) * 0.22;
   return 0.28 - ((a - 135) / 45) * 0.13;
 }
 
 /** Drive lost to wrong trim: 1 = perfect. Under-sheeting (luffing) costs more than over-sheeting. */
-export function trimEfficiency(sheet: number, absTwa: number): number {
-  const e = sheet - bestSheet(absTwa);
+export function trimEfficiency(sheet: number, absTwa: number, tws?: number): number {
+  const e = sheet - bestSheet(absTwa, tws);
   if (e >= 0) return Math.max(0.12, 1 - 2.4 * e * e);
   return Math.max(0.05, 1 - 3.6 * e * e);
 }

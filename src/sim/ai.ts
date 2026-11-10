@@ -4,7 +4,7 @@
 //   helm (steering and trimming like a person: reaction delay, small errors).
 // They sail the same physics as you and never get help from the engine.
 
-import { accelTau, noGoAngle, polarSpeed, trimEfficiency, upAngle, vmgAngles, bestSheet } from './classes';
+import { accelTau, noGoAngle, overpowerEase, polarSpeed, trimEfficiency, upAngle, vmgAngles, bestSheet } from './classes';
 import { Course, Leg, Rounding, roundingPoint } from './course';
 import { Rng, V2, bearing, clamp, dir, dist, lerp, n180, n360, sub, dot, cross } from './math';
 import { bankAhead, bow, capsule, closest, hullGap, lineSide, stern } from './physics';
@@ -252,6 +252,7 @@ export class Skipper implements Helm {
   // ───────────────────────── helm (every step) ─────────────────────────
   helm(h: AiHost, dt: number) {
     const b = this.b;
+    if (b.finished || b.retired) return; // the engine sails her clear (clear.ts)
     const due = h.t - this.lv.reaction * (1.3 - 0.6 * this.persona.consistency);
     let cmd = this.queue[0];
     for (const q of this.queue) { if (q.t <= due) cmd = q; else break; }
@@ -262,7 +263,7 @@ export class Skipper implements Helm {
     this.ouTrim += (-this.ouTrim * 0.3 + this.rng.gauss() * this.lv.trimNoise) * dt;
     if (this.penDir !== 0 && b.penalty.owed > 0 && this.intent === 'Taking a One-Turn Penalty') {
       b.rudder = this.penDir * 0.95;
-      b.sheet = clamp(bestSheet(Math.abs(b.twa)), 0, 1);
+      b.sheet = clamp(bestSheet(Math.abs(b.twa), b.tws) - overpowerEase(b.heel), 0, 1);
       return;
     }
     const target = cmd.hdg + this.ou;
@@ -276,7 +277,9 @@ export class Skipper implements Helm {
     const big = Math.abs(err) > 50 && Math.abs(b.twa) > noGoAngle(b.tws) + 3;
     const lim = big ? this.lv.tackRudder : 1;
     b.rudder = clamp(r, -lim, lim);
-    b.sheet = clamp(cmd.sheet + this.ouTrim, 0.05, 1);
+    // "Right in" upwind is a touch off in very light air; and overpowered in a gust she eases a touch.
+    const want = cmd.sheet >= 0.97 ? bestSheet(Math.abs(b.twa), b.tws) : cmd.sheet;
+    b.sheet = clamp(want - overpowerEase(b.heel) + this.ouTrim, 0.05, 1);
   }
 
   // ───────────────────────── helpers ─────────────────────────

@@ -3,7 +3,8 @@
 // collisions → start/rounding/finish progress → referee → recording.
 
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
-import { CLASSES, bestSheet, rigPower, vmgAngles } from './classes';
+import { CLASSES, bestSheet, overpowerEase, rigPower, vmgAngles } from './classes';
+import { Clearing, sailClear, startClearing } from './clear';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
 import { KN, Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
 import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, settleHeel, stern } from './physics';
@@ -121,6 +122,8 @@ export class Race implements AiHost {
   /** Sailing a recorded race again: the log being followed and how far through it we are. */
   private following: { log: RaceLog; i: number; a: number; until: number; cur: RaceLog['input'][number] | null } | null = null;
   private passed: ('tack' | 'gybe' | null)[] = [];
+  /** Boats that have finished: where each is sailing clear to and waiting (by boat index). */
+  readonly clearing: (Clearing | null)[] = [];
   private lastSignal = Infinity;
   private helmAssist: { target: number; until: number } | null = null;
   /** A live race: the people racing, one seat each (see CrewSeat). Empty for a race on your own. */
@@ -443,7 +446,8 @@ export class Race implements AiHost {
     }
     // Penalties are the skipper's own: she sails her turn herself (the referee sees it done).
     p.rudder = rudder;
-    const best = bestSheet(Math.abs(p.twa));
+    // Auto-trim: right in upwind (a touch off in very light air), and eased a touch when a gust lays her over.
+    const best = bestSheet(Math.abs(p.twa), p.tws) - overpowerEase(p.heel);
     p.sheet = input.autoTrim ? Math.min(best, input.sheet >= 0.98 ? best : input.sheet) : input.sheet;
     return assist && this.t < assist.until ? assist : null;
   }
@@ -547,17 +551,24 @@ export class Race implements AiHost {
     const p = this.player;
     if (this.live) this.crewInputs();
     else if (p && !p.finished && !this.autopilot) this.helmAssist = this.steer(p, this.input, this.helmAssist);
+    // Boats that have finished sail clear of the line and wait out of everyone's way (clear.ts).
+    this.boats.forEach((b, i) => { const c = this.clearing[i]; if (b.finished && c) sailClear(b, i, c, this.boats, this.course, t); });
 
-    // Physics.
-    this.passed = this.boats.map(b => (b.finished || b.retired ? null : integrate(b, dt, t, this.sea)));
+    // Physics. A boat that has finished still sails, but she's out of the race: no collisions,
+    // shadow, marks or rule-keeping for her.
+    this.passed = this.boats.map(b => {
+      if (b.retired) return null;
+      const passed = integrate(b, dt, t, this.sea);
+      return b.finished ? null : passed;
+    });
     const contacts = collide(this.boats);
     const touches = markContacts(this.boats, this.course);
-    for (const b of this.boats) if (!b.finished && bank(b, this.course) && b.isPlayer) this.events.push({ type: 'bank', t, boat: b.id });
+    for (const b of this.boats) if (bank(b, this.course) && b.isPlayer && !b.finished) this.events.push({ type: 'bank', t, boat: b.id });
 
     this.signals(t);
     this.progressAll(t);
     this.recordHist();
-    this.referee.step(contacts, touches, this.passed);
+    this.referee.step(contacts, touches, this.passed); // (it only judges boats racing)
 
     this.t = Math.round((t + dt) * 1000) / 1000;
     this.step_++;
@@ -655,6 +666,7 @@ export class Race implements AiHost {
           b.roundedAt.push(t); b.placeAtLeg.push(place);
           this.events.push({ type: 'finish', t, boat: b.id, place });
           if (b.isPlayer) this.finishedAt = t;
+          this.clearing[i] = startClearing(c, b, t, this.clearing.flatMap(x => (x ? [x.spot] : [])));
         }
         return;
       }

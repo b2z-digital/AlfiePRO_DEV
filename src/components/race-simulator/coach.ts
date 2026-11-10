@@ -3,7 +3,7 @@
 // (start line bias, time to the line, point of sail, trim).
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
-import { accelTau, bestSheet, noGoAngle, polarSpeed, vmgAngles } from '@/sim/classes';
+import { accelTau, bestSheet, lightEase, noGoAngle, overpowerEase, polarSpeed, vmgAngles } from '@/sim/classes';
 import { bearing, dir, dist, n180, n360 } from '@/sim/math';
 import { bankAhead, bow, hullGap, lineSide } from '@/sim/physics';
 import { keepClear } from '@/sim/referee';
@@ -63,12 +63,24 @@ export function pointOfSail(b: Boat): string {
   return 'Running';
 }
 
+/** After the finish your boat sails herself clear: what the boat strip says then. */
+export const SAILING_CLEAR = 'Finished · keeping clear of the boats still racing';
+
+/**
+ * The trim line under your boat. Upwind, radio sailors sail with the sail right in: ease only a touch
+ * in very light air, or when a gust lays her over (then sheet back in as it passes).
+ */
 export function trimAdvice(b: Boat): string {
-  const e = b.sheet - bestSheet(Math.abs(b.twa));
-  if (Math.abs(b.twa) < noGoAngle(b.tws)) return 'Bear away to fill the sail';
-  if (Math.abs(b.twa) < vmgAngles(b.cls, b.tws).up - 4) return 'Bear away a touch: she’s slowing';
+  const a = Math.abs(b.twa);
+  if (a < noGoAngle(b.tws)) return 'Bear away to fill the sail';
+  if (a < vmgAngles(b.cls, b.tws).up - 4) return 'Bear away a touch: she’s slowing';
+  const upwind = a <= 55;
+  const gust = overpowerEase(b.heel);
+  const e = b.sheet - (bestSheet(a, b.tws) - gust);
+  if (e > 0.06 && gust > 0.03) return 'Overpowered: ease a touch through the gust';
+  if (e > 0.05 && upwind && lightEase(b.tws) > 0.02) return 'Very light: ease a touch for power';
   if (e > 0.09) return 'Trim: ease the sail a touch';
-  if (e < -0.09) return 'Trim: sheet in a touch';
+  if (e < -0.09) return upwind ? 'Upwind: sheet right in' : 'Trim: sheet in a touch';
   return 'Trim: good';
 }
 
@@ -178,7 +190,7 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
     if (p.ocs && !p.returning) return cue('The start', 'Recall: you were over at the gun. Bear away, dip right back below the line, then start again. Keep clear of everyone while you return (Rule 21).', 'warn');
     return cue('The start', 'Cross the line between the pin and the start mark to start.');
   }
-  if (p.finished) return cue('Finish', 'Finished. Sail clear of the line and watch the rest come in.');
+  if (p.finished) return cue('Finish', 'Finished. Your boat sails clear of the line, out of the way of boats still racing. Watch the rest come in.');
 
   // ── Penalty owed ──
   if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn');
@@ -210,6 +222,12 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
     const shift = n180(p.twd - mem.mean);
     const lifted = p.tack === 'stbd' ? shift : -shift;
     if (p.shadow > 0.12) return cue('Upwind', `You're in dirty air (${Math.round(p.shadow * 100)}% less wind). Tack, or bear off a little to get clear air.`);
+    // Trim upwind: right in, except in a gust that lays her over, in very light air, and through a
+    // tack in a strong breeze.
+    const kn = p.tws / 0.514444;
+    if (race.t - p.lastHtwT < 8 && kn >= 14 && Math.abs(p.heel) > 30 && p.spd < 0.65 * p.targetSpd) return cue('Upwind', 'In this breeze, ease the sail a touch as you tack, let her build speed on the new tack, then sheet right in again.');
+    if (overpowerEase(p.heel) > 0.04 && p.sheet > bestSheet(Math.abs(p.twa), p.tws) - 0.03) return cue('Upwind', 'Overpowered in this gust: ease the sail a touch so she stands up and drives, then sheet right in again as it passes.');
+    if (lightEase(p.tws) > 0.03 && p.sheet > 0.99) return cue('Upwind', "It's very light: ease the sail a touch off fully in for more power, and steer gently so she keeps moving.");
     const up = vmgAngles(p.cls, p.tws).up + 1.5;
     const brg = bearing(p, target);
     const other = p.tack === 'stbd' ? n360(p.twd + up) : n360(p.twd - up);
