@@ -18,6 +18,10 @@ export interface RaceSettings {
   windFrom?: number;
   /** A real venue (see src/sim/venues): the course is laid on its water for the day's wind. */
   venue?: string;
+  /** At a venue: roughly where to sail, picked on its map (metres from the club's saved location, east
+   *  and north). The skippers stand on the nearest bank and the course is laid in front of them. Not
+   *  set: the club's own control area. */
+  venueSpot?: [number, number];
   /** Who's sailing: the member's name and their sail number in this class (from their boats). */
   player?: { name: string; sail: string };
   /** A live race: everyone racing from their own device, in seat order. Each sails one of the boats. */
