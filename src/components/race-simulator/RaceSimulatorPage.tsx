@@ -18,6 +18,8 @@ import type { RaceSummary } from './stats';
 import { Profile, loadProfile, saveRace } from './profile';
 import { TrainingProgress, loadTraining, recordAnswer, recordScene } from './progress';
 import { C } from './ui';
+import { VENUES } from '@/sim/venues';
+import { VenueWind, fetchVenueWind } from './venueWind';
 
 interface RaceSimulatorPageProps {
   darkMode: boolean;
@@ -42,8 +44,13 @@ function storeSetup(s: Setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
 }
 
-function toSettings(s: Setup, mode: 'race' | 'start'): RaceSettings {
+function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null): RaceSettings {
+  // At a venue: its usual breeze, today's wind there (direction and strength), or any direction.
+  const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
+  const live = def && s.windDir === 'today' && today ? today : null;
+  const windFrom = !def ? undefined : live ? live.from : s.windDir === 'any' ? Math.floor(Math.random() * 360) : def.usualWind;
   return {
+    venue: def?.id, windFrom, windKnots: live ? live.kn : undefined,
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
@@ -88,6 +95,17 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   // The view for this race or scene: your saved choice, but lessons open from above, where the
   // situation reads like the diagram. Switching with V in a lesson doesn't change your saved view.
   const [runView, setRunView] = useState<SimView>(setup.view);
+  // Today's wind at the venue, fetched when you choose it.
+  const [today, setToday] = useState<VenueWind | 'loading' | 'failed' | null>(null);
+  useEffect(() => {
+    const def = setup.venue !== 'pond' ? VENUES[setup.venue] : undefined;
+    if (!def || setup.windDir !== 'today') return;
+    let live = true;
+    setToday(t => (t && t !== 'failed' ? t : 'loading'));
+    void fetchVenueWind(def).then(r => { if (live) setToday(r ?? 'failed'); });
+    return () => { live = false; };
+  }, [setup.venue, setup.windDir]);
+  const todayWind = today && today !== 'loading' && today !== 'failed' ? today : null;
 
   const changeSetup = useCallback((s: Setup) => { setSetup(s); storeSetup(s); }, []);
   const changeView = useCallback((v: SimView) => {
@@ -97,10 +115,10 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   }, [run]);
 
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
-    setRun({ settings: toSettings(s, mode), mode, key: Date.now() });
+    setRun({ settings: toSettings(s, mode, todayWind), mode, key: Date.now() });
     setRunView(s.view);
     setWhere('race');
-  }, []);
+  }, [todayWind]);
 
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
@@ -219,7 +237,7 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   return (
     <div className="h-full overflow-y-auto">
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile} onProfileCleared={() => setProfile(loadProfile())}
-        training={training} onOpen={w => setWhere(w)} />
+        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} />
     </div>
   );
 }

@@ -11,7 +11,9 @@ import { LAB } from '@/sim/training';
 import { Profile, clearProfile, skills } from './profile';
 import { TrainingProgress, drillStars, licence } from './progress';
 import type { SimView } from './SimRace';
-import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, compassName, cx, ordinal } from './ui';
+import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
+import type { VenueWind } from './venueWind';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -19,14 +21,19 @@ export interface Setup {
   laps: number; length: CourseLength; sequenceSeconds: number;
   coach: CoachMode; autoTrim: boolean; forgetfulSkippers: boolean;
   seaState: SeaKind; view: SimView;
+  /** A venue id, or 'pond' for the practice pond. */
+  venue: string;
+  /** At a venue: its usual breeze, today's wind there, or any direction. */
+  windDir: 'usual' | 'today' | 'any';
 }
 
-/** The default race: an IOM against 8 State-level skippers on choppy water, seen from the bank, with
- *  the 1-minute scratch sequence clubs use in StartBox and the sails on your stick (no auto-trim). */
+/** The default race: an IOM against 8 State-level skippers at Lake Macquarie RYC in its sea breeze,
+ *  on choppy water, seen from the club's control area, with the 1-minute scratch sequence clubs use
+ *  in StartBox and the sails on your stick (no auto-trim). */
 export const DEFAULT_SETUP: Setup = {
   classId: 'IOM', fleetSize: 8, level: 'state', windStrength: 'medium', windCharacter: 'oscillating',
   laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'full', autoTrim: false, forgetfulSkippers: false,
-  seaState: 'chop', view: 'bank',
+  seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
 
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
@@ -94,9 +101,11 @@ function TrainCard({ title, text, icon, action, actionLabel, soon, badge }: { ti
   );
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
+  /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
+  today: VenueWind | 'loading' | 'failed' | null;
 }) {
   const stars = drillStars(training);
   const lic = licence(training);
@@ -104,6 +113,13 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
+  const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
+  const windHint = !venue ? null
+    : s.windDir === 'usual' ? `The club's usual breeze, from ${String(venue.usualWind).padStart(3, '0')}°.`
+      : s.windDir === 'any' ? 'A different direction every race, so you learn the whole lake.'
+        : today === 'loading' ? 'Getting the wind at the club now…'
+          : today === 'failed' || !today ? `Couldn't get today's wind, so it's the ${venue.usualWindName} for now.`
+            : `Now at the club: ${Math.round(today.kn)} kn from the ${compassName(today.from)} (${String(Math.round(today.from)).padStart(3, '0')}°). It sets the wind strength too.`;
   const weakest = sk ? (Object.entries({ starts: sk.starts, upwind: sk.upwind, roundings: sk.roundings, downwind: sk.downwind, rules: sk.rules }) as [string, number][]).sort((a, b) => a[1] - b[1])[0] : null;
 
   const surprise = () => {
@@ -141,6 +157,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Every skipper in the fleet has a game plan, a personality and the rules in their head. Pick who you race and in what.</p>
             </div>
             <div className="grid gap-5 md:grid-cols-2">
+              <Field label="Where" hint={venue ? `${venue.place}, from the club's control area. The course is laid for the wind, with every mark well off the bank. Map data ${venue.credit}.` : 'A sheltered practice pond, lined with trees.'}>
+                <Seg label="Where" value={s.venue} onChange={v => set({ venue: v })} options={[...Object.values(VENUES).map(d => ({ value: d.id, label: d.short })), { value: 'pond', label: 'Practice pond' }]} />
+              </Field>
+              {venue ? (
+                <Field label="Wind direction" hint={windHint}>
+                  <Seg label="Wind direction" value={s.windDir} onChange={v => set({ windDir: v })} options={[{ value: 'usual', label: `${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}` }, { value: 'today', label: "Today's wind" }, { value: 'any', label: 'Any direction' }]} />
+                </Field>
+              ) : <div className="hidden md:block" />}
               <Field label="Class">
                 <Seg label="Class" value={s.classId} onChange={v => set({ classId: v })} options={[{ value: 'IOM', label: 'IOM' }, { value: 'DF95', label: 'DF95' }, { value: 'DF65', label: 'DF65' }, { value: '10R', label: '10 Rater' }, { value: 'M', label: 'Marblehead' }]} />
               </Field>
@@ -242,7 +266,9 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <TrainCard title="Scenario Lab" text="Port-tack approaches, crowded roundings, gate choices. Replay a moment until you win it." action={() => onOpen('lab')} actionLabel="Open the Lab"
               badge={<Chip tone={labWon ? 'blue' : 'plain'}>{labWon} of {LAB.length} won</Chip>}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 001.3 2h13.4a1.5 1.5 0 001.3-2L14 9V3" /></svg>} />
-            <TrainCard title="Venue practice" soon text="Your club's course in today's forecast, so you can rehearse the shifts before you get to the pond."
+            <TrainCard title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water from the control area, in the wind blowing there today. Rehearse the shifts before you get to the club.`}
+              action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today' }); document.getElementById('qr-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} actionLabel="Use today's wind"
+              badge={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? <Chip tone="blue">Set up</Chip> : undefined}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>} />
           </div>
         </section>

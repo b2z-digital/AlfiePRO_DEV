@@ -124,7 +124,8 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
   const sum: RaceSummary = {
     at: Date.now(), mode,
     title: mode === 'start' ? 'Start practice' : 'Quick race',
-    cls: p.cls.name, level: s.level, fleet: race.boats.length, wind: `${s.windStrength} wind, ${s.windCharacter}`,
+    cls: p.cls.name, level: s.level, fleet: race.boats.length,
+    wind: `${s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength} wind`}, ${s.windCharacter}${race.venue ? ` · ${race.venue.def.short}` : ''}`,
     status: mine.status, place: mine.status === 'finished' ? mine.place : null, of: race.boats.length,
     time: mine.time, behind: mine.time !== null && winner.time !== null ? mine.time - winner.time : null,
     late, spdAtGun: log.atGun?.spdPct ?? null, fromFavouredL, favoured,

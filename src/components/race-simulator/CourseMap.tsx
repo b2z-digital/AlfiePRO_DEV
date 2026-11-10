@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import type { Race } from '@/sim/engine';
 import { dir } from '@/sim/math';
 import type { BankCam } from './bank';
+import { drawVenueLand } from './venueMap';
 
 /** `cam`: in the bank view, the wedge of what you can see from where you stand. */
 export default function CourseMap({ race, width = 240, height = 170, cam = null }: { race: Race; width?: number; height?: number; cam?: BankCam | null }) {
@@ -27,10 +28,20 @@ export default function CourseMap({ race, width = 240, height = 170, cam = null 
         const al = dx * c.up.x + dy * c.up.y, ac = dx * c.right.x + dy * c.right.y;
         return [width / 2 + ac * s, height / 2 - (al - midA) * s] as const;
       };
-      ctx.fillStyle = 'rgba(30,70,130,0.35)';
-      ctx.strokeStyle = 'rgba(150,190,140,0.35)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.rect(width / 2 - B.across * s, height / 2 - (B.alongMax - midA) * s, lenC * s, lenA * s); ctx.fill(); ctx.stroke();
+      if (race.venue) {
+        // The real lake and its bank round the course area.
+        ctx.fillStyle = 'rgba(30,70,130,0.35)';
+        ctx.fillRect(0, 0, width, height);
+        drawVenueLand(ctx, race.venue, (x, y) => [P(x, y)[0], P(x, y)[1]], s, width, height, false);
+        ctx.setLineDash([2, 3]); ctx.strokeStyle = 'rgba(235,240,255,0.18)'; ctx.lineWidth = 1;
+        ctx.strokeRect(width / 2 - B.across * s, height / 2 - (B.alongMax - midA) * s, lenC * s, lenA * s);
+        ctx.setLineDash([]);
+      } else {
+        ctx.fillStyle = 'rgba(30,70,130,0.35)';
+        ctx.strokeStyle = 'rgba(150,190,140,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.rect(width / 2 - B.across * s, height / 2 - (B.alongMax - midA) * s, lenC * s, lenA * s); ctx.fill(); ctx.stroke();
+      }
       // What you can see from the bank.
       if (cam && cam.ready) {
         const [cx0, cy0] = P(cam.x, cam.y);

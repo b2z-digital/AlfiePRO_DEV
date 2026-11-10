@@ -13,7 +13,11 @@ export interface RaceSettings {
   windStrength: WindStrength;
   windCharacter: WindCharacter;
   windKnots?: number;         // venue practice
-  windFrom?: number;          // compass degrees; default 0 so the course runs up the screen
+  /** Compass degrees the wind comes from. On the practice pond it's the course axis (default 0, so the
+   *  course runs up the screen); at a venue it's the real direction (default the venue's usual breeze). */
+  windFrom?: number;
+  /** A real venue (see src/sim/venues): the course is laid on its water for the day's wind. */
+  venue?: string;
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length

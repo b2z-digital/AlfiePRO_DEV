@@ -11,6 +11,8 @@ import { Referee, isRacing, spellSail } from './referee';
 import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
 import { WindField } from './wind';
 import { Sea, makeSea } from './sea';
+import { VenueScene, frameAt, layCourse, shoreFor, venueScene } from './venue';
+import { VENUES } from './venues';
 
 export const BOAT_COLORS = ['#2A93FF', '#F472B6', '#2DD4BF', '#94A3B8', '#A78BFA', '#34D399', '#FBBF24', '#FB923C', '#F87171', '#60A5FA', '#E879F9', '#4ADE80', '#FCD34D', '#38BDF8', '#C084FC', '#FDA4AF'];
 
@@ -31,6 +33,8 @@ export class Race implements AiHost {
   wind: WindField;
   /** Waves, or null for flat water. */
   sea: Sea | null;
+  /** The real venue the race is at (its water, bank and control area in the race frame), or null on the practice pond. */
+  venue: VenueScene | null = null;
   boats: Boat[] = [];
   skippers: (Helm | null)[] = [];
   referee: Referee;
@@ -57,11 +61,23 @@ export class Race implements AiHost {
     this.settings = settings;
     this.rng = new Rng(settings.seed);
     const cls = CLASSES[settings.classId];
-    const axis = settings.windFrom ?? 0;
+    // At a venue the race frame turns with the wind (the course axis stays 0) and the real
+    // direction is kept as course.rot; on the practice pond windFrom is the axis itself.
+    const def = settings.venue ? VENUES[settings.venue] : undefined;
+    const axis = def ? 0 : settings.windFrom ?? 0;
     const rb = this.rng.range(-3.5, 3.5);
     const bias = settings.lineBias ?? rb;
     this.course = buildCourse(axis, cls.loa, { laps: settings.laps, length: settings.length, fleetSize: settings.fleetSize, lineBias: bias });
     const c = this.course;
+    if (def) {
+      const rot = n360(settings.windFrom ?? def.usualWind);
+      const S = layCourse(def, rot, c);
+      if (S) {
+        this.venue = venueScene(def, frameAt(rot, S));
+        c.rot = rot;
+        c.shore = shoreFor(this.venue, c);
+      }
+    }
     const mid = (c.bounds.alongMin + c.bounds.alongMax) / 2;
     this.wind = new WindField(
       { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts },

@@ -9,6 +9,7 @@ import { noGoAngle } from '@/sim/classes';
 import { wavePhase } from '@/sim/sea';
 import type { WorldOverlay } from '@/sim/scene';
 import { DrawOpts, Pose, drawBoat3d, drawReflection, onWaves, rigFor, sailSet, twaFor } from './boat3d';
+import { drawCredit, drawVenueScene } from './bankVenue';
 
 interface V2 { x: number; y: number }
 interface Proj { x: number; y: number; z: number }
@@ -28,20 +29,24 @@ const NEAR = 0.35;
 
 export function newBankCam(): BankCam { return { x: 0, y: 0, z: EYE, yaw: 0, pitch: 3, fov: 50, ready: false }; }
 
-/** The control area: a stretch of the right-hand bank (looking upwind), either side of the start line. */
-export function controlArea(race: Race) {
+/** The control area, the stretch of bank the skippers stand on: at a venue, the club's own; on the
+ *  practice pond, the right-hand bank (looking upwind) either side of the start line. */
+export function controlArea(race: Race): { a: V2; b: V2 } {
+  if (race.venue) return { a: race.venue.control[0], b: race.venue.control[1] };
   const c = race.course, B = c.bounds, L = c.L;
   const at = (along: number, across: number): V2 => ({ x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across });
-  return { from: -8 * L, to: 14 * L, across: B.across + 1.2 * L, at };
+  return { a: at(-8 * L, B.across + 1.2 * L), b: at(14 * L, B.across + 1.2 * L) };
 }
 
 /** Walk along the control area towards your boat and turn to keep her in view, glancing towards
  *  where she's going. Zoom narrows the view; it also narrows on its own when she's far off. */
 export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, look: V2 | null, w: number) {
-  const c = race.course, L = c.L;
+  const L = race.course.L;
+  // Stand where the control area comes closest to her.
   const ca = controlArea(race);
-  const tAlong = (target.x - c.origin.x) * c.up.x + (target.y - c.origin.y) * c.up.y;
-  const want = ca.at(Math.max(ca.from, Math.min(ca.to, tAlong)), ca.across);
+  const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
+  const u = Math.max(0, Math.min(1, ((target.x - ca.a.x) * ex + (target.y - ca.a.y) * ey) / el2));
+  const want = { x: ca.a.x + ex * u, y: ca.a.y + ey * u };
   const snap = !cam.ready;
   const kWalk = snap ? 1 : Math.min(1, dt * 0.7);
   cam.x += (want.x - cam.x) * kWalk; cam.y += (want.y - cam.y) * kWalk;
@@ -66,7 +71,7 @@ export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom
   cam.fov += (fov - cam.fov) * Math.min(1, dt * 2.5);
 }
 
-interface View {
+export interface BankView {
   P: (x: number, y: number, z: number) => Proj;
   /** Screen points of a polygon on the water, clipped to what's in front of you. */
   ground: (pts: V2[]) => Proj[];
@@ -75,7 +80,7 @@ interface View {
   F: number; w: number; h: number;
 }
 
-function makeView(cam: BankCam, w: number, h: number): View {
+function makeView(cam: BankCam, w: number, h: number): BankView {
   const cy = Math.cos(cam.yaw * DEG), sy = Math.sin(cam.yaw * DEG);
   const cp = Math.cos(cam.pitch * DEG), sp = Math.sin(cam.pitch * DEG);
   // Camera basis: forward (looking down by the pitch), right, and up.
@@ -127,7 +132,7 @@ function path(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], cl
 }
 
 /** A line on the water, clipped to what's in front of you. */
-function groundLine(ctx: CanvasRenderingContext2D, V: View, pts: V2[], closed: boolean) {
+function groundLine(ctx: CanvasRenderingContext2D, V: BankView, pts: V2[], closed: boolean) {
   ctx.beginPath();
   const n = closed ? pts.length : pts.length - 1;
   for (let i = 0; i < n; i++) {
@@ -185,7 +190,8 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   const twd = race.wind.meanTwd(t);
   const tws = race.wind.meanTws(t);
   const at = (al: number, ac: number): V2 => ({ x: c.origin.x + c.up.x * al + c.right.x * ac, y: c.origin.y + c.up.y * al + c.right.y * ac });
-  const inPond = (x: number, y: number) => {
+  const shore = c.shore;
+  const inPond = shore ? (x: number, y: number) => shore.grid.wet(x, y) : (x: number, y: number) => {
     const dx = x - c.origin.x, dy = y - c.origin.y;
     const al = dx * c.up.x + dy * c.up.y, ac = dx * c.right.x + dy * c.right.y;
     return al > B.alongMin && al < B.alongMax && Math.abs(ac) < B.across;
@@ -203,92 +209,112 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   ctx.fillStyle = land;
   ctx.fillRect(0, Math.max(0, hz), w, h);
 
-  // Distant tree line beyond the pond, then the pond itself.
-  const pond = [at(B.alongMin, -B.across), at(B.alongMax, -B.across), at(B.alongMax, B.across), at(B.alongMin, B.across)];
-  // Trees round the pond: crowns lit from the sun's side, softer and hazier the further away they are.
-  const trees = (back: number, n: number, hMin: number, hVar: number, color: string, seed: number) => {
-    const crowns: { d: number; draw: () => void }[] = [];
-    for (let e = 0; e < 4; e++) {
-      const a = pond[e], b2 = pond[(e + 1) % 4];
-      const ex = b2.x - a.x, ey = b2.y - a.y, el = Math.hypot(ex, ey) || 1;
-      const out = { x: -ey / el, y: ex / el }; // the pond runs anticlockwise, so this points away from it
-      for (let k = 0; k < n; k++) {
-        const u = (k + hash(k, e + seed)) / n;
-        const off = back * L * (1 + hash(e + seed, k) * 0.8);
-        const gx = a.x + ex * u + out.x * off, gy = a.y + ey * u + out.y * off;
-        const d = V.depth(gx, gy);
-        if (d < 4) continue;
-        const base = P(gx, gy, 0);
-        if (base.x < -200 || base.x > w + 200) continue;
-        const tall = hash(k * 3 + seed, e + 5) > 0.86; // the odd tall, narrow one
-        const ht = (hMin + hash(k + seed, e) * hVar) * (tall ? 1.3 : 1);
-        const top = P(gx, gy, ht);
-        const wpx = Math.max(2, ((ht * (tall ? 0.34 : 0.55 + hash(e, k + seed) * 0.5)) / d) * V.F);
-        const hpx = Math.max(1, (base.y - top.y) / 2);
-        const haze = Math.max(0, Math.min(0.55, (d - 22) / 110));
-        const col = mix(color, '#9FB4BC', haze), lit = mix(col, '#A9C49A', 0.28);
-        crowns.push({ d, draw: () => {
-          ctx.fillStyle = col;
-          ctx.beginPath(); ctx.ellipse(base.x, base.y - hpx, wpx / 2, hpx, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = lit;
-          ctx.beginPath(); ctx.ellipse(base.x - wpx * 0.14, base.y - hpx * 1.18, wpx * 0.3, hpx * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-        } });
+  // At a venue, the real lake and its banks; on the practice pond, a tree-lined pond.
+  let waterClip: (() => void) | null = null;
+  if (race.venue) {
+    waterClip = drawVenueScene(ctx, V, race, cam, hz);
+  } else {
+    // Distant tree line beyond the pond, then the pond itself.
+    const pond = [at(B.alongMin, -B.across), at(B.alongMax, -B.across), at(B.alongMax, B.across), at(B.alongMin, B.across)];
+    // Trees round the pond: crowns lit from the sun's side, softer and hazier the further away they are.
+    const trees = (back: number, n: number, hMin: number, hVar: number, color: string, seed: number) => {
+      const crowns: { d: number; draw: () => void }[] = [];
+      for (let e = 0; e < 4; e++) {
+        const a = pond[e], b2 = pond[(e + 1) % 4];
+        const ex = b2.x - a.x, ey = b2.y - a.y, el = Math.hypot(ex, ey) || 1;
+        const out = { x: -ey / el, y: ex / el }; // the pond runs anticlockwise, so this points away from it
+        for (let k = 0; k < n; k++) {
+          const u = (k + hash(k, e + seed)) / n;
+          const off = back * L * (1 + hash(e + seed, k) * 0.8);
+          const gx = a.x + ex * u + out.x * off, gy = a.y + ey * u + out.y * off;
+          const d = V.depth(gx, gy);
+          if (d < 4) continue;
+          const base = P(gx, gy, 0);
+          if (base.x < -200 || base.x > w + 200) continue;
+          const tall = hash(k * 3 + seed, e + 5) > 0.86; // the odd tall, narrow one
+          const ht = (hMin + hash(k + seed, e) * hVar) * (tall ? 1.3 : 1);
+          const top = P(gx, gy, ht);
+          const wpx = Math.max(2, ((ht * (tall ? 0.34 : 0.55 + hash(e, k + seed) * 0.5)) / d) * V.F);
+          const hpx = Math.max(1, (base.y - top.y) / 2);
+          const haze = Math.max(0, Math.min(0.55, (d - 22) / 110));
+          const col = mix(color, '#9FB4BC', haze), lit = mix(col, '#A9C49A', 0.28);
+          crowns.push({ d, draw: () => {
+            ctx.fillStyle = col;
+            ctx.beginPath(); ctx.ellipse(base.x, base.y - hpx, wpx / 2, hpx, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = lit;
+            ctx.beginPath(); ctx.ellipse(base.x - wpx * 0.14, base.y - hpx * 1.18, wpx * 0.3, hpx * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+          } });
+        }
       }
+      crowns.sort((p1, p2) => p2.d - p1.d);
+      for (const c2 of crowns) c2.draw();
+    };
+    // Check the pond runs the way `trees` expects (its outward normal), and flip it if not.
+    {
+      const a = pond[0], b2 = pond[1], cx0 = (pond[0].x + pond[2].x) / 2, cy0 = (pond[0].y + pond[2].y) / 2;
+      const out = { x: -(b2.y - a.y), y: b2.x - a.x };
+      if ((a.x - cx0) * out.x + (a.y - cy0) * out.y < 0) pond.reverse();
     }
-    crowns.sort((p1, p2) => p2.d - p1.d);
-    for (const c2 of crowns) c2.draw();
-  };
-  // Check the pond runs the way `trees` expects (its outward normal), and flip it if not.
-  {
-    const a = pond[0], b2 = pond[1], cx0 = (pond[0].x + pond[2].x) / 2, cy0 = (pond[0].y + pond[2].y) / 2;
-    const out = { x: -(b2.y - a.y), y: b2.x - a.x };
-    if ((a.x - cx0) * out.x + (a.y - cy0) * out.y < 0) pond.reverse();
-  }
-  // Hazy hills on the horizon, then the far tree line.
-  {
-    ctx.fillStyle = '#9DB2B9';
-    ctx.beginPath(); ctx.moveTo(0, hz + 2);
-    for (let k = 0; k <= 48; k++) {
-      const x = (w * k) / 48, a = cam.yaw + ((x - w / 2) / V.F) * (180 / Math.PI);
-      ctx.lineTo(x, hz - 6 - 16 * (0.5 + 0.3 * Math.sin(a * 0.07 + 1.3) + 0.2 * Math.sin(a * 0.23 + 0.4)));
+    // Hazy hills on the horizon, then the far tree line.
+    {
+      ctx.fillStyle = '#9DB2B9';
+      ctx.beginPath(); ctx.moveTo(0, hz + 2);
+      for (let k = 0; k <= 48; k++) {
+        const x = (w * k) / 48, a = cam.yaw + ((x - w / 2) / V.F) * (180 / Math.PI);
+        ctx.lineTo(x, hz - 6 - 16 * (0.5 + 0.3 * Math.sin(a * 0.07 + 1.3) + 0.2 * Math.sin(a * 0.23 + 0.4)));
+      }
+      ctx.lineTo(w, hz + 2); ctx.closePath(); ctx.fill();
     }
-    ctx.lineTo(w, hz + 2); ctx.closePath(); ctx.fill();
-  }
-  trees(14, 40, 3, 2.5, '#4E6E5A', 11);
+    trees(14, 40, 3, 2.5, '#4E6E5A', 11);
 
-  const water = V.ground(pond);
-  if (water.length > 2) {
-    const wg = ctx.createLinearGradient(0, hz, 0, h);
-    wg.addColorStop(0, '#9DB8CF'); wg.addColorStop(0.035, '#5F86A8'); wg.addColorStop(0.25, '#2F577E'); wg.addColorStop(1, '#173A5E');
-    ctx.fillStyle = wg;
-    path(ctx, water); ctx.fill();
-    ctx.strokeStyle = 'rgba(220,235,220,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    const water = V.ground(pond);
+    if (water.length > 2) {
+      const wg = ctx.createLinearGradient(0, hz, 0, h);
+      wg.addColorStop(0, '#9DB8CF'); wg.addColorStop(0.035, '#5F86A8'); wg.addColorStop(0.25, '#2F577E'); wg.addColorStop(1, '#173A5E');
+      ctx.fillStyle = wg;
+      path(ctx, water); ctx.fill();
+      ctx.strokeStyle = 'rgba(220,235,220,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    trees(4, 52, 1.4, 1.8, '#2F4A32', 3);
   }
-  trees(4, 52, 1.4, 1.8, '#2F4A32', 3);
 
-  // ── Puffs: darker patches of rippled water, stretched along the wind ──
+  // ── Puffs: darker patches of rippled water, stretched along the wind. Each one is the ellipse its
+  // outline makes on the screen, filled with a soft radial gradient (a blur filter is far slower) ──
   const wv = dir(twd), xv = { x: wv.y, y: -wv.x };
-  const soft = 'filter' in ctx;
+  ctx.save();
+  if (waterClip) { waterClip(); ctx.clip('evenodd'); }
   for (const p of race.wind.puffs) {
     const life = Math.sin(Math.PI * Math.min(1, Math.max(0, p.age / p.life)));
     const a = Math.min(1, Math.abs(p.strength) * 3 + 0.2) * life;
     if (a < 0.04 || V.depth(p.x, p.y) < -p.r * 1.6) continue;
-    for (const [sc, al] of [[1, 0.5], [0.62, 0.55]] as const) {
-      const ring: V2[] = [];
-      for (let k = 0; k < 22; k++) {
-        const ang = (k / 22) * Math.PI * 2;
-        const along = Math.cos(ang) * p.r * 1.5 * sc, acr = Math.sin(ang) * p.r * sc;
-        ring.push({ x: p.x + wv.x * along + xv.x * acr, y: p.y + wv.y * along + xv.y * acr });
-      }
-      const q = V.ground(ring);
-      if (q.length < 3) continue;
-      ctx.fillStyle = p.strength > 0 ? `rgba(6,18,38,${0.5 * a * al})` : `rgba(215,232,255,${0.1 * a * al})`;
-      // Soft edges where the canvas can blur; a flat patch where it can't.
-      if (soft) ctx.filter = `blur(${Math.max(2, Math.min(10, (p.r / Math.max(4, V.depth(p.x, p.y))) * V.F * 0.18))}px)`;
-      path(ctx, q); ctx.fill();
-      if (soft) ctx.filter = 'none';
+    const ring: V2[] = [];
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2;
+      const along = Math.cos(ang) * p.r * 1.5, acr = Math.sin(ang) * p.r;
+      ring.push({ x: p.x + wv.x * along + xv.x * acr, y: p.y + wv.y * along + xv.y * acr });
     }
+    const q = V.ground(ring);
+    if (q.length < 3) continue;
+    // Centre and principal axes of the outline on the screen.
+    let mx = 0, my = 0;
+    for (const pt of q) { mx += pt.x; my += pt.y; }
+    mx /= q.length; my /= q.length;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const pt of q) { const dx = pt.x - mx, dy = pt.y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+    sxx /= q.length; syy /= q.length; sxy /= q.length;
+    const tr = sxx + syy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy)));
+    const ra = Math.sqrt(2 * (tr / 2 + disc)), rb = Math.sqrt(2 * Math.max(1e-6, tr / 2 - disc));
+    if (ra < 1.5 || mx + ra < -40 || mx - ra > w + 40 || my - ra > h + 40 || my + ra < hz - 4) continue;
+    const rgb = p.strength > 0 ? '6,18,38' : '215,232,255', k = p.strength > 0 ? 0.5 : 0.1;
+    ctx.save();
+    ctx.translate(mx, my); ctx.rotate(0.5 * Math.atan2(2 * sxy, sxx - syy)); ctx.scale(1, Math.max(0.02, rb / ra));
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ra);
+    g.addColorStop(0, `rgba(${rgb},${k * a * 0.95})`); g.addColorStop(0.55, `rgba(${rgb},${k * a * 0.6})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, ra, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
+  ctx.restore();
 
   // ── Every boat's pose (live, or from her history in a replay), and her reflection ──
   const o: DrawOpts = { P, F: V.F, dpr, cam: [cam.x, cam.y, cam.z], t };
@@ -343,6 +369,8 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   ctx.lineWidth = 1; ctx.lineCap = 'round';
   ripple(0.7, 11, 0.12, 0.16);
   ripple(2.6, 70, 0.4, 0.11);
+  // Out on the open lake: the wind on the water, fading into the distance.
+  if (shore) ripple(9, 420, 1.5, 0.07);
   // Whitecaps in rough water.
   if (sea && sea.kind === 'rough') {
     ctx.fillStyle = 'rgba(240,248,255,0.5)';
@@ -453,6 +481,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
       label(ctx, nextAt.name.replace(/^the /, ''), Math.max(60, Math.min(w - 60, ax)), ay + (ay > h / 2 ? -28 : 28), '#CFE5FF', 12);
     }
   }
+  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
 /** Hull tape and deck colours that go with a hull colour. */
@@ -480,7 +509,7 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
   return onWaves(p, race.sea, race.t);
 }
 
-function drawBankBoat(ctx: CanvasRenderingContext2D, V: View, race: Race, b: Boat, pose: Pose, o: DrawOpts, v: BankOptions) {
+function drawBankBoat(ctx: CanvasRenderingContext2D, V: BankView, race: Race, b: Boat, pose: Pose, o: DrawOpts, v: BankOptions) {
   const t = race.t;
   const { top, base, size } = drawBoat3d(ctx, pose, o);
   // Labels over the masthead.

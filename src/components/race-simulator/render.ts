@@ -8,6 +8,8 @@ import { vmgAngles, noGoAngle } from '@/sim/classes';
 import { dir, n180 } from '@/sim/math';
 import { keepClear } from '@/sim/referee';
 import { hullGap } from '@/sim/physics';
+import { drawVenueLand, waterPath } from './venueMap';
+import { drawCredit } from './bankVenue';
 
 export interface Camera { x: number; y: number; scale: number } // world metres at screen centre, px per metre
 
@@ -159,9 +161,23 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     }
   }
 
-  // ── The bank: everything outside the pond is land ──
+  // ── The bank: everything outside the pond is land (at a venue, outside the real shoreline) ──
   const c = race.course;
-  {
+  if (race.venue) {
+    const T = (x: number, y: number): [number, number] => [X(x), Y(y)];
+    drawVenueLand(ctx, race.venue, T, s, w, h, true);
+    // The course area: as far as the boats can go out on the open lake.
+    const B = c.bounds;
+    const corner = (a: number, x: number) => ({ x: c.origin.x + c.up.x * a + c.right.x * x, y: c.origin.y + c.up.y * a + c.right.y * x });
+    const q = [corner(B.alongMin, -B.across), corner(B.alongMax, -B.across), corner(B.alongMax, B.across), corner(B.alongMin, B.across)];
+    ctx.save();
+    waterPath(ctx, race.venue, T); ctx.clip('evenodd');
+    ctx.setLineDash([3, 7]);
+    ctx.strokeStyle = 'rgba(235,240,255,0.16)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(X(q[0].x), Y(q[0].y)); for (let k = 1; k < 4; k++) ctx.lineTo(X(q[k].x), Y(q[k].y)); ctx.closePath(); ctx.stroke();
+    ctx.restore();
+  } else {
     const B = c.bounds;
     const corner = (a: number, x: number) => ({ x: c.origin.x + c.up.x * a + c.right.x * x, y: c.origin.y + c.up.y * a + c.right.y * x });
     const q = [corner(B.alongMin, -B.across), corner(B.alongMax, -B.across), corner(B.alongMax, B.across), corner(B.alongMin, B.across)];
@@ -378,6 +394,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), r, 0, Math.PI * 2); ctx.stroke();
   }
+  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
 /** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on
@@ -528,6 +545,7 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#0B1A31';
   ctx.fillRect(0, 0, w, h);
+  if (race.venue) drawVenueLand(ctx, race.venue, (x, y) => [X(x), Y(y)], s, w, h, false);
   // Line and marks.
   ctx.setLineDash([5, 4]);
   ctx.strokeStyle = '#FFB340';

@@ -7,6 +7,7 @@ import { V2, clamp, cross, dir, dot, n180, n360, sub, twaOf } from './math';
 import type { Boat } from './types';
 import type { WindField } from './wind';
 import { Sea, waveEffect } from './sea';
+import { nearestShore, shoreRay, shoreWet } from './venue';
 
 export const DT = 0.05;
 
@@ -226,6 +227,28 @@ export function bank(b: Boat, course: Course): boolean {
     const into = Math.max(0, (na !== along ? Math.sign(along - na) * dot(v, course.up) : 0) + (nc !== across ? Math.sign(across - nc) * dot(v, course.right) : 0));
     b.spd *= 1 - 0.5 * Math.min(1, into);
   }
+  // At a real venue: the shore. Bow, middle and stern stay half a beam off the water's edge.
+  const sh = course.shore;
+  if (sh) {
+    const v = dir(b.hdg), r = b.cls.beam / 2, half = b.cls.loa / 2 - r;
+    for (const k of [1, 0, -1]) {
+      const p = { x: b.x + v.x * half * k, y: b.y + v.y * half * k };
+      const s = nearestShore(sh, p);
+      if (!Number.isFinite(s.d) || (s.d > r + 0.3 && sh.grid.wet(p.x, p.y))) continue;
+      const wet = shoreWet(sh, p);
+      const push = wet ? r - s.d : r + s.d;
+      if (push <= 0) continue;
+      // Into the water: away from the nearest shore point if afloat, towards (and past) it if not.
+      let nx = (p.x - s.q.x) * (wet ? 1 : -1), ny = (p.y - s.q.y) * (wet ? 1 : -1);
+      const len = Math.hypot(nx, ny);
+      if (len < 1e-6) continue;
+      nx /= len; ny /= len;
+      b.x += nx * (push + 0.002); b.y += ny * (push + 0.002);
+      const into = Math.max(0, -(v.x * nx + v.y * ny));
+      b.spd *= 1 - 0.5 * Math.min(1, into);
+      hit = true;
+    }
+  }
   return hit;
 }
 
@@ -271,6 +294,7 @@ export function bankAhead(b: Boat, course: Course, hdg = b.hdg): number {
   if (va < -1e-6) t = Math.min(t, (B.alongMin - pa) / va);
   if (vc > 1e-6) t = Math.min(t, (B.across - pc) / vc);
   if (vc < -1e-6) t = Math.min(t, (-B.across - pc) / vc);
+  if (course.shore) t = Math.min(t, shoreRay(course.shore, b, v));
   return Math.max(0, t - b.cls.loa / 2);
 }
 

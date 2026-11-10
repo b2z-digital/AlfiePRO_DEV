@@ -25,9 +25,11 @@ import {
 } from './hud';
 import GamepadModal from './GamepadModal';
 import CourseMap from './CourseMap';
-import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, compassName, ordinal } from './ui';
 
 export type SimView = 'bank' | 'top';
+
+const NO_OVERLAYS: WorldOverlay[] = [];
 
 /** A drill, lesson or lab moment to play. */
 export interface ActiveScene {
@@ -113,7 +115,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     return b;
   }, [scene]);
   const race = useMemo(() => built?.race ?? new Race(settings!), [built, settings]);
-  const overlays: WorldOverlay[] = built?.overlays ?? [];
+  // Stable when there are none: a new [] each render would restart the race loop every frame.
+  const overlays: WorldOverlay[] = built?.overlays ?? NO_OVERLAYS;
   useEffect(() => {
     // Development only: let a test or the console reach the race, and hand the player's boat to an AI helm.
     if (!import.meta.env.DEV) return;
@@ -276,7 +279,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     }
     return {
       T, raceT: Math.max(0, -T), preStart: pre,
-      wind: { kn: ws.tws / KN, from: ws.twd, spark, swing: mem.swing(40) },
+      // At a venue the race frame turns with the wind: show the real compass direction.
+      wind: { kn: ws.tws / KN, from: (ws.twd + race.course.rot) % 360, spark, swing: mem.swing(40) },
       line,
       course: { leg: p.finished ? 'Finished' : legLabel(race, p.started ? p.legIndex : 0), legNo: (p.started ? p.legIndex : 0) + 1, legs, next: nx ? `To ${nx.name}` : '', distL: nx && !p.finished ? Math.round(dist(nx, p) / p.cls.loa) : null, place, of: race.boats.length, status },
       fleet,
@@ -298,7 +302,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       return { x: race.course.origin.x + race.course.up.x * mid, y: race.course.origin.y + race.course.up.y * mid, scale: s };
     };
     const frame = (now: number) => {
-      const dtReal = Math.min(0.1, (now - last) / 1000);
+      // The frame's timestamp can be a little before the moment the loop started: never negative.
+      const dtReal = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       const st = R.current;
       ctl.update(dtReal, st.mapping);
@@ -591,9 +596,12 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   }, [ctl, doTack, doHail, doPenalty, togglePause, onViewChange]);
 
   const s = race.settings;
+  const windText = s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind`;
   const sub = scene
     ? `${scene.group} · ${scene.spec.brief}`
-    : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind, ${s.windCharacter}`;
+    : race.venue
+      ? `${race.venue.def.short} · ${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText} from the ${compassName(race.course.rot)}, ${s.windCharacter}`
+      : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText}, ${s.windCharacter}`;
   const title = scene ? scene.spec.title : mode === 'start' ? 'Start practice' : 'Quick race';
   const p = race.player;
   const otherSail = moment ? (() => { const id = moment.offender === p?.id ? moment.victim : moment.offender; return id ? race.boatById(id).sail : null; })() : null;

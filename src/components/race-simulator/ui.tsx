@@ -143,6 +143,12 @@ export function InfoGlyph() {
   );
 }
 
+/** 075 → "ENE". */
+export function compassName(deg: number): string {
+  const n = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return n[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
+}
+
 /** "0:06", "2:30", "-0:04" */
 export function clock(s: number): string {
   const neg = s < 0;

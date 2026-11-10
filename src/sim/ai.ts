@@ -189,6 +189,7 @@ export class Skipper implements Helm {
 
     this.pendingAvoid = null;
     let final = plan.maneuver === 'penalty' ? plan : this.tactics(h, plan);
+    if (h.course.shore && !man) final = this.keepOffShore(h, final);
     // Abort a tack to avoid a foul only at its very start; once turning, finish it.
     if (man && this.maneuver && h.t - this.maneuver.t0 < 0.4 && final !== plan && Math.abs(n180(final.hdg - plan.hdg)) > 30) this.maneuver = null;
     else if (man && final !== plan) {
@@ -200,6 +201,25 @@ export class Skipper implements Helm {
     if (!man && final.maneuver === 'tack' && plan.maneuver !== 'tack') this.beginManeuver(h, 'tack');
     this.intent = final.intent;
     this.push(h.t, final.hdg, final.sheet);
+  }
+
+  /** At a real venue: if the course she wants runs onto the bank within a few lengths, bear off or
+   *  luff onto the nearest course that's clear (upwind, tack instead if that's the way out). */
+  private keepOffShore(h: AiHost, plan: Plan): Plan {
+    const b = this.b, L = b.cls.loa;
+    if (bankAhead(b, h.course, plan.hdg) > 2.6 * L) return plan;
+    const ng = noGoAngle(b.tws);
+    for (const a of [15, -15, 30, -30, 45, -45, 60, -60, 80, -80, 100, -100, 130, -130]) {
+      const hd = n360(plan.hdg + a);
+      const twa = Math.abs(n180(b.twd - hd));
+      if (twa < ng + 2) continue;
+      if (bankAhead(b, h.course, hd) > 4.5 * L) {
+        // Crossing the wind to get there is a tack.
+        const flips = Math.sign(n180(b.twd - hd)) !== Math.sign(n180(b.twd - b.hdg)) && twa < 100;
+        return { hdg: hd, sheet: bestSheet(twa), intent: 'Keeping off the bank', maneuver: flips ? 'tack' : plan.maneuver };
+      }
+    }
+    return plan;
   }
 
   private beginManeuver(h: AiHost, kind: 'tack' | 'gybe') {
@@ -585,6 +605,8 @@ export class Skipper implements Helm {
     const off = dot(sub(b, h.course.origin), h.course.right);
     const outward = (onStbd ? dot(dir(hs), h.course.right) : dot(dir(hp), h.course.right));
     if (!tack && Math.abs(off) > B.across * 0.82 && Math.sign(outward) === Math.sign(off)) { tack = true; why = 'Tacking away from the bank'; }
+    // At a real venue the shore can come first.
+    if (!tack && h.course.shore && bankAhead(b, h.course, onStbd ? hs : hp) < 3.6 * L && bankAhead(b, h.course, onStbd ? hp : hs) > 4 * L) { tack = true; why = 'Tacking away from the bank'; }
     if (tack && sinceTack < this.lv.minTack * (1.2 - 0.4 * this.persona.risk)) tack = false;
     if (tack) {
       this.lastTackT = h.t;
