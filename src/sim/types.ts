@@ -65,6 +65,8 @@ export interface Persona {
   consistency: number; // 0..1
   shiftSense: number;  // multiplier on the shift threshold (lower = tacks on smaller shifts)
   sidePref: number;    // -1 left, 0 none, +1 right
+  /** How much she reads the line and fights for the end that pays (her level's start strategy), 0 to 1. */
+  startSense?: number;
 }
 
 export interface PenaltyState {
@@ -100,6 +102,10 @@ export interface Boat {
   heelRate: number;      // deg/s
   luffUp: number;        // deg a gust has rounded her up (weather helm), easing back as she comes upright
   rigPower: number;      // the rig's heeling power, 1 = the class's A rig
+  sheetFelt: number;     // the sheet as the rig feels it: a sail sheeted in fills and loads up over a moment, eased it spills at once
+  runPower: number;      // how hard her rig presses her bow down on a run, 1 = the class's biggest rig (every class changes down as it blows up)
+  dive: number;          // running pressed: 0 riding level, about 1 the bow buried and the stern lifting, more and she's tripping over it
+  pitch: number;         // deg, bow up positive: what the dive does to her trim (the waves' pitching comes on top when she's drawn)
 
   // wind at the boat this step (after shadows)
   twd: number; tws: number; twa: number;
@@ -124,6 +130,8 @@ export interface Boat {
   lastBearing2: number;
   finished: boolean;
   finishTime: number;
+  /** Crossed the finishing line owing a penalty: she must get her hull wholly back on the course side before she can finish (RRS 44.2). */
+  reFinish?: boolean;
   dsq: boolean;
   retired: boolean;
   /** Lost control and drifting (Appendix E: unable to continue in the heat). Others must avoid her (Rule 22). */
@@ -165,6 +173,7 @@ export type SimEvent =
   | { type: 'penalty-done'; t: number; boat: string }
   | { type: 'rounded'; t: number; boat: string; leg: number; place: number }
   | { type: 'finish'; t: number; boat: string; place: number }
+  | { type: 'no-finish'; t: number; boat: string }   // crossed the finishing line owing a penalty: not finished
   | { type: 'hail'; t: number; boat: string; text: string }
   | { type: 'started'; t: number; boat: string; late: number }
   | { type: 'bank'; t: number; boat: string }

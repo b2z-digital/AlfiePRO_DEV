@@ -2,8 +2,8 @@
 // step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
 // collisions → start/rounding/finish progress → referee → recording.
 
-import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
-import { CLASSES, bestSheet, overpowerEase, rigPower, vmgAngles } from './classes';
+import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, sharpStarter } from './ai';
+import { CLASSES, bestSheet, overpowerEase, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
 import { KN, Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
@@ -105,6 +105,8 @@ export class Race implements AiHost {
   t = 0;
   gunT: number;
   step_ = 0;
+  /** While a frame is being drawn part-way through a step: how far behind the last step it is, s. */
+  renderLag = 0;
   events: SimEvent[] = [];
   incidents: Incident[] = [];
   hist: { x: number[]; y: number[]; hdg: number[]; spd: number[]; rot: number[]; heel: number[] }[] = [];
@@ -216,7 +218,7 @@ export class Race implements AiHost {
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
         id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona,
-        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN),
+        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN), sheetFelt: 0.6, runPower: runPower(this.wind.baseTws / KN), dive: 0, pitch: 0,
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
         started: false, ocs: false, returning: false, legIndex: 0, progress: 0, progress2: 0, lastBearing: 0, lastBearing2: 0,
@@ -233,7 +235,9 @@ export class Race implements AiHost {
         this.crew.push({ boat: i, log: { input: [], acts: [] }, upTo: 0, aiFrom: Infinity, input: { rudder: 0, sheet: 1, autoTrim: crew![i].autoTrim ?? s.autoTrim }, assist: null, fi: 0, fa: 0 });
       } else if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
       else {
-        const lv = LEVELS[s.level];
+        // (Every fourth skipper of a club fleet is one of its sharp starters.)
+        const lv = i % 4 === 1 ? sharpStarter(LEVELS[s.level]) : LEVELS[s.level];
+        persona!.startSense = lv.startSense;
         const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
         if (s.forgetfulSkippers && this.rng.chance(lv.forget * 2)) this.forgot.add(b.id);
         this.skippers.push(sk);
@@ -659,7 +663,17 @@ export class Race implements AiHost {
       const leg = c.legs[b.legIndex];
       if (!leg) return;
       if (leg.kind === 'finish') {
+        // Back wholly on the course side after crossing with a penalty owed: she may finish again.
+        if (b.reFinish && Math.max(lineSide(c, nowBow), lineSide(c, stern(b))) < 0) b.reFinish = false;
         if (segIntersect(prevBow, nowBow, c.finish.pin, c.finish.stbd) >= 0 && lineSide(c, nowBow) > 0 && lineSide(c, prevBow) <= 0) {
+          // A boat can't finish with a penalty hanging over her: she takes her turn, gets her hull
+          // wholly back on the course side of the line, and then finishes (RRS 44.2). (A skipper
+          // who has forgotten her penalty sails on through, to be disqualified if she's protested.)
+          if ((b.penalty.owed > 0 && !this.forgot.has(b.id)) || b.reFinish) {
+            if (!b.reFinish) this.events.push({ type: 'no-finish', t, boat: b.id });
+            b.reFinish = true;
+            return;
+          }
           b.finished = true;
           b.finishTime = t - this.gunT;
           const place = this.boats.filter(o => o.finished).length;

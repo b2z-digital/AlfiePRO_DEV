@@ -443,3 +443,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-family: monospace;
   font-size: 0.9em;
 }
+
+/* The Race Simulator's pages: a dark, on-the-water backdrop whatever the app theme. It is fixed to
+   the screen, so it runs behind the navigation rail too instead of stopping at its edge. */
+.sim-page { position: relative; isolation: isolate; }
+.sim-page::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-color: #060B16;
+  background-image:
+    radial-gradient(1300px 820px at 18% -12%, rgba(30, 108, 255, 0.24), transparent 62%),
+    radial-gradient(1000px 700px at 104% 108%, rgba(138, 77, 255, 0.10), transparent 60%);
+}

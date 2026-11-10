@@ -40,7 +40,7 @@ export default function SimChallenge({ challenge, me, onSail, onBack, load = lea
   const mine = rows.findIndex(e => e.user_id === me);
 
   return (
-    <div className="min-h-full text-[14px] text-[#F1F4FA]" style={{ backgroundColor: C.bg, backgroundImage: 'radial-gradient(1100px 700px at 12% -10%, rgba(30,108,255,.2), transparent 60%)', fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       <div className="mx-auto flex max-w-[1100px] flex-col gap-6 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
         <header className="flex flex-wrap items-center gap-4">
           <Btn onClick={onBack}>

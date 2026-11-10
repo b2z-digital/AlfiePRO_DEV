@@ -211,6 +211,59 @@ describe('Race simulator: start and penalties', () => {
   });
 });
 
+describe('Race simulator: finishing with a penalty owed', () => {
+  /** A boat a length and a half below the middle of the finishing line, close-hauled, on the last leg. */
+  const atTheFinish = (owed: number, plan: (race: Race) => PlanFn) => {
+    const probe = new Race({ ...base, fleetSize: 1 });
+    const c = probe.course, L = probe.boats[0].cls.loa;
+    const mid = { x: (c.finish.pin.x + c.finish.stbd.x) / 2 - c.up.x * 1.5 * L, y: (c.finish.pin.y + c.finish.stbd.y) / 2 - c.up.y * 1.5 * L };
+    let race: Race | null = null;
+    const made = scenario([{ x: mid.x, y: mid.y, hdg: 317, spd: 0.85, leg: c.legs.length - 1, plan: (t, b) => plan(race!)(t, b) }]);
+    race = made;
+    made.boats[0].penalty.owed = owed;
+    return made;
+  };
+
+  it("doesn't finish a boat that crosses the line owing a penalty", () => {
+    const race = atTheFinish(1, () => () => ({ hdg: 317 }));
+    run(race, 8);
+    const b = race.boats[0];
+    expect(lineSide(race.course, b)).toBeGreaterThan(0);   // she sailed across the line
+    expect(b.finished).toBe(false);                        // and isn't finished
+    expect(b.reFinish).toBe(true);
+    expect(race.events.filter(e => e.type === 'no-finish').length).toBe(1);
+    expect(race.events.some(e => e.type === 'finish')).toBe(false);
+  });
+
+  it('finishes her once she has taken her turn, got wholly back behind the line and crossed again', () => {
+    const race = atTheFinish(1, r => (_t, b) => {
+      const L = b.cls.loa, side = lineSide(r.course, b);
+      if (b.penalty.owed > 0) return side > 0.3 * L ? { hdg: n180(b.hdg + 60) } : { hdg: 317 };   // over the line: take the turn
+      if (b.reFinish) return { hdg: 180, sheet: 0.2 };                                            // back behind it
+      return { hdg: 317 };                                                                        // and finish
+    });
+    const b = race.boats[0];
+    let crossedBackTooSoon = false;
+    const end = race.t + 60;
+    while (race.t < end && !b.finished) {
+      race.step();
+      // Her turn done but only part of her hull back behind the line: still not allowed to finish.
+      if (b.penalty.owed === 0 && b.reFinish && b.finished) crossedBackTooSoon = true;
+    }
+    expect(b.penalty.taken).toBe(1);
+    expect(b.finished).toBe(true);
+    expect(b.reFinish).toBe(false);
+    expect(crossedBackTooSoon).toBe(false);
+    expect(race.events.filter(e => e.type === 'finish').length).toBe(1);
+  });
+
+  it('finishes a boat with nothing owed as before', () => {
+    const race = atTheFinish(0, () => () => ({ hdg: 317 }));
+    run(race, 8);
+    expect(race.boats[0].finished).toBe(true);
+  });
+});
+
 describe('Race simulator: AI fleet', () => {
   const fleet = (seed: number, extra: Partial<RaceSettings> = {}) => {
     const race = new Race({ ...base, fleetSize: 8, windCharacter: 'oscillating', laps: 2, sequenceSeconds: 60, seed, ...extra });

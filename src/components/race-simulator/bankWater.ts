@@ -119,17 +119,50 @@ export function tex(ctx: CanvasRenderingContext2D, kind: Tex): CanvasPattern | n
   return tiles.get(kind) ?? null;
 }
 
+const ZERO: V2 = { x: 0, y: 0 };
+
+// Where the wind's ripples have got to. They drift downwind at a pace that grows with the breeze,
+// and lie across it. Both are added up as the race goes on (a little each frame), never worked out
+// from the clock: "time × speed" slides the whole pattern whenever the speed changes (backwards, up
+// the course, every time the breeze eases), and turning the pattern about a far-off point swings
+// it sideways under the boats whenever the wind shifts. Here a shift turns the ripples about the
+// water you're looking at, so they only ever drift downwind.
+const drifts = new WeakMap<Race, { t: number; twd: number; x: number; y: number; dist: number }>();
+/** Metres a second the ripples drift downwind in a breeze of `kn` knots. */
+export const rippleSpeed = (kn: number) => 0.18 + 0.05 * kn;
+/** `dist`: how far they have drifted in all, metres. */
+export function rippleDrift(race: Race, pivot: V2): { O: V2; down: V2; across: V2; kn: number; dist: number } {
+  const t = race.t, twd = race.wind.meanTwd(t), kn = race.wind.meanTws(t) / 0.514444;
+  const down = dir(twd + 180), across = { x: down.y, y: -down.x };
+  let s = drifts.get(race);
+  if (!s) { s = { t, twd, x: 0, y: 0, dist: 0 }; drifts.set(race, s); }
+  const dt = t - s.t;
+  if (dt !== 0) {
+    if (Math.abs(dt) < 1) {
+      // The wind has swung: turn the pattern with it, about the water in view.
+      const d = ((((twd - s.twd) % 360) + 540) % 360 - 180) * DEG, cd = Math.cos(d), sd = Math.sin(d);
+      const vx = pivot.x - s.x, vy = pivot.y - s.y;
+      s.x = pivot.x - (vx * cd + vy * sd); s.y = pivot.y - (-vx * sd + vy * cd);
+      const v = rippleSpeed(kn) * dt;
+      s.x += down.x * v; s.y += down.y * v; s.dist += v;
+    }
+    s.t = t; s.twd = twd;
+  }
+  return { O: { x: s.x, y: s.y }, down, across, kn, dist: s.dist };
+}
+
 /**
  * Map a texture onto the water around a point: across the wind is the tile's x, downwind its y,
  * `m` metres to a tile pixel, scrolled downwind by `flow` pixels. Exact at Q, close enough nearby.
  */
-export function mapAt(pat: CanvasPattern, V: Pick<BankView, 'P'>, Q: V2, across: V2, down: V2, m: number, flow: number) {
+export function mapAt(pat: CanvasPattern, V: Pick<BankView, 'P'>, Q: V2, across: V2, down: V2, m: number, flow: number, O: V2 = ZERO) {
   const e = 0.25;
   const p0 = V.P(Q.x, Q.y, 0), px = V.P(Q.x + e, Q.y, 0), py = V.P(Q.x, Q.y + e, 0);
   const jxx = (px.x - p0.x) / e, jxy = (py.x - p0.x) / e, jyx = (px.y - p0.y) / e, jyy = (py.y - p0.y) / e;
   const A = { x: (jxx * across.x + jxy * across.y) * m, y: (jyx * across.x + jyy * across.y) * m };
   const B = { x: (jxx * down.x + jxy * down.y) * m, y: (jyx * down.x + jyy * down.y) * m };
-  const uQ = ((Q.x * across.x + Q.y * across.y) / m) % TILE, vQ = ((Q.x * down.x + Q.y * down.y) / m - flow) % TILE;
+  const qx = Q.x - O.x, qy = Q.y - O.y;
+  const uQ = ((qx * across.x + qy * across.y) / m) % TILE, vQ = ((qx * down.x + qy * down.y) / m - flow) % TILE;
   pat.setTransform(new DOMMatrix([A.x, A.y, B.x, B.y, p0.x - A.x * uQ - B.x * vQ, p0.y - A.y * uQ - B.y * vQ]));
   return Math.min(Math.hypot(A.x, A.y), Math.hypot(B.x, B.y)); // how big a tile pixel is on screen, at its smallest
 }
@@ -164,9 +197,8 @@ export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Ra
   const wave = sea ? tex(ctx, 'wave') : null;
   if (!ripple && !wave) return;
   const t = race.t;
-  const down = dir(race.wind.meanTwd(t) + 180), across = { x: down.y, y: -down.x };
-  const kn = race.wind.meanTws(t) / 0.514444;
-  const strength = smooth(0.5, 13, kn) * 0.8 + 0.12;
+  const kn0 = race.wind.meanTws(t) / 0.514444;
+  const strength = smooth(0.5, 13, kn0) * 0.8 + 0.12;
   // The ground under a screen row, straight ahead: the ray through it, down to the water.
   const cy = Math.cos(cam.yaw * DEG), sy = Math.sin(cam.yaw * DEG), cp = Math.cos(cam.pitch * DEG), sp = Math.sin(cam.pitch * DEG);
   const f = { x: sy * cp, y: cy * cp, z: -sp }, u = { x: sy * sp, y: cy * sp, z: cp };
@@ -178,7 +210,8 @@ export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Ra
     return { x: cam.x + (f.x - u.x * k) * tt, y: cam.y + (f.y - u.y * k) * tt, d: tt };
   };
   const FINE = 0.01, COARSE = 0.044;
-  const rflow = (t * (0.12 + 0.02 * kn));
+  // The ripples turn (when the wind swings) about the water in the middle of the view.
+  const { O, down, across } = rippleDrift(race, groundAt(hz + (V.h - hz) * 0.45) ?? { x: cam.x, y: cam.y });
   const w0 = sea && wave ? sea.trains[0] : null;
   const cols = detail >= 2 ? 4 : 2;
   const rgt = { x: cy, y: -sy };
@@ -202,11 +235,11 @@ export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Ra
     if (ripple) {
       ctx.fillStyle = ripple;
       // Fine near the bank; the coarse one takes over just where the fine one gets too small.
-      const pf = mapAt(ripple, V, Q, across, down, FINE, rflow / FINE);
+      const pf = mapAt(ripple, V, Q, across, down, FINE, 0, O);
       const af = smooth(0.2, 0.5, pf);
       if (af * strength > 0.012) { ctx.globalAlpha = af * strength * far; ctx.fillRect(0, y0, V.w, h); }
       if (af < 0.99 && detail >= 2) {
-        const pc = mapAt(ripple, V, Q, across, down, COARSE, rflow / COARSE);
+        const pc = mapAt(ripple, V, Q, across, down, COARSE, 0, O);
         const ac = smooth(0.2, 0.5, pc) * (1 - af) * 0.85;
         if (ac * strength > 0.012) { ctx.globalAlpha = ac * strength * far; ctx.fillRect(0, y0, V.w, h); }
       }
@@ -252,10 +285,9 @@ function puffRing(p: Puff, down: V2, across: V2, scale: number): V2[] {
  * coming. Lulls: smoother, paler patches where the water reflects more of the sky.
  */
 export function drawGusts(ctx: CanvasRenderingContext2D, V: BankView, race: Race, hz: number, detail = 2) {
-  const t = race.t;
   const down = race.wind.down, across = { x: down.y, y: -down.x };
-  const kn = race.wind.meanTws(t) / 0.514444;
   const pat = detail >= 2 ? tex(ctx, 'gust') : null;
+  const rd = rippleDrift(race, { x: 0, y: 0 }); // (already moved on for this frame by the ripples)
   for (const p of race.wind.puffs) {
     // Darker the stronger it is: a big gust stands out, a little puff is just a shade.
     const a = Math.min(1, Math.abs(p.strength) * 1.5 + 0.25) * puffLife(p);
@@ -285,7 +317,7 @@ export function drawGusts(ctx: CanvasRenderingContext2D, V: BankView, race: Race
     // A gust's rougher water: its texture over its ragged middle. Its ripples drift with the rest of
     // the water; the gust itself sweeps across them.
     if (dark && pat) {
-      const px = mapAt(pat, V, { x: p.x, y: p.y }, across, down, 0.024, (t * (0.15 + 0.025 * kn)) / 0.024);
+      const px = mapAt(pat, V, { x: p.x, y: p.y }, rd.across, rd.down, 0.024, 0, rd.O);
       // Gone where it would be too fine to draw, and close in, where it would be blown up into blobs.
       const vis = smooth(0.16, 0.4, px) * (1 - smooth(2.5, 6, px));
       const q = vis > 0.02 ? V.ground(puffRing(p, down, across, 0.85)) : [];
@@ -384,11 +416,18 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
     const steps = Math.min(n, Math.round(T / 0.05));
     const pts: { x: number; y: number; nx: number; ny: number; age: number; s: number }[] = [];
     let s0 = 0;
-    for (let k = n; k >= n - steps; k--) {
+    // A frame drawn part-way through a step: she is a little behind the last point of her track,
+    // so the wake starts at her stern as drawn and picks her track up from the point before.
+    const lag = back <= 0 ? race.renderLag : 0;
+    if (lag > 0) {
+      const f = dir(p.hdg);
+      pts.push({ x: p.x - f.x * L * 0.47, y: p.y - f.y * L * 0.47, nx: f.y, ny: -f.x, age: 0, s: 0 });
+    }
+    for (let k = lag > 0 ? n - 1 : n; k >= n - steps; k--) {
       const f = dir(H.hdg[k]);
       const q = { x: H.x[k] - f.x * L * 0.47, y: H.y[k] - f.y * L * 0.47 };
       if (pts.length) s0 += Math.hypot(q.x - pts[pts.length - 1].x, q.y - pts[pts.length - 1].y);
-      pts.push({ ...q, nx: f.y, ny: -f.x, age: (n - k) * 0.05, s: s0 });
+      pts.push({ ...q, nx: f.y, ny: -f.x, age: Math.max(0, (n - k) * 0.05 - lag), s: s0 });
     }
     if (pts.length < 3) continue;
     // ── The lane, smoother and paler than the ripples round it, and white water just behind her ──
@@ -433,8 +472,37 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
           quadTo(dark, e0, e1, { x: e1.x - ox * 1.6, y: e1.y - oy * 1.6 }, { x: e0.x - ox * 1.6, y: e0.y - oy * 1.6 });
         }
       }
-      ctx.fillStyle = 'rgba(3,15,32,0.13)'; ctx.fill(dark);
-      ctx.fillStyle = 'rgba(214,232,250,0.32)'; ctx.fill(lit);
+      // Close to the bank they'd read as rows of dashes, so they fade out as she comes near.
+      const far = smooth(4, 14, V.depth(p.x, p.y));
+      if (far > 0.02) {
+        ctx.fillStyle = `rgba(3,15,32,${(0.13 * far).toFixed(3)})`; ctx.fill(dark);
+        ctx.fillStyle = `rgba(214,232,250,${(0.32 * far).toFixed(3)})`; ctx.fill(lit);
+      }
+    }
+    // ── Bow buried in a dive: a mound of white water piled up over it and thrown out to each side ──
+    const dive = p.dive ?? 0;
+    if (dive > 0.3) {
+      const f = dir(p.hdg), sd = { x: f.y, y: -f.x };
+      const k = Math.min(1.3, (dive - 0.3) / 0.6);
+      const c0 = { x: p.x + f.x * L * 0.44, y: p.y + f.y * L * 0.44 };
+      // Soft-edged, like spray and foam, and steady (it swells and settles, it doesn't flicker).
+      const swell = 1 + 0.08 * Math.sin(race.t * 6.5 + wb.i);
+      const blob = (rx: number, ry: number, fwd: number, alpha: number) => {
+        const c1 = { x: c0.x + f.x * fwd, y: c0.y + f.y * fwd };
+        const pc = V.P(c1.x, c1.y, 0.01), px = V.P(c1.x + sd.x * rx, c1.y + sd.y * rx, 0.01), py = V.P(c1.x + f.x * ry, c1.y + f.y * ry, 0.01);
+        if (Math.min(pc.z, px.z, py.z) < 0.4) return;
+        const ax = Math.hypot(px.x - pc.x, px.y - pc.y), ay = Math.hypot(py.x - pc.x, py.y - pc.y);
+        if (ax < 1 || ay < 0.3) return;
+        ctx.save();
+        ctx.translate(pc.x, pc.y); ctx.rotate(Math.atan2(px.y - pc.y, px.x - pc.x)); ctx.scale(1, Math.max(0.05, ay / ax));
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ax);
+        g.addColorStop(0, `rgba(250,253,255,${alpha.toFixed(3)})`); g.addColorStop(0.55, `rgba(238,246,255,${(alpha * 0.6).toFixed(3)})`); g.addColorStop(1, 'rgba(232,242,252,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, ax, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      };
+      blob(beam * (1.3 + 2.0 * k) * swell, L * (0.16 + 0.2 * k), L * 0.0, 0.34 * Math.min(1, k));
+      blob(beam * (0.7 + 1.0 * k) * swell, L * (0.09 + 0.1 * k), L * 0.05, 0.8 * Math.min(1, k));
     }
     // ── Bow wave: white water peeling off both sides of the bow ──
     if (fast > 0.12) {

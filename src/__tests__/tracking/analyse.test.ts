@@ -35,7 +35,15 @@ describe('tracking analysis against the simulator', () => {
     const done = r.events.filter(e => e.type === 'penalty-done') as unknown as { boat: string; t: number }[];
     const found = done.filter(d => a.turns.some(t => t.boatId === d.boat && Math.abs(t.t - d.t) < 8));
     expect(found.length).toBe(done.length);
-    expect(a.turns.length).toBeLessThanOrEqual(done.length + 1);
+    // Every turn it reports is a boat that really did spin right round (a penalty, or a skipper
+    // circling in the crowd at a mark: from positions alone they're the same thing).
+    for (const turn of a.turns) {
+      const i = r.boats.findIndex(b => b.id === turn.boatId);
+      const H = r.track.filter(f => f.t >= turn.t - 12 && f.t <= turn.t + 1).map(f => f.d[i * 5 + 2]);
+      let ang = 0, lo = 0, hi = 0;
+      for (let k = 1; k < H.length; k++) { ang += ((H[k] - H[k - 1] + 540) % 360) - 180; lo = Math.min(lo, ang); hi = Math.max(hi, ang); }
+      expect(hi - lo).toBeGreaterThan(300);
+    }
     const contacts = r.events.filter(e => e.type === 'incident' && (e as { incident: { kind: string } }).incident.kind === 'contact') as unknown as { t: number; incident: { offender: string; victim: string } }[];
     for (const c of contacts) {
       expect(a.encounters.some(e => Math.abs(e.t - c.t) < 3 && [e.a, e.b].includes(c.incident.offender) && [e.a, e.b].includes(c.incident.victim))).toBe(true);

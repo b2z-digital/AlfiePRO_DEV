@@ -54,6 +54,27 @@ export function chosenSequence(sequences: SimSequence[], id: string | null | und
   return id === null ? null : sequences.find(q => q.id === id) ?? null;
 }
 
+// Recordings already loading or loaded, by address: choosing a sequence on the home screen starts
+// its recording loading, so it's ready when the race starts (a one-minute start begins counting
+// down the moment the race opens, with no time to fetch it).
+const warm = new Map<string, HTMLAudioElement>();
+function recording(url: string): HTMLAudioElement {
+  let el = warm.get(url);
+  if (!el) {
+    el = new Audio(url);
+    el.preload = 'auto';
+    warm.set(url, el);
+    // Keep the last few only.
+    for (const k of warm.keys()) { if (warm.size <= 3) break; if (k !== url) { const old = warm.get(k)!; old.removeAttribute('src'); old.load(); warm.delete(k); } }
+  }
+  return el;
+}
+/** Start a sequence's recording loading now (call when it's chosen, before the race). */
+export function warmSequence(seq: SimSequence | null | undefined) {
+  if (!seq?.audio || typeof window === 'undefined' || typeof Audio === 'undefined') return;
+  try { recording(seq.audio.url).load(); } catch { /* it loads when the race starts */ }
+}
+
 /**
  * Plays a sequence against the race clock. Call update() every frame; stop() when you leave.
  * A recording plays in an audio element (so it keeps its pitch when the race runs fast); separate
@@ -66,6 +87,12 @@ export class SequencePlayer {
   private retryAt = 0;
   private want = 0;
   private shouldPlay = false;
+  /** When the last jump in the recording was asked for, and how long jumps have been taking. */
+  private seekAt = -1e9;
+  private seekLag = 0;
+  private silentSince: number | null = null;
+  private readonly onError = () => { this.failed = true; };
+  private readonly onSeeked = () => { this.seekLag = Math.min(2, Math.max(0, (performance.now() - this.seekAt) / 1000)); };
   private lastToGun = Infinity;
   private timers: number[] = [];
   private readonly unlock = () => this.prime();
@@ -73,9 +100,10 @@ export class SequencePlayer {
   constructor(private seq: SimSequence) {
     if (typeof window === 'undefined' || typeof Audio === 'undefined') return;
     if (seq.audio) {
-      this.el = new Audio(seq.audio.url);
-      this.el.preload = 'auto';
-      this.el.addEventListener('error', () => { this.failed = true; });
+      this.el = recording(seq.audio.url);
+      if (this.el.error) { warm.delete(seq.audio.url); this.el = recording(seq.audio.url); }
+      this.el.addEventListener('error', this.onError);
+      this.el.addEventListener('seeked', this.onSeeked);
     }
     if (seq.sounds?.length) void preloadSounds(seq.sounds.map(x => x.url));
     // Some browsers (Safari on iPhone and iPad) only let a page play sound that a tap or key press started.
@@ -84,6 +112,25 @@ export class SequencePlayer {
 
   /** False if the club's recording couldn't be loaded: the simulator calls the start itself then. */
   get working(): boolean { return !this.failed; }
+
+  /**
+   * Is the sequence making its sound right now? False while a recording is still loading or
+   * catching up (the simulator makes that call itself, so a start is never silent).
+   */
+  get audible(): boolean {
+    if (this.failed) return false;
+    if (!this.el) return !!this.seq.sounds?.length;
+    return !this.el.paused && !this.el.seeking && this.el.readyState >= 3;
+  }
+
+  /**
+   * Is the sequence calling the start? True while it sounds, and for a moment while a recording
+   * gets going; false once it has been silent for longer than that when it should be playing.
+   */
+  get calling(): boolean {
+    if (this.failed) return false;
+    return this.silentSince == null || performance.now() - this.silentSince < 1500;
+  }
 
   /** `toGun`: seconds to the gun (negative after it). `running`: the race clock is moving at `rate`. */
   update(toGun: number, running: boolean, rate: number, muted: boolean) {
@@ -100,11 +147,17 @@ export class SequencePlayer {
         if (el.playbackRate !== rate) el.playbackRate = rate;
         if (el.paused) {
           if (!this.starting && performance.now() >= this.retryAt) this.start();
-        } else if (Math.abs(el.currentTime - this.want) > 0.35) {
-          try { el.currentTime = this.want; } catch { /* still seeking */ }
+        } else if (!el.seeking && el.readyState >= 3 && Math.abs(el.currentTime - this.want) > 0.35) {
+          // Out of step with the race clock: jump to where it should be. Never while a jump is
+          // still under way or the recording is still loading: a jump that takes longer than the
+          // step we allow would be restarted every frame, and the recording would never sound.
+          // Aim ahead by as long as jumps have been taking, so it lands in step.
+          this.seek(this.want + this.seekLag * rate);
         }
       }
     }
+    if (this.el && this.shouldPlay && !this.audible) this.silentSince ??= performance.now();
+    else this.silentSince = null;
     if (s.sounds && running && !muted) {
       for (const snd of s.sounds) {
         if (this.lastToGun > snd.at && toGun <= snd.at && this.lastToGun - toGun < 2) this.play(snd.url, snd.repeat, snd.gapMs / rate);
@@ -116,13 +169,20 @@ export class SequencePlayer {
   private start() {
     const el = this.el;
     if (!el) return;
-    try { el.currentTime = this.want; } catch { /* not loaded yet */ }
+    this.seek(this.want);
     this.starting = true;
     el.play().then(
       () => { this.starting = false; if (!this.shouldPlay) el.pause(); },
       // Not allowed yet (no tap or key press), or still loading: try again shortly.
       () => { this.starting = false; this.retryAt = performance.now() + 1500; },
     );
+  }
+
+  private seek(to: number) {
+    const el = this.el;
+    if (!el) return;
+    this.seekAt = performance.now();
+    try { el.currentTime = Math.max(0, to); } catch { /* not loaded yet */ }
   }
 
   /** On a tap or key press: start the recording if it should be playing, so the browser allows it. */
@@ -144,7 +204,8 @@ export class SequencePlayer {
   }
 
   stop() {
-    if (this.el) { this.el.pause(); this.el.removeAttribute('src'); this.el.load(); }
+    // The recording stays loaded for the next race.
+    if (this.el) { this.el.pause(); this.el.playbackRate = 1; this.el.removeEventListener('error', this.onError); this.el.removeEventListener('seeked', this.onSeeked); }
     for (const t of this.timers) window.clearTimeout(t);
     this.timers = [];
     if (typeof window !== 'undefined') for (const ev of ['pointerdown', 'keydown'] as const) window.removeEventListener(ev, this.unlock, true);

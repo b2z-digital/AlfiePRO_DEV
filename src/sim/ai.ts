@@ -19,14 +19,30 @@ export interface LevelParams {
   minTack: number; tackRudder: number; margin: number;
   /** Start judgement: spread of the clock error (s) and of judging the line from the bank (hull lengths). */
   startSigma: number; lineSigma: number;
+  /**
+   * Start strategy, 0 to 1: how much she reads the line and goes for the end that pays (the upwind
+   * end of a biased line, and on a square one the starboard end, for clear wind over the boats
+   * below and the freedom to tack) rather than starting wherever she likes to.
+   */
+  startSense: number;
 }
 
 export const LEVELS: Record<SkipperLevel, LevelParams> = {
-  club: { reaction: 0.45, noise: 3.5, trimNoise: 0.07, shiftThr: 9, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 7, tackRudder: 0.68, margin: 0.45, startSigma: 0.9, lineSigma: 0.42 },
-  state: { reaction: 0.32, noise: 2.2, trimNoise: 0.045, shiftThr: 6, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 5.5, tackRudder: 0.78, margin: 0.42, startSigma: 0.5, lineSigma: 0.26 },
-  national: { reaction: 0.22, noise: 1.4, trimNoise: 0.03, shiftThr: 4.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 4.5, tackRudder: 0.85, margin: 0.4, startSigma: 0.3, lineSigma: 0.16 },
-  world: { reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 3.5, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 4, tackRudder: 0.9, margin: 0.38, startSigma: 0.18, lineSigma: 0.1 },
+  club: { reaction: 0.45, noise: 3.5, trimNoise: 0.07, shiftThr: 9, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 7, tackRudder: 0.68, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
+  state: { reaction: 0.32, noise: 2.2, trimNoise: 0.045, shiftThr: 6, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 5.5, tackRudder: 0.78, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
+  national: { reaction: 0.22, noise: 1.4, trimNoise: 0.03, shiftThr: 4.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 4.5, tackRudder: 0.85, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
+  world: { reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 3.5, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 4, tackRudder: 0.9, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
 };
+
+/**
+ * A club fleet's sharp starters: every club has two or three who start like state sailors (they
+ * read the line, fight for the end that pays and are on it at the gun), while the rest of their
+ * sailing is club sailing.
+ */
+export function sharpStarter(lv: LevelParams): LevelParams {
+  const st = LEVELS.state;
+  return lv.startSense >= st.startSense ? lv : { ...lv, startSense: 0.75, startSigma: st.startSigma, lineSigma: st.lineSigma, startMargin: st.startMargin };
+}
 
 export const PERSONAS: Persona[] = [
   { key: 'pin', name: 'Pin hunter', aggression: 0.7, risk: 0.6, startEnd: 0.1, startEarly: 0.3, consistency: 0.7, shiftSense: 1, sidePref: -1 },
@@ -79,7 +95,7 @@ export class Skipper implements Helm {
   gate: 0 | 1 | null = null;
   /** Pre-start state: the piece of line they want, how deep they hover, when they set up,
    *  and their personal clock and line-sighting errors for this race. */
-  pre = { spot: 0.5, dir: 1 as 1 | -1, triggered: false, settled: false, lastFlip: -99, clockErr: 0, lineErr: 0, setupT: 30, hoverD: 1.4 };
+  pre = { spot: 0.5, dir: 1 as 1 | -1, triggered: false, settled: false, lastFlip: -99, clockErr: 0, lineErr: 0, setupT: 30, hoverD: 1.4, lineShift: 0 };
   desHdg: number;
   desSheet: number;
   intent = '';
@@ -266,7 +282,12 @@ export class Skipper implements Helm {
       b.sheet = clamp(bestSheet(Math.abs(b.twa), b.tws) - overpowerEase(b.heel), 0, 1);
       return;
     }
-    const target = cmd.hdg + this.ou;
+    let target = cmd.hdg + this.ou;
+    // Pressed on a run, with the bow starting to go down: weave gently from side to side to keep it
+    // up, as you do. The best skippers feel it early; a club sailor sits there until it buries.
+    const feel = 0.08 + 0.85 * this.lv.reaction;
+    const weave = clamp((b.dive - feel) / 0.25, 0, 1);
+    if (weave > 0 && !this.maneuver) target += 11 * weave * dsin(h.t * 2.5 + this.idx * 1.9);
     let err = n180(target - b.hdg);
     // Too slow to tack through a big turn: go the long way round (bear away and gybe) instead.
     if (Math.abs(err) > 60 && b.spd < 0.3 * b.cls.hullSpeed) {
@@ -279,7 +300,8 @@ export class Skipper implements Helm {
     b.rudder = clamp(r, -lim, lim);
     // "Right in" upwind is a touch off in very light air; and overpowered in a gust she eases a touch.
     const want = cmd.sheet >= 0.97 ? bestSheet(Math.abs(b.twa), b.tws) : cmd.sheet;
-    b.sheet = clamp(want - overpowerEase(b.heel) + this.ouTrim, 0.05, 1);
+    // (And pressed on a run she sheets in a little, to show the wind less sail.)
+    b.sheet = clamp(want - overpowerEase(b.heel) + 0.14 * weave + this.ouTrim, 0.05, 1);
   }
 
   // ───────────────────────── helpers ─────────────────────────
@@ -368,9 +390,31 @@ export class Skipper implements Helm {
 
     // ── Which piece of line: personality, line bias and room from the others ──
     if (!pre.triggered && !pre.settled) {
+      // The line's bias as a sailor judges it: from the wind's average over the sequence, not the
+      // puff of the moment (a fleet that chased every swing of the wind would stampede from end to
+      // end and nobody would be set up at the gun). The course was laid to the wind, so that's
+      // where the average starts.
+      // (A skipper in a drill or lesson starts where her part says, and reads the wind as it is.)
+      const sense = this.persona.startSense ?? 0;
+      pre.lineShift += (n180(twd - c.axis) - pre.lineShift) * (0.1 / 240);
       const sq = n360(bearing(P, S) - 90);
-      const bias = n180(twd - sq); // + = starboard end favoured
+      const bias = n180((sense > 0 ? c.axis + pre.lineShift : twd) - sq); // + = starboard end favoured
       let f = clamp(this.persona.startEnd + clamp(bias, -10, 10) * 0.012 + ((this.idx % 3) - 1) * 0.05, 0.1, 0.9);
+      // A skipper who reads the line goes for the end that pays: the upwind end of a biased line
+      // (and it takes a good few degrees of pin bias to outweigh the starboard end's pull), and on a square line the starboard end, for clear wind over everyone
+      // below and the freedom to tack away. They can't all have the end: the boldest take it and
+      // the rest line up along from it, a little over a length apart and spreading out down the
+      // line, so the front row fills from the end that pays.
+      const pays = clamp(bias / 10 + 0.45, -1, 1);
+      if (sense > 0.3 && Math.abs(pays) > 0.05) {
+        const claim = (o: Boat) => (o.persona ? 0.6 * o.persona.aggression + 0.4 * o.persona.risk : 0) + (Number(o.id.slice(1)) % 7) * 0.013;
+        let ahead = 0;
+        for (const o of h.boats) if (o !== b && !o.human && (o.persona?.startSense ?? 0) > 0.3 && claim(o) > claim(b)) ahead++;
+        let along = 0.9 * L;                         // the boldest sets up a length in from the mark
+        for (let k = 0; k < ahead; k++) along += (1.1 + 0.05 * k) * L;
+        const slot = clamp(along / len, 0.9 * L / len, 0.94);
+        f = lerp(f, pays > 0 ? 1 - slot : slot, Math.min(1, sense * 1.15) * clamp(Math.abs(pays) / 0.2, 0, 1));
+      }
       const mine = f * len;
       let push = 0;
       for (const o of h.boats) {
@@ -379,8 +423,8 @@ export class Skipper implements Helm {
         const dd = mine - dot(sub(o, P), ld);
         if (Math.abs(dd) < 1.6 * L) push += (dd >= 0 ? 1 : -1) * (1.6 * L - Math.abs(dd)) * 0.5;
       }
-      f = clamp((mine + push) / len, 0.08, 0.92);
-      pre.spot = lerp(pre.spot, f, 0.03);
+      f = sense > 0 ? clamp((mine + push) / len, Math.min(0.06, 0.9 * L / len), Math.max(0.94, 1 - 0.9 * L / len)) : clamp((mine + push) / len, 0.08, 0.92);
+      pre.spot = lerp(pre.spot, f, sense > 0 ? 0.04 : 0.03);
     }
     // Where we cross (X), and the hover spot back down the starboard close-hauled course from it.
     const X = { x: P.x + line.x * pre.spot, y: P.y + line.y * pre.spot };

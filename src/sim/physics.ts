@@ -1,14 +1,14 @@
 // Boat physics: wind at each boat (with wind shadow and backwind), speed, turning,
 // tacks and gybes as real turns, being caught in irons, and collisions.
 
-import { accelTau, bestSheet, heelFor, heelForce, noGoAngle, polarSpeed, trimEfficiency, upAngle } from './classes';
+import { accelTau, bestSheet, bowLift, heelFor, heelForce, noGoAngle, polarSpeed, trimEfficiency, upAngle } from './classes';
 import { Course } from './course';
 import { V2, clamp, cross, dir, dot, n180, n360, sub, twaOf } from './math';
 import type { Boat } from './types';
 import type { WindField } from './wind';
 import { Sea, waveEffect } from './sea';
 import { nearestShore, shoreRay, shoreWet } from './venue';
-import { dcos, dexp, dhypot } from './dmath';
+import { dcos, dexp, dhypot, dsin } from './dmath';
 
 export const DT = 0.05;
 
@@ -82,17 +82,22 @@ function heelWanted(b: Boat, twa: number): number {
   const side = twa > 0 || (twa === 0 && b.tack === 'stbd') ? 1 : -1;
   if (b.disabled) return 4 * side;
   const aws2 = b.tws * b.tws + b.spd * b.spd + 2 * b.tws * b.spd * dcos((a * Math.PI) / 180);
-  return side * heelFor((aws2 * heelForce(a, b.sheet, b.tws) * b.rigPower) / b.cls.stiffness);
+  return side * heelFor((aws2 * heelForce(a, b.sheetFelt, b.tws) * b.rigPower) / b.cls.stiffness);
 }
 
 /** Sit her at the heel her wind and trim give, at rest (a new boat, or one set up for a scene). */
-export function settleHeel(b: Boat) { b.heel = heelWanted(b, twaOf(b.hdg, b.twd)); b.heelRate = 0; }
+export function settleHeel(b: Boat) { b.sheetFelt = b.sheet; b.heel = heelWanted(b, twaOf(b.hdg, b.twd)); b.heelRate = 0; }
 
 export function heelStep(b: Boat, dt: number, twa: number) {
   const c = b.cls;
+  // Sheeted in, the sails fill and load up over the best part of a second (and she has to gather
+  // way before they pull their hardest), so she leans into it rather than snapping over. Eased,
+  // they spill at once: dumping the sheet in a gust still saves her.
+  b.sheetFelt += (b.sheet - b.sheetFelt) * (b.sheet > b.sheetFelt ? 1 - dexp(-dt / 0.75) : 1);
   const want = heelWanted(b, twa);
-  // Lightly damped: a gust that hits hard throws her over past where she settles, then she comes back.
-  const w = (2 * Math.PI) / c.rollPeriod, zeta = 0.25;
+  // The bulb's weight and the fin's grip on the water damp her roll: a gust that hits hard still
+  // throws her a little past where she settles, then she comes back.
+  const w = (2 * Math.PI) / c.rollPeriod, zeta = 0.42;
   b.heelRate += (w * w * (want - b.heel) - 2 * zeta * w * b.heelRate) * dt;
   b.heel += b.heelRate * dt;
   // Laid flat, the mast and sails in the water stop her going any further.
@@ -113,13 +118,50 @@ export function weatherHelm(b: Boat): number {
   return Math.min(25, 0.32 * ex + 0.012 * ex * ex);
 }
 
+/**
+ * Running pressed. Off the wind a model yacht's rig drives her forward and down, not over: in a
+ * gust too strong for her rig her bow is pushed under, she slows as it buries, her stern lifts
+ * (taking the rudder with it), and with the bow dug in as a pivot she darts off to one side.
+ * How hard she is being pressed, 0 (riding level) to about 1.3 (burying):
+ * - It grows with the apparent wind's pressure from behind, so a boat already going fast, or one
+ *   that has come up onto a reach, is pressed less. A smaller rig presses less, a longer hull resists more.
+ * - A sail sheeted in a little on a run shows the wind less of itself.
+ */
+export function divePress(b: Boat, absTwa: number): number {
+  if (b.disabled || absTwa < 118) return 0;
+  const off = clamp((absTwa - 118) / 30, 0, 1);
+  const aws2 = b.tws * b.tws + b.spd * b.spd + 2 * b.tws * b.spd * dcos((absTwa * Math.PI) / 180);
+  const shown = clamp(1 - 1.3 * Math.max(0, b.sheetFelt - bestSheet(absTwa)), 0.45, 1);
+  const q = (aws2 * b.runPower * shown) / bowLift(b.cls);
+  return clamp((q - DIVE_FROM) / (DIVE_FULL - DIVE_FROM), 0, 1.3) * off;
+}
+/** Pressure (apparent wind squared, m²/s², on an IOM's A rig) at which the bow starts to go down, and at which it's buried. */
+const DIVE_FROM = 27, DIVE_FULL = 62;
+
+/**
+ * Her dive this step. Left to run straight she is pressed further and further down over a second or
+ * two; kept moving in a gentle weave from side to side she sheds it (each turn brings her up across
+ * the wind a little, the bow lifts and she picks up speed), which is how you sail a pressed boat downwind.
+ */
+function diveStep(b: Boat, dt: number, absTwa: number) {
+  const press = divePress(b, absTwa);
+  // (Her helm's doing, not the lurching about a buried bow does on its own.)
+  const weave = clamp(Math.abs(b.rudder) / 0.28, 0, 1) * clamp(b.spd / (0.3 * b.cls.hullSpeed), 0, 1);
+  const want = press * (1 - 0.55 * weave);
+  b.dive += (want - b.dive) * (1 - dexp(-dt / (want > b.dive ? 1.25 : 0.45)));
+  if (b.dive < 1e-4) b.dive = 0;
+  // Bow down as it buries, and steeply once she's tripping over it.
+  const d = b.dive;
+  b.pitch = d <= 0 ? 0 : -(1.5 * Math.min(1, d * 4) + 12 * Math.min(1, d) + 30 * Math.max(0, d - 1));
+}
+
 /** Integrate one boat for one step. Returns 'tack' or 'gybe' when the boat passed through the wind. */
 export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null): 'tack' | 'gybe' | null {
   const c = b.cls;
   heelStep(b, dt, twaOf(b.hdg, b.twd));
   if (b.disabled) {
     // Out of control: the sail flaps, she stops and drifts slowly downwind.
-    b.targetSpd = 0;
+    b.targetSpd = 0; b.dive = 0; b.pitch = 0;
     b.spd *= dexp(-dt / 1.5);
     b.rot *= dexp(-dt / 0.3);
     b.hdg = n360(b.hdg + b.rot * dt);
@@ -130,6 +172,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   }
   const twa = twaOf(b.hdg, b.twd);
   const a = Math.abs(twa);
+  diveStep(b, dt, a);
   const ng = noGoAngle(b.tws);
   const perfect = polarSpeed(c, b.tws, a);
   b.targetSpd = perfect;
@@ -139,6 +182,9 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   // Laid over too far she slows: more drag, less drive, and nearly stopped when she's knocked flat.
   const over = Math.max(0, Math.abs(b.heel) - 28);
   if (over > 0) target *= Math.max(0.3, 1 - 0.004 * over - 0.00022 * over * over);
+  // Bow buried, she pushes a wall of water: half her speed gone with the deck awash, most of it when she trips.
+  const dv = b.dive;
+  if (dv > 0) target *= Math.max(0.22, 1 - 0.5 * Math.min(1, dv) * Math.min(1, dv) - 1.2 * Math.max(0, dv - 1));
   const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg, c.loa) : null;
   if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;
@@ -146,7 +192,8 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   if (b.spd < 0) b.spd = 0;
 
   // Heeled hard, the rudder loses its grip on the water.
-  const grip = 1 - clamp((Math.abs(b.heel) - 32) / 36, 0, 0.55);
+  // And with her stern lifted in a dive, the rudder is half out of it.
+  const grip = (1 - clamp((Math.abs(b.heel) - 32) / 36, 0, 0.55)) * (1 - 0.6 * clamp(dv, 0, 1));
   const steer = clamp(b.spd / (0.35 * c.hullSpeed), a < ng + 4 ? 0.32 : 0.16, 1) * grip;
   let rotTarget = b.rudder * c.maxRot * steer;
   // A slow boat near head to wind has her bow blown off the wind, so holding her there takes work.
@@ -158,6 +205,14 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   // (Scaled by how fast she'd sail here, not her speed this instant, which the waves themselves
   // change: that would turn their to-and-fro into a steady pull one way.)
   if (wave) rotTarget += wave.yaw * clamp(0.4 + b.targetSpd / c.hullSpeed, 0, 1);
+  if (dv > 0.25) {
+    // Bow dug in, she won't run straight: any turn she has feeds itself (the buried bow is a pivot
+    // and her stern swings round it), and the water never leaves her quite straight to begin with.
+    // Caught early with the rudder she straightens; left, she darts off to one side.
+    const k = (dv - 0.25) / 0.75;
+    const twitch = 7 * dsin(t * 2.3 + b.x * 0.9 + b.y * 0.6) + 4 * dsin(t * 0.83 + b.y * 1.7);
+    rotTarget += clamp(1.35 * k * k * b.rot + k * k * twitch, -0.6 * c.maxRot, 0.6 * c.maxRot);
+  }
   b.rot += (rotTarget - b.rot) * (1 - dexp(-dt / 0.12));
   b.hdg = n360(b.hdg + b.rot * dt);
   // Weather helm rounds her up quickly as a gust heels her (less when she's slow), and lets her bear

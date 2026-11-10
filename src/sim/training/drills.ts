@@ -220,7 +220,7 @@ export const DRILLS: Drill[] = [
     scene: () => ({
       origin: 'line', preStart: 45, settings: { lineBias: 8 },
       boats: [
-        { role: 'You', at: [3.2, -3.6], hdg: 300, spd: 0.3, helm: 'player' },
+        { role: 'You', at: [3.0, -3.6], hdg: 300, spd: 0.3, helm: 'player' },
         ai('Steady', [-1, -6.5], 'steady'), ai('Conservative', [2, -4.5], 'careful'), ai('Speed builder', [4, -6], 'builder'), ai('Squeezer', [6, -5], 'squeezer'),
       ],
     }),

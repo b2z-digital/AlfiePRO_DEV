@@ -412,7 +412,8 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
   const p: Pose = {
     cls: b.cls.id, rig: rigFor(b.cls.id, race.wind.baseTws / 0.514444),
     x: bx, y: by, hdg: bh,
-    heel, pitch: 0, heave: 0,
+    // Diving, she pivots about a point well forward: the bow goes under a little and the stern lifts a lot.
+    heel, pitch: live ? b.pitch : 0, heave: live ? Math.sin(-b.pitch * DEG) * b.cls.loa * 0.2 : 0, dive: live ? b.dive : 0,
     sd: set.sd, boom: set.boom, jib: set.jib, luff: set.luff,
     color: b.color, tape: b.isPlayer ? '#2A93FF' : t.tape, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
     sail: b.sail, country: 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,

@@ -12,7 +12,11 @@ import { windwardBoat } from '@/sim/scene';
 
 export type CoachMode = 'full' | 'hints' | 'off';
 
-export interface Cue { topic: string; text: string; watch: string | null; tone: 'plain' | 'warn' }
+export interface Cue {
+  topic: string; text: string; watch: string | null; tone: 'plain' | 'warn';
+  /** The same advice as a coach would call it across the water: a few words, said aloud in Full coaching. */
+  say?: string;
+}
 
 export interface LineInfo {
   favoured: 'pin' | 'starboard' | 'square';
@@ -72,6 +76,8 @@ export const SAILING_CLEAR = 'Finished · keeping clear of the boats still racin
  */
 export function trimAdvice(b: Boat): string {
   const a = Math.abs(b.twa);
+  if (b.dive > 0.85) return 'Nose-diving: steer out of it';
+  if (b.dive > 0.35) return 'Bow going down: weave her gently';
   if (a < noGoAngle(b.tws)) return 'Bear away to fill the sail';
   if (a < vmgAngles(b.cls, b.tws).up - 4) return 'Bear away a touch: she’s slowing';
   const upwind = a <= 55;
@@ -82,6 +88,69 @@ export function trimAdvice(b: Boat): string {
   if (e > 0.09) return 'Trim: ease the sail a touch';
   if (e < -0.09) return upwind ? 'Upwind: sheet right in' : 'Trim: sheet in a touch';
   return 'Trim: good';
+}
+
+/** A call across the water: what Alfie says aloud. `urgent` ones are said at once, over anything else. */
+export interface Call { key: string; say: string; urgent?: boolean; again?: number }
+
+/**
+ * Boat-handling calls, as a coach standing next to you would make them, the moment they're needed:
+ * she's nose-diving, in irons, pinching, overpowered, or the sails are wrong for the course. Only
+ * once you've started (before the gun you're luffing and easing on purpose), and trim calls only
+ * when you're trimming yourself.
+ */
+export function handlingCall(p: Boat, autoTrim: boolean): Call | null {
+  if (!p.started || p.finished || p.disabled) return null;
+  if (p.dive > 0.85) return { key: 'dive-hard', say: 'Nose-diving! Steer out of it.', urgent: true, again: 6 };
+  if (p.dive > 0.35) return { key: 'dive', say: "Bow's going down. Weave her gently, side to side.", again: 9 };
+  if (p.penalty.active) return null; // turning for a penalty: every point of sail goes by
+  const a = Math.abs(p.twa);
+  if (a < noGoAngle(p.tws)) return { key: 'irons', say: "You're in irons. Bear away to fill the sails.", again: 7 };
+  if (a < vmgAngles(p.cls, p.tws).up - 4) return { key: 'pinch', say: 'Pinching. Bear away a touch.', again: 9 };
+  if (autoTrim) return null;
+  const upwind = a <= 55;
+  const gust = overpowerEase(p.heel);
+  const e = p.sheet - (bestSheet(a, p.tws) - gust);
+  if (e > 0.06 && gust > 0.03) return { key: 'gust', say: 'Overpowered. Ease through the gust.', again: 9 };
+  if (e > 0.11) return { key: 'ease', say: upwind ? 'Ease a touch.' : 'Ease the sails.', again: 9 };
+  if (e < -0.11) return { key: 'sheet', say: upwind ? 'Sheet right in.' : 'Sheet in a touch.', again: 9 };
+  return null;
+}
+
+const URGENT = /^(Go now|You're over|You were over|Take your penalty|Not finished)/;
+const RARELY = /^(Lifted|The line|The (pin|starboard) end|Leave it|Take the)/;
+
+/** A coaching line as a call: the same words count as the same call, whatever numbers are in them. */
+export function cueCall(c: Cue | null): Call | null {
+  if (!c?.say) return null;
+  return { key: c.say.replace(/\d+/g, '#'), say: c.say, urgent: URGENT.test(c.say), again: RARELY.test(c.say) ? 45 : URGENT.test(c.say) ? 7 : 14 };
+}
+
+/**
+ * When Alfie speaks. A coach who never stops talking is worse than none, so:
+ * - a call has to still be true a second after it came up (urgent ones are said at once);
+ * - there's a gap after every call (shorter before an urgent one);
+ * - the same call isn't repeated until it has had time to sink in;
+ * - and he doesn't talk over a hail or the start sequence's own calls unless it's urgent.
+ * `now` is real seconds. Returns the words to say now, or null.
+ */
+export class CoachVoice {
+  private said = new Map<string, number>();
+  private pending: { key: string; since: number } | null = null;
+  private lastAt = -99;
+
+  pick(now: number, call: Call | null, busy: boolean): string | null {
+    if (!call) { this.pending = null; return null; }
+    if (!this.pending || this.pending.key !== call.key) this.pending = { key: call.key, since: now };
+    if (!call.urgent && now - this.pending.since < 1) return null;
+    if (busy && !call.urgent) return null;
+    if (now - this.lastAt < (call.urgent ? 1.2 : 3.5)) return null;
+    const before = this.said.get(call.key);
+    if (before !== undefined && now - before < (call.again ?? 14)) return null;
+    this.said.set(call.key, now);
+    this.lastAt = now;
+    return call.say;
+  }
 }
 
 /** Running mean of the wind the player sees, for lifts and headers. */
@@ -164,36 +233,39 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
   const c = race.course, L = p.cls.loa;
   const T = race.gunT - race.t;
   const watch = ruleWatch(race, p);
-  const cue = (topic: string, text: string, tone: Cue['tone'] = 'plain'): Cue => ({ topic, text, watch, tone });
+  const cue = (topic: string, text: string, tone: Cue['tone'] = 'plain', say?: string): Cue => ({ topic, text, watch, tone, say });
 
   // ── Before the gun ──
   if (T > 0) {
-    if (li.belowL < 0 && T > 2.5) return cue('The start', `You're over the line with ${Math.ceil(T)} s to go. Bear away and dip back below it now.`, 'warn');
+    if (li.belowL < 0 && T > 2.5) return cue('The start', `You're over the line with ${Math.ceil(T)} s to go. Bear away and dip back below it now.`, 'warn', "You're over the line. Dip back below it.");
     if (T > 40) {
       const end = li.favoured === 'pin' ? 'pin' : 'starboard';
       return li.favoured === 'square'
-        ? cue('The start', 'The line is square to the wind, so start where you can get clear air and a gap to leeward.')
-        : cue('The start', `The ${end} end is favoured by ${Math.round(li.bias)}°, worth about ${li.worth.toFixed(1)} lengths. Plan to start near it, with a gap to leeward.`);
+        ? cue('The start', 'The line is square to the wind, so start where you can get clear air and a gap to leeward.', 'plain', 'The line is square. The starboard end gives you clear wind, if you can win it.')
+        : cue('The start', `The ${end} end is favoured by ${Math.round(li.bias)}°, worth about ${li.worth.toFixed(1)} lengths. Plan to start near it, with a gap to leeward.`, 'plain', `The ${end} end is favoured. Set up near it, with a gap to leeward.`);
     }
-    if (p.tack === 'port' && T > 15) return cue('The start', 'Get onto starboard for the last 20 seconds: port boats have to keep clear of everyone on starboard (Rule 10).');
-    if (li.ttl === null) return cue('The start', 'Get below the line on starboard and find your spot, about one to two lengths back.');
+    if (p.tack === 'port' && T > 15) return cue('The start', 'Get onto starboard for the last 20 seconds: port boats have to keep clear of everyone on starboard (Rule 10).', 'plain', 'Get onto starboard for the start.');
+    if (li.ttl === null) return cue('The start', 'Get below the line on starboard and find your spot, about one to two lengths back.', 'plain', 'Get below the line on starboard and find your spot.');
     const early = T - li.ttl;
-    if (T > 15 && early > 6) return cue('The start', `You're ${li.belowL.toFixed(1)} lengths back, ${li.ttl.toFixed(1)} s from the line at full speed. Hold your spot: luff and ease to stay slow.`);
-    if (early > 2.5) return cue('The start', `Burn ${Math.round(early - 0.8)} seconds, then pull the trigger at 0:${String(Math.max(1, Math.round(li.ttl + 0.4))).padStart(2, '0')}: bear away to close-hauled and sheet in. You'll cross at full speed just after the gun.`);
-    if (early > 0.7) return cue('The start', `Nearly: pull the trigger at 0:${String(Math.max(1, Math.round(li.ttl))).padStart(2, '0')}. Bear away and sheet in.`);
-    if (early >= -0.8) return cue('The start', 'Go now: bear away to close-hauled and sheet in hard.');
-    return cue('The start', `You're ${(-early).toFixed(1)} s late. Foot off a few degrees and sheet in to build speed.`, 'warn');
+    if (T > 15 && early > 6) return cue('The start', `You're ${li.belowL.toFixed(1)} lengths back, ${li.ttl.toFixed(1)} s from the line at full speed. Hold your spot: luff and ease to stay slow.`, 'plain', 'Hold your spot. Luff and ease to stay slow.');
+    if (early > 2.5) return cue('The start', `Burn ${Math.round(early - 0.8)} seconds, then pull the trigger at 0:${String(Math.max(1, Math.round(li.ttl + 0.4))).padStart(2, '0')}: bear away to close-hauled and sheet in. You'll cross at full speed just after the gun.`, 'plain', `Hold. Go in ${Math.max(1, Math.round(early - 0.8))}.`);
+    if (early > 0.7) return cue('The start', `Nearly: pull the trigger at 0:${String(Math.max(1, Math.round(li.ttl))).padStart(2, '0')}. Bear away and sheet in.`, 'plain', 'Get ready.');
+    if (early >= -0.8) return cue('The start', 'Go now: bear away to close-hauled and sheet in hard.', 'plain', 'Go now! Bear away and sheet in.');
+    return cue('The start', `You're ${(-early).toFixed(1)} s late. Foot off a few degrees and sheet in to build speed.`, 'warn', "You're late. Foot off and sheet in.");
   }
 
   // ── After the gun, not started ──
   if (!p.started) {
-    if (p.ocs && !p.returning) return cue('The start', 'Recall: you were over at the gun. Bear away, dip right back below the line, then start again. Keep clear of everyone while you return (Rule 21).', 'warn');
+    if (p.ocs && !p.returning) return cue('The start', 'Recall: you were over at the gun. Bear away, dip right back below the line, then start again. Keep clear of everyone while you return (Rule 21).', 'warn', 'You were over. Go back below the line and start again.');
     return cue('The start', 'Cross the line between the pin and the start mark to start.');
   }
   if (p.finished) return cue('Finish', 'Finished. Your boat sails clear of the line, out of the way of boats still racing. Watch the rest come in.');
 
   // ── Penalty owed ──
-  if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn');
+  const finishing = c.legs[p.legIndex]?.kind === 'finish';
+  if (p.penalty.owed > 0 && finishing) return cue('Rules', `You can't finish with a penalty outstanding. Take your One-Turn Penalty now (one tack and one gybe), ${p.reFinish ? 'get your hull right back behind the line' : 'clear of other boats'}, then finish (Rule 44.2).`, 'warn', 'Take your penalty turn before you finish.');
+  if (p.reFinish) return cue('Finish', 'Penalty done. Get your whole hull back behind the finishing line, then cross it to finish (Rule 44.2).', 'warn', 'Get right back behind the line, then finish.');
+  if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn', 'You owe a penalty turn. Get clear, then one tack and one gybe.');
 
   const leg = c.legs[p.legIndex];
   if (!leg) return cue('Racing', '');
@@ -204,7 +276,7 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
   // ── Rounding ──
   if (M && dist(M.p, p) < 4.5 * L) {
     const side = leg.kind === 'mark' ? leg.rounding.side : 'port';
-    return cue('Rounding', `${M.name[0].toUpperCase()}${M.name.slice(1)} is left to ${side}. Wide in, tight out: start your turn early and finish it close to the mark.`);
+    return cue('Rounding', `${M.name[0].toUpperCase()}${M.name.slice(1)} is left to ${side}. Wide in, tight out: start your turn early and finish it close to the mark.`, 'plain', `Leave it to ${side}. Wide in, tight out.`);
   }
   if (leg.kind === 'gate') {
     const a = c.byId[leg.options[0].markId], bm = c.byId[leg.options[1].markId];
@@ -212,7 +284,7 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
     if (Math.min(da, db) < 14 * L) {
       const busy = (m: { p: { x: number; y: number } }) => race.boats.filter(o => o !== p && !o.finished && dist(o, m.p) < 4 * L).length;
       const pick = da + busy(a) * 1.5 * L <= db + busy(bm) * 1.5 * L ? 'right-hand' : 'left-hand';
-      return cue('Downwind', `Pick your gate mark: the ${pick} one is closer or less crowded. Either counts; round it wide in, tight out.`);
+      return cue('Downwind', `Pick your gate mark: the ${pick} one is closer or less crowded. Either counts; round it wide in, tight out.`, 'plain', `Take the ${pick} gate mark.`);
     }
   }
 
@@ -221,33 +293,34 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
     const target = M ? M.p : { x: (c.finish.pin.x + c.finish.stbd.x) / 2, y: (c.finish.pin.y + c.finish.stbd.y) / 2 };
     const shift = n180(p.twd - mem.mean);
     const lifted = p.tack === 'stbd' ? shift : -shift;
-    if (p.shadow > 0.12) return cue('Upwind', `You're in dirty air (${Math.round(p.shadow * 100)}% less wind). Tack, or bear off a little to get clear air.`);
+    if (p.shadow > 0.12) return cue('Upwind', `You're in dirty air (${Math.round(p.shadow * 100)}% less wind). Tack, or bear off a little to get clear air.`, 'plain', 'Dirty air. Tack, or foot off for clear wind.');
     // Trim upwind: right in, except in a gust that lays her over, in very light air, and through a
     // tack in a strong breeze.
     const kn = p.tws / 0.514444;
-    if (race.t - p.lastHtwT < 8 && kn >= 14 && Math.abs(p.heel) > 30 && p.spd < 0.65 * p.targetSpd) return cue('Upwind', 'In this breeze, ease the sail a touch as you tack, let her build speed on the new tack, then sheet right in again.');
-    if (overpowerEase(p.heel) > 0.04 && p.sheet > bestSheet(Math.abs(p.twa), p.tws) - 0.03) return cue('Upwind', 'Overpowered in this gust: ease the sail a touch so she stands up and drives, then sheet right in again as it passes.');
-    if (lightEase(p.tws) > 0.03 && p.sheet > 0.99) return cue('Upwind', "It's very light: ease the sail a touch off fully in for more power, and steer gently so she keeps moving.");
+    if (race.t - p.lastHtwT < 8 && kn >= 14 && Math.abs(p.heel) > 30 && p.spd < 0.65 * p.targetSpd) return cue('Upwind', 'In this breeze, ease the sail a touch as you tack, let her build speed on the new tack, then sheet right in again.', 'plain', 'Ease a touch through the tack, then sheet in.');
+    if (overpowerEase(p.heel) > 0.04 && p.sheet > bestSheet(Math.abs(p.twa), p.tws) - 0.03) return cue('Upwind', 'Overpowered in this gust: ease the sail a touch so she stands up and drives, then sheet right in again as it passes.', 'plain', 'Overpowered. Ease through the gust.');
+    if (lightEase(p.tws) > 0.03 && p.sheet > 0.99) return cue('Upwind', "It's very light: ease the sail a touch off fully in for more power, and steer gently so she keeps moving.", 'plain', 'Very light. Ease a touch for power.');
     const up = vmgAngles(p.cls, p.tws).up + 1.5;
     const brg = bearing(p, target);
     const other = p.tack === 'stbd' ? n360(p.twd + up) : n360(p.twd - up);
     const fetchOther = p.tack === 'stbd' ? n180(brg - other) >= 0 : n180(other - brg) >= 0;
     const d = dist(p, target);
-    if (fetchOther && d > 3 * L) return cue('Upwind', `You're on the ${p.tack === 'stbd' ? 'port' : 'starboard'}-tack layline for ${M ? M.name : 'the finish'}. Tack now so you don't overstand.`);
-    if (M && M.kind === 'windward' && p.tack === 'port' && d < 8 * L) return cue('Upwind', `${M.name[0].toUpperCase()}${M.name.slice(1)} is left to port: get onto the starboard layline before the zone. Tacking inside it puts you under Rule 18.3.`);
-    if (-lifted > 5) return cue('Upwind', `You're headed ${Math.round(-lifted)}° on ${tackName(p)}. Tack and you'll be on the lifted tack, pointing closer to ${M ? M.name : 'the finish'}.`);
-    if (lifted > 5) return cue('Upwind', `You're lifted ${Math.round(lifted)}° on ${tackName(p)}. Stay on this tack while it lasts.`);
+    if (fetchOther && d > 3 * L) return cue('Upwind', `You're on the ${p.tack === 'stbd' ? 'port' : 'starboard'}-tack layline for ${M ? M.name : 'the finish'}. Tack now so you don't overstand.`, 'plain', 'Layline. Tack now.');
+    if (M && M.kind === 'windward' && p.tack === 'port' && d < 8 * L) return cue('Upwind', `${M.name[0].toUpperCase()}${M.name.slice(1)} is left to port: get onto the starboard layline before the zone. Tacking inside it puts you under Rule 18.3.`, 'plain', 'Get onto the starboard layline before the zone.');
+    if (-lifted > 5) return cue('Upwind', `You're headed ${Math.round(-lifted)}° on ${tackName(p)}. Tack and you'll be on the lifted tack, pointing closer to ${M ? M.name : 'the finish'}.`, 'plain', 'Headed. Tack now.');
+    if (lifted > 5) return cue('Upwind', `You're lifted ${Math.round(lifted)}° on ${tackName(p)}. Stay on this tack while it lasts.`, 'plain', 'Lifted. Hold this tack.');
     if (!M) return cue('Finish', `The finish is upwind on the start line: the ${li.favoured === 'pin' ? 'pin' : li.favoured === 'starboard' ? 'starboard' : 'nearer'} end is closer.`);
     return cue('Upwind', 'Sail close-hauled and keep the boat moving. Watch the wind graph: tack when you\'re headed more than 5°.');
   }
 
   // ── Downwind ──
+  if (p.dive > 0.3) return cue('Downwind', "She's pressed, and her bow is going down. Keep her moving in a gentle weave from side to side, and sheet in a little to show the wind less sail. Left to run straight she'll bury her bow, lift her rudder out and broach.", 'warn');
   const target = M ? M.p : leg.kind === 'gate' ? { x: (c.byId[leg.options[0].markId].p.x + c.byId[leg.options[1].markId].p.x) / 2, y: (c.byId[leg.options[0].markId].p.y + c.byId[leg.options[1].markId].p.y) / 2 } : p;
   const dn = vmgAngles(p.cls, p.tws).down;
   const brg = bearing(p, target);
   const cur = p.tack === 'stbd' ? n360(p.twd - dn) : n360(p.twd + dn);
   const oth = p.tack === 'stbd' ? n360(p.twd + dn) : n360(p.twd - dn);
   const dCur = Math.abs(n180(cur - brg)), dOth = Math.abs(n180(oth - brg));
-  if (dOth + 12 < dCur && dist(p, target) > 4 * L) return cue('Downwind', `Gybe: the other gybe points ${Math.round(dCur - dOth)}° closer to ${M ? M.name : 'the gate'}.`);
+  if (dOth + 12 < dCur && dist(p, target) > 4 * L) return cue('Downwind', `Gybe: the other gybe points ${Math.round(dCur - dOth)}° closer to ${M ? M.name : 'the gate'}.`, 'plain', 'Gybe now. The other gybe is closer.');
   return cue('Downwind', 'Sail deep and fast, and gybe on the big shifts. Look upwind for the dark patches of pressure coming down.');
 }
