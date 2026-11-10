@@ -20,6 +20,21 @@ interface FeatureAccessResult {
 const featureCache = new Map<string, { flags: FeatureFlag[]; timestamp: number }>();
 const CACHE_TTL = 30 * 1000;
 
+// Features switched on for this person themselves: Feature Access can turn a feature on for a single
+// user, wherever they are in the app, as well as for a whole club or association.
+let grantsCache: { userId: string; keys: Set<string>; timestamp: number } | null = null;
+async function personalGrants(userId: string, force: boolean): Promise<Set<string>> {
+  if (!force && grantsCache && grantsCache.userId === userId && Date.now() - grantsCache.timestamp < CACHE_TTL) return grantsCache.keys;
+  try {
+    const { data, error } = await supabase.rpc('get_my_feature_grants');
+    const keys = new Set<string>(error ? [] : ((data || []) as { feature_key: string }[]).map(r => r.feature_key));
+    grantsCache = { userId, keys, timestamp: Date.now() };
+    return keys;
+  } catch {
+    return new Set();
+  }
+}
+
 function getOrgTypeForDb(type: string): string {
   if (type === 'state') return 'state_association';
   if (type === 'national') return 'national_association';
@@ -27,7 +42,8 @@ function getOrgTypeForDb(type: string): string {
 }
 
 export function useFeatureAccess(): FeatureAccessResult {
-  const { currentClub, currentOrganization } = useAuth();
+  const { currentClub, currentOrganization, user } = useAuth();
+  const userId = user?.id ?? '';
   const [features, setFeatures] = useState<FeatureFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
@@ -46,7 +62,7 @@ export function useFeatureAccess(): FeatureAccessResult {
       return;
     }
 
-    const cacheKey = `${orgId}-${dbOrgType}`;
+    const cacheKey = `${orgId}-${dbOrgType}-${userId}`;
     if (!force) {
       const cached = featureCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -67,7 +83,9 @@ export function useFeatureAccess(): FeatureAccessResult {
       if (error) {
         setFeatures([]);
       } else {
-        const flags = (data || []) as FeatureFlag[];
+        const grants = userId ? await personalGrants(userId, force) : new Set<string>();
+        if (!mountedRef.current) return;
+        const flags = ((data || []) as FeatureFlag[]).map(f => (grants.has(f.feature_key) && !f.is_enabled ? { ...f, is_enabled: true } : f));
         setFeatures(flags);
         featureCache.set(cacheKey, { flags, timestamp: Date.now() });
       }
@@ -76,7 +94,7 @@ export function useFeatureAccess(): FeatureAccessResult {
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [orgId, dbOrgType]);
+  }, [orgId, dbOrgType, userId]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -90,7 +108,7 @@ export function useFeatureAccess(): FeatureAccessResult {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const cacheKey = `${orgId}-${dbOrgType}`;
+        const cacheKey = `${orgId}-${dbOrgType}-${userId}`;
         featureCache.delete(cacheKey);
         loadFeatures(true);
       }
@@ -98,7 +116,7 @@ export function useFeatureAccess(): FeatureAccessResult {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [orgId, dbOrgType, loadFeatures]);
+  }, [orgId, dbOrgType, userId, loadFeatures]);
 
   useEffect(() => {
     if (!orgId) return;
