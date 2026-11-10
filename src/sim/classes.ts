@@ -67,14 +67,15 @@ export function bowLift(c: ClassDef): number {
 
 /**
  * How hard the sails heel her (about 0 to 1.3): close-hauled to a close reach the sails mostly push
- * her over, further off the wind more of their force drives her forward, and head to wind they flog.
+ * her over, further off the wind more of their force drives her forward (by a broad reach most of
+ * it, and on a run nearly all: pressed there she goes bow down, not over), and head to wind they flog.
  * Eased past the sweet spot she spills wind; over-sheeted on a reach she heels more.
  */
 export function heelForce(absTwa: number, sheet: number, tws: number): number {
   const a = clamp(absTwa, 0, 180);
   const ng = noGoAngle(tws);
   if (a < ng - 4) return 0.05;
-  const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 110 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.06 + 0.84 * dcos(((a - 110) / 70) * (Math.PI / 2)) * dcos(((a - 110) / 70) * (Math.PI / 2));
+  const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 100 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.05 + 0.93 * dcos((Math.min(70, a - 100) / 70) * (Math.PI / 2)) * dcos((Math.min(70, a - 100) / 70) * (Math.PI / 2));
   const fill = clamp((a - (ng - 4)) / 10, 0, 1);
   // Pinching above her best close-hauled angle the sails start to lift and lose their power.
   const luff = 1 - 0.6 * clamp((upAngle(tws) - a) / 18, 0, 1);

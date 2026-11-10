@@ -12,7 +12,8 @@ import { Smoother } from './smooth';
 import { dir, dist, n180 } from '@/sim/math';
 import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
 import type { SceneSpec } from '@/sim/training';
-import { CoachMode, Cue, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
+import { CoachMode, CoachVoice, Cue, WindMemory, coachCue, cueCall, handlingCall, lineInfo, pointOfSail, trimAdvice } from './coach';
+import { Ambience } from './ambience';
 import { Camera, drawRace } from './render';
 import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './input';
@@ -160,6 +161,15 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctl = useRef(new Controls()).current;
   const audio = useRef(new RaceAudio()).current;
+  // Alfie's voice (Full coaching), and the sound of the pond.
+  const voice = useRef(new CoachVoice()).current;
+  const ambience = useMemo(() => new Ambience(), []);
+  useEffect(() => {
+    // Sound starts with your first tap or key press, as browsers require.
+    const wake = () => ambience.unlock();
+    for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, wake, true);
+    return () => { for (const ev of ['pointerdown', 'keydown'] as const) window.removeEventListener(ev, wake, true); ambience.stop(); };
+  }, [ambience]);
   const mem = useRef(new WindMemory()).current;
   const log = useRef(new PlayerLog()).current;
   const cam = useRef<Camera>({ x: 0, y: -4, scale: 30 }).current;
@@ -362,6 +372,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     // ever steps down (never back up and down again, which would make the water flicker and the
     // frame rate swing), and only after a steady run of slow frames.
     const perf = { detail: 2, ft: 1 / 60, slow: 0 };
+    // Development only: the race, for the screenshot harness to set a moment up.
+    if (import.meta.env.DEV) (window as unknown as { __simRace?: unknown }).__simRace = race;
     // Frames are drawn part-way through the race's steps, so everything moves smoothly.
     const smooth = new Smoother(), smoothGhost = new Smoother();
     let running = false;
@@ -545,10 +557,22 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           const w = live.waiting();
           setLiveNote(n => (n.dropped === live.dropped && n.desync === live.desync && n.waiting.join() === w.join() ? n : { waiting: w, dropped: live.dropped, desync: live.desync }));
         }
+        // The sound of the pond follows the wind at your boat, her speed and the sea.
+        ambience.update({
+          kn: (p ? p.tws : race.wind.meanTws(race.t)) / KN, fast: p ? p.spd / p.cls.hullSpeed : 0, sea: !race.sea ? 0 : race.sea.kind === 'rough' ? 1 : 0.5,
+          running: live ? !st.ended : !st.paused && !st.replay && !st.ended && !race.replaying, muted: audio.muted,
+        });
         if (p && race.t - st.cueAt > 0.5) {
           st.cueAt = race.t;
           const T = race.gunT - race.t;
           const next = coachCue(race, p, mem, lineInfo(race, p));
+          // Full coaching: Alfie calls it aloud, the way a coach on the bank would. Handling first
+          // (bear away, ease, weave), then the tactics (tack on the header, the layline, the start).
+          if (st.coach === 'full' && !audio.muted && !st.paused && !st.replay && !st.ended && !scene?.watch) {
+            const call = handlingCall(p, race.settings.autoTrim) ?? cueCall(next);
+            const words = voice.pick(now / 1000, call, audio.speaking);
+            if (words) audio.say(words, !!call?.urgent);
+          }
           const cur = st.cue;
           const since = race.t - st.cueChangedAt;
           const u = urgency(next, T);

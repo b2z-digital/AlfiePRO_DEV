@@ -31,6 +31,11 @@ export class RaceAudio {
     window.speechSynthesis.speak(u);
   }
 
+  /** Is something being said right now (a hail, a recall, a call from the coach)? */
+  get speaking(): boolean {
+    return typeof window !== 'undefined' && 'speechSynthesis' in window && (window.speechSynthesis.speaking || window.speechSynthesis.pending);
+  }
+
   beep(freq = 880, ms = 150) {
     if (this.muted) return;
     getStartBoxEngine().playSynthBeep(freq, ms).catch(() => {});
