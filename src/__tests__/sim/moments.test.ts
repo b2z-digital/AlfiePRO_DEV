@@ -36,8 +36,11 @@ describe("Alfie's moments", () => {
     const { race, log } = raced();
     const sum = summarize(race, log, 'race');
     const ms = findMoments(race, log, sum);
-    expect(ms[0].kind).toBe('start');
-    expect(ms.some(m => m.kind === 'mark')).toBe(true);
+    // The start (after anything that happened in the pre-start), then the marks, then the finish.
+    const start = ms.findIndex(m => m.kind === 'start'), mark = ms.findIndex(m => m.kind === 'mark');
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(ms.slice(0, start).every(m => m.t <= ms[start].t && m.kind === 'incident')).toBe(true);
+    expect(mark).toBeGreaterThan(start);
     expect(ms[ms.length - 1].kind).toBe('finish');
     for (let k = 1; k < ms.length; k++) expect(ms[k].t).toBeGreaterThanOrEqual(ms[k - 1].t);
     for (const m of ms) {

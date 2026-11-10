@@ -851,7 +851,7 @@ const m6: RulesModule = {
       diagram: { plan: penaltyTurn(closeHauled('stbd'), 0.3), seconds: 10 },
       play: {
         brief: 'You owe a penalty for a foul a moment ago.',
-        tip: 'Turn the same way the whole time: through head to wind and through dead downwind. Or press P and the helm turns for you.',
+        tip: 'Turn the same way the whole time: through head to wind and through dead downwind, right round.',
         goal: {
           text: 'Take your One-Turn Penalty', seconds: 20,
           check: g => fouled(g) ?? (g.player.penalty.taken > 0 ? won('Penalty done', 'One turn, one tack and one gybe, in clear water (Appendix E). Back to racing.') : null),

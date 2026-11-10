@@ -184,9 +184,37 @@ export function BoatStrip({ tack, pos, spdPct, kn, trim, auto }: { tack: 'Starbo
 }
 
 // ───────────────────────── Sticks ─────────────────────────
-export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, onTack, onHail, tackLabel, penalty, onPenalty, compact }: {
+/** A One-Turn Penalty you owe, and how far round your turn you are. */
+export interface PenaltyProgress { owed: number; deg: number; tack: boolean; gybe: boolean }
+
+/** How your penalty turn is going: right round (360°), through a tack and a gybe. */
+function PenaltyTurn({ owed, deg, tack, gybe }: PenaltyProgress) {
+  const f = Math.min(1, deg / 360), R = 11, len = 2 * Math.PI * R;
+  const tick = (done: boolean, text: string) => (
+    <span className={cx('inline-flex items-center gap-1 text-[12.5px] font-semibold', done ? 'text-[#A7F3D0]' : '')} style={done ? undefined : { color: C.mute }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{done ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <circle cx="12" cy="12" r="6" />}</svg>
+      {text}
+    </span>
+  );
+  return (
+    <div className="flex items-center gap-3 border-b border-white/[0.08] pb-3" role="status" aria-label={`Penalty turn: ${Math.round(deg)} degrees, tack ${tack ? 'done' : 'to do'}, gybe ${gybe ? 'done' : 'to do'}`}>
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+        <circle cx="14" cy="14" r={R} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="3.5" />
+        <circle cx="14" cy="14" r={R} fill="none" stroke="#FFB061" strokeWidth="3.5" strokeLinecap="round" strokeDasharray={`${len * f} ${len}`} transform="rotate(-90 14 14)" />
+      </svg>
+      <div className="flex min-w-0 flex-col">
+        <span className="text-[13px] font-semibold text-[#FFD7B0]">{owed > 1 ? `${owed} penalty turns to sail` : 'Sail your penalty turn'}</span>
+        <span className="flex gap-3">{tick(tack, 'Tack')}{tick(gybe, 'Gybe')}<span className="text-[12.5px] tabular-nums" style={{ color: C.mute }}>{Math.round(deg)}°</span></span>
+      </div>
+    </div>
+  );
+}
+
+export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, onTack, onHail, tackLabel, penalty = null, compact }: {
   rudder: number; sheet: number; onRudder: (v: number) => void; onRudderEnd: () => void; onSheet: (v: number) => void;
-  onTack: () => void; onHail: () => void; tackLabel: string; penalty: boolean; onPenalty: () => void; compact?: boolean;
+  onTack: () => void; onHail: () => void; tackLabel: string;
+  /** The penalty you owe: you sail it yourself, and this shows how far round you are. */
+  penalty?: PenaltyProgress | null; compact?: boolean;
 }) {
   const rudRef = useRef<HTMLSpanElement>(null);
   const sailRef = useRef<HTMLSpanElement>(null);
@@ -200,7 +228,9 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
     onSheet(Math.max(0, Math.min(1, (e.clientY - r.top) / r.height)));
   };
   return (
-    <Hud className="flex items-end gap-[18px] px-[18px] py-4">
+    <Hud className="flex flex-col gap-3 px-[18px] py-4">
+      {penalty && <PenaltyTurn {...penalty} />}
+      <div className="flex items-end gap-[18px]">
       <div className="flex flex-col items-center gap-1.5">
         <span className="text-[11px]" style={{ color: C.mute }}>OUT</span>
         <span
@@ -233,16 +263,17 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
         <Cap className="!text-[10px]">Rudder</Cap>
       </div>
       <div className="flex flex-col gap-2">
-        {penalty ? <Btn small primary onClick={onPenalty}>Do my turn</Btn> : <Btn small onClick={onTack}>{tackLabel}</Btn>}
+        <Btn small onClick={onTack}>{tackLabel}</Btn>
         <Btn small onClick={onHail}>Hail</Btn>
+      </div>
       </div>
     </Hud>
   );
 }
 
 // ───────────────────────── Rules moment ─────────────────────────
-export function RulesMomentPanel({ inc, mine, otherSail, onPenalty, onContinue, onReplay, onLearn }: {
-  inc: Incident; mine: boolean; otherSail: string | null; onPenalty: () => void; onContinue: () => void; onReplay: () => void; onLearn: () => void;
+export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, onLearn }: {
+  inc: Incident; mine: boolean; otherSail: string | null; onContinue: () => void; onReplay: () => void; onLearn: () => void;
 }) {
   const rt = ruleText(inc.rule);
   const head = inc.kind === 'ocs' ? 'You were over the line at the gun'
@@ -266,7 +297,7 @@ export function RulesMomentPanel({ inc, mine, otherSail, onPenalty, onContinue, 
         <div className="flex flex-col gap-2.5 pt-1">
           <Cap>The ruling</Cap>
           <p className="m-0 text-[13.5px] leading-[1.45]">
-            {mine ? <><b>You</b> take a One-Turn Penalty: get clear, then one tack and one gybe.</> : <><b>{otherSail}</b> must take a One-Turn Penalty. You did nothing wrong{otherSail ? ` and hailed "Protest"` : ''}.</>}
+            {mine ? <><b>You</b> take a One-Turn Penalty: as soon as you're clear of other boats, turn right round the same way, through one tack and one gybe.</> : <><b>{otherSail}</b> must take a One-Turn Penalty. You did nothing wrong{otherSail ? ` and hailed "Protest"` : ''}.</>}
           </p>
         </div>
       )}
@@ -277,13 +308,12 @@ export function RulesMomentPanel({ inc, mine, otherSail, onPenalty, onContinue, 
         </div>
       )}
       <div className="mt-auto flex flex-wrap gap-2.5">
-        {mine && inc.kind !== 'ocs' ? <Btn primary onClick={onPenalty}>Take my penalty</Btn> : <Btn primary onClick={onContinue}>Carry on racing</Btn>}
+        <Btn primary onClick={onContinue}>Carry on racing</Btn>
         <Btn onClick={onReplay}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
           Watch replay
         </Btn>
         {rt && <Btn quiet onClick={onLearn}>Rule {rt.rule} in brief</Btn>}
-        {mine && inc.kind !== 'ocs' && <Btn quiet onClick={onContinue}>I'll do it myself</Btn>}
       </div>
     </Hud>
   );
@@ -372,7 +402,7 @@ export function HintBanner({ inc, mine, onOpen, onClose }: { inc: Incident; mine
       <WarnGlyph />
       <div className="min-w-0 flex-1">
         <p className="m-0 text-[14px] font-semibold">Rule {inc.rule}: {inc.title}</p>
-        <p className="m-0 mt-0.5 text-[13px] leading-[1.45]" style={{ color: C.mute }}>{mine ? 'You owe a One-Turn Penalty. ' : 'The other boat owes a penalty. '}{inc.nextTime ?? ''}</p>
+        <p className="m-0 mt-0.5 text-[13px] leading-[1.45]" style={{ color: C.mute }}>{inc.kind === 'ocs' ? (mine ? 'Recall: sail back below the line and start again. ' : '') : mine ? 'You owe a One-Turn Penalty: when you\'re clear, turn right round through a tack and a gybe. ' : 'The other boat owes a penalty. '}{inc.nextTime ?? ''}</p>
       </div>
       <Btn small onClick={onOpen}>Explain</Btn>
       <Btn small icon aria-label="Dismiss" onClick={onClose}>✕</Btn>

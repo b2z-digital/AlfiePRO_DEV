@@ -6,6 +6,7 @@ import { Race, windwardBoat } from './engine';
 import { AiHost, Helm, LEVELS, PERSONAS, Skipper } from './ai';
 import { bestSheet, polarSpeed, vmgAngles } from './classes';
 import { initialProgress } from './course';
+import { settleHeel } from './physics';
 import { Rng, bearing, clamp, dir, dot, n180, n360, sub } from './math';
 import { Referee, spellSail } from './referee';
 import type { Boat, Incident, RaceSettings, SkipperLevel } from './types';
@@ -184,6 +185,7 @@ export function buildScene(def: SceneDef, seed: number, playerPlan?: PlanFn | 'a
     b.spd = sb.disabled ? 0 : (sb.spd ?? 0.95) * polarSpeed(b.cls, w.tws, Math.abs(twa));
     b.sheet = sb.disabled ? 0 : bestSheet(Math.abs(twa));
     b.penalty = { owed: sb.owes ?? 0, active: false, rot: 0, passedHtw: false, passedDdw: false, taken: 0 };
+    settleHeel(b);
     b.color = sb.color ?? SCENE_COLORS[i % SCENE_COLORS.length];
     if (sb.sail) b.sail = sb.sail;
     while (used.has(b.sail)) b.sail = String((Number(b.sail) + 7) % 98 + 2).padStart(2, '0');
@@ -198,7 +200,7 @@ export function buildScene(def: SceneDef, seed: number, playerPlan?: PlanFn | 'a
       b.progress = initialProgress(leg.options[0], m0, b); b.lastBearing = bearing(m0, b);
       b.progress2 = initialProgress(leg.options[1], m1, b); b.lastBearing2 = bearing(m1, b);
     }
-    race.hist[i] = { x: [], y: [], hdg: [], spd: [], rot: [] };
+    race.hist[i] = { x: [], y: [], hdg: [], spd: [], rot: [], heel: [] };
     if (sb.forgets) race.forgot.add(b.id); else race.forgot.delete(b.id);
     // Helm.
     const helm = b.isPlayer ? playerPlan : sb.helm;

@@ -79,6 +79,9 @@ export interface Boat {
   rot: number;           // deg/s, current turn rate
   rudder: number;        // -1..1, positive turns clockwise (to starboard)
   sheet: number;         // 0..1, 1 = fully sheeted in
+  heel: number;          // deg, + = heeled to port (the starboard-tack lean)
+  heelRate: number;      // deg/s
+  rigPower: number;      // the rig's heeling power, 1 = the class's A rig
 
   // wind at the boat this step (after shadows)
   twd: number; tws: number; twa: number;
@@ -159,6 +162,4 @@ export interface PlayerInput {
   /** Ask the helm assist to tack or gybe now. */
   tack?: boolean;
   gybe?: boolean;
-  /** Assisted One-Turn Penalty. */
-  penaltyAssist?: boolean;
 }

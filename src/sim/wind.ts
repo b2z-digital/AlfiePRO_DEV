@@ -25,13 +25,28 @@ interface Osc { amp: number; period: number; phase: number }
 export interface Puff {
   id: number;
   x: number; y: number;      // centre, m
-  r: number;                 // radius across the wind, m
+  r: number;                 // radius across the wind, m (half as long again along it)
   strength: number;          // +0.3 = 30% more wind, negative = lull
   shift: number;             // degrees added to the direction inside the puff
   age: number; life: number; // s
 }
 
 export interface WindSample { twd: number; tws: number }
+
+/** A puff is half as long again along the wind as across it. */
+export const PUFF_LENGTH = 1.5;
+
+/**
+ * How much of a puff is felt at a point, 0 to 1: the same all through its middle, falling away over
+ * its last few metres, so you feel it arrive. `down` is the way the wind is blowing.
+ */
+export function puffWeight(p: Puff, x: number, y: number, down: V2): number {
+  const dx = x - p.x, dy = y - p.y;
+  const al = (dx * down.x + dy * down.y) / (PUFF_LENGTH * p.r), ac = (dx * down.y - dy * down.x) / p.r;
+  const d2 = al * al + ac * ac;
+  if (d2 > 2.2) return 0;
+  return Math.exp(-d2 * d2 * d2) * Math.sin(Math.PI * clamp(p.age / p.life, 0, 1));
+}
 
 export class WindField {
   readonly baseTwd: number;
@@ -50,10 +65,13 @@ export class WindField {
   private area: { cx: number; cy: number; halfAlong: number; halfAcross: number };
   readonly character: WindCharacter;
   private shifts: { t: number; deg: number; over: number }[];
+  /** The way the wind is blowing now, which the puffs ride and line up with. */
+  down: V2;
 
   constructor(settings: WindSettings, seed: number, area: { cx: number; cy: number; halfAlong: number; halfAcross: number }) {
     this.rng = new Rng(seed ^ 0x5eed);
     this.area = area;
+    this.down = dir(settings.direction + 180);
     this.character = settings.character;
     const kn = settings.knots ?? (settings.strength === 'light' ? 5 : settings.strength === 'fresh' ? 15 : 9.5);
     this.baseTws = kn * KN;
@@ -114,7 +132,7 @@ export class WindField {
       id: this.nextPuffId++,
       x: a.cx + up.x * along + right.x * across,
       y: a.cy + up.y * along + right.y * across,
-      r: r.range(6, 16) * Math.sqrt(a.halfAcross / 25),
+      r: r.range(5, 13) * Math.sqrt(a.halfAcross / 25),
       strength: s,
       shift: r.range(-6, 6),
       age: alongFrac === undefined ? 0 : r.range(5, 20),
@@ -126,6 +144,7 @@ export class WindField {
   step(dt: number, t: number) {
     const tws = this.meanTws(t);
     const down = dir(this.meanTwd(t) + 180);
+    this.down = down;
     const v = tws * 0.55;
     for (const p of this.puffs) {
       p.x += down.x * v * dt;
@@ -148,11 +167,8 @@ export class WindField {
     let twd = twd0 + clamp(this.sideShift * across, -6, 6);
     let k = 1, shift = 0;
     for (const p of this.puffs) {
-      const dx = x - p.x, dy = y - p.y;
-      const d2 = (dx * dx + dy * dy) / (p.r * p.r);
-      if (d2 > 9) continue;
-      const env = Math.sin(Math.PI * clamp(p.age / p.life, 0, 1));
-      const w = Math.exp(-d2) * env;
+      const w = puffWeight(p, x, y, this.down);
+      if (w <= 0) continue;
       k += p.strength * w;
       shift += p.shift * w;
     }
@@ -164,12 +180,7 @@ export class WindField {
   /** Puff intensity at a point (for drawing darker water): positive = more wind. */
   intensity(x: number, y: number): number {
     let k = 0;
-    for (const p of this.puffs) {
-      const dx = x - p.x, dy = y - p.y;
-      const d2 = (dx * dx + dy * dy) / (p.r * p.r);
-      if (d2 > 9) continue;
-      k += p.strength * Math.exp(-d2) * Math.sin(Math.PI * clamp(p.age / p.life, 0, 1));
-    }
+    for (const p of this.puffs) k += p.strength * puffWeight(p, x, y, this.down);
     return k;
   }
 }

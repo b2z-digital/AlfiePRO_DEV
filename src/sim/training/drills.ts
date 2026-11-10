@@ -159,6 +159,7 @@ export const DRILLS: Drill[] = [
     }),
     scoreText: v => `${v.toFixed(1)} s late`,
     solution: timedStart({ margin: 1.3 }),
+    demoSeeds: [1, 3, 4],
     mistake: timedStart({ margin: -6 }),
     mistakeRule: '',
   },
@@ -230,7 +231,7 @@ export const DRILLS: Drill[] = [
     scoreText: v => `${v.toFixed(1)} s late`,
     // Set up to the right and let a luffing boat's drift bring the crossing point down to the pin.
     solution: timedStart({ before: holdForLine(0.18, 2.6), margin: 0.7 }),
-    demoSeeds: [3, 4, 5],
+    demoSeeds: [3, 4, 6],
     mistakeRule: '',
   },
   {

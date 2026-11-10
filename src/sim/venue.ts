@@ -193,11 +193,13 @@ export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
     for (const p of must) { const g = geoOf(S, p); if (!grid.wet(g.x, g.y)) return Infinity; }
     let wet = 0;
     for (const p of soft) { const g = geoOf(S, p); if (grid.wet(g.x, g.y)) wet++; }
-    // Where the skippers stand, in the race frame: close beside the racing, not in it.
+    // Where the skippers stand, in the race frame: close beside the racing, not in it, and as far as
+    // the water allows level with the start line, so they look straight down it from the bank (with
+    // the wind along the bank, the course then runs along it in front of them, as clubs set it).
     const dx = ctrl.x - S.x, dy = ctrl.y - S.y;
     const q = { x: dx * f0.r.x + dy * f0.r.y, y: dx * f0.u.x + dy * f0.u.y };
     const dc = rectDist(q, area.x0, area.y0, area.x1, area.y1);
-    return Math.abs(dc - 6 * L) + 0.03 * Math.hypot(q.x, q.y) + 25 * L * (1 - wet / soft.length);
+    return Math.abs(dc - 6 * L) + 0.35 * Math.abs(q.y) + 0.03 * Math.abs(q.x) + 25 * L * (1 - wet / soft.length);
   };
 
   // Coarse search round the control area, then refine round the best few.

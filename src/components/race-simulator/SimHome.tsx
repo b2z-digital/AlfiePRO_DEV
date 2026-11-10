@@ -29,6 +29,8 @@ export interface Setup {
   venue: string;
   /** At a venue: its usual breeze, today's wind there, or any direction. */
   windDir: 'usual' | 'today' | 'any';
+  /** With today's wind: sail in today's strength too (the default), or in the strength chosen. */
+  todayStrength?: boolean;
   /** The StartBox sequence to start with (an id); null for the simulator's own calls; unset, the club's. */
   startSeq?: string | null;
 }
@@ -189,7 +191,13 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       : s.windDir === 'any' ? 'A different direction every race, so you learn the whole lake.'
         : today === 'loading' ? 'Getting the wind at the club now…'
           : today === 'failed' || !today ? `Couldn't get today's wind, so it's the ${venue.usualWindName} for now.`
-            : `Now at the club: ${Math.round(today.kn)} kn from the ${compassName(today.from)} (${String(Math.round(today.from)).padStart(3, '0')}°). It sets the wind strength too.`;
+            : `Now at the club: ${Math.round(today.kn)} kn from the ${compassName(today.from)} (${String(Math.round(today.from)).padStart(3, '0')}°).`;
+  // With today's wind, its strength is one of the choices (and the one used unless you pick another).
+  const todayKn = venue && s.windDir === 'today' && today && today !== 'loading' && today !== 'failed' ? today.kn : null;
+  const useToday = todayKn !== null && s.todayStrength !== false;
+  const strengthHint = useToday ? `Today's real breeze at the club, ${Math.round(todayKn!)} kn. Pick a strength to sail in that instead, from today's direction.`
+    : s.windStrength === 'fresh' ? 'A fresh breeze: the boats heel hard and the gusts lay them over. IOMs change down to the B rig.'
+      : s.windStrength === 'light' ? 'Light air: keep her moving, and look for the darker water where the breeze is.' : null;
   const weakest = sk ? (Object.entries({ starts: sk.starts, upwind: sk.upwind, roundings: sk.roundings, downwind: sk.downwind, rules: sk.rules }) as [string, number][]).sort((a, b) => a[1] - b[1])[0] : null;
 
   const surprise = () => {
@@ -244,8 +252,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <Field label="Skippers" hint={LEVEL_TEXT[s.level]}>
                 <Seg label="Skipper level" value={s.level} onChange={v => set({ level: v })} options={[{ value: 'club', label: 'Club' }, { value: 'state', label: 'State' }, { value: 'national', label: 'National' }, { value: 'world', label: 'World' }]} />
               </Field>
-              <Field label="Wind">
-                <Seg label="Wind strength" value={s.windStrength} onChange={v => set({ windStrength: v })} options={[{ value: 'light', label: 'Light 3–6 kn' }, { value: 'medium', label: 'Medium 7–12 kn' }, { value: 'fresh', label: 'Fresh 13–18 kn' }]} />
+              <Field label="Wind" hint={strengthHint}>
+                <Seg label="Wind strength" value={useToday ? 'today' : s.windStrength}
+                  onChange={v => (v === 'today' ? set({ todayStrength: true }) : set({ windStrength: v as WindStrength, todayStrength: false }))}
+                  options={[...(todayKn !== null ? [{ value: 'today', label: `Today's ${Math.round(todayKn)} kn` }] : []), { value: 'light', label: 'Light 3–6 kn' }, { value: 'medium', label: 'Medium 7–12 kn' }, { value: 'fresh', label: 'Fresh 13–18 kn' }]} />
                 <Seg label="Wind character" value={s.windCharacter} onChange={v => set({ windCharacter: v })} options={[{ value: 'steady', label: 'Steady' }, { value: 'oscillating', label: 'Oscillating' }, { value: 'puffy', label: 'Puffy' }, { value: 'persistent', label: 'Persistent shift' }]} />
               </Field>
               <Field label="Course" hint={`Windward–leeward with offset and gate · finish upwind · about ${minutes(s)} minutes`}>
@@ -267,7 +277,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <Field label="View" hint={s.view === 'bank' ? 'From the control area on the bank, the way you see a race. Press V to switch.' : 'From above, with laylines. Press V to switch.'}>
                 <Seg label="View" value={s.view} onChange={v => set({ view: v })} options={[{ value: 'bank', label: 'From the bank' }, { value: 'top', label: 'From above' }]} />
               </Field>
-              <Field label={<span className="inline-flex items-center gap-2"><AlfieOrb size={18} />Alfie's coaching</span>} hint={s.coach === 'full' ? 'Alfie talks you through the race as you sail, and pauses it to explain any rules incident you are in.' : s.coach === 'hints' ? 'Alfie gives tips as you sail; rules incidents show as a banner without pausing.' : 'No tips. Incidents still show briefly.'}>
+              <Field label={<span className="inline-flex items-center gap-2"><AlfieOrb size={18} />Alfie's coaching</span>} hint={s.coach === 'full' ? 'Alfie talks you through the race as you sail and flags any rules incident you are in. The race never stops: you sail your own penalty turns.' : s.coach === 'hints' ? 'Alfie gives tips as you sail; rules incidents show as a banner.' : 'No tips. Incidents still show briefly.'}>
                 <Seg label="Alfie's coaching" value={s.coach} onChange={v => set({ coach: v })} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints only' }, { value: 'off', label: 'Off' }]} />
               </Field>
               <div className="flex flex-col gap-2">
@@ -374,7 +384,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               badge={<Chip tone={labWon ? 'blue' : 'plain'}>{labWon} of {LAB.length} won</Chip>}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 001.3 2h13.4a1.5 1.5 0 001.3-2L14 9V3" /></svg>} />
             <TrainCard title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water from the control area, in the wind blowing there today. Rehearse the shifts before you get to the club.`}
-              action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today' }); document.getElementById('qr-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} actionLabel="Use today's wind"
+              action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today', todayStrength: true }); document.getElementById('qr-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} actionLabel="Use today's wind"
               badge={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? <Chip tone="blue">Set up</Chip> : undefined}
               icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>} />
           </div>

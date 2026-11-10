@@ -60,8 +60,10 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const live = def && s.windDir === 'today' && today ? today : null;
   const windFrom = !def ? undefined : live ? live.from : s.windDir === 'any' ? Math.floor(Math.random() * 360) : def.usualWind;
+  // Today's strength too, unless a strength was picked to sail in from today's direction.
+  const knots = live && s.todayStrength !== false ? live.kn : undefined;
   return {
-    venue: def?.id, windFrom, windKnots: live ? live.kn : undefined,
+    venue: def?.id, windFrom, windKnots: knots,
     // Your own name, and your sail number when you have a boat in this class.
     player: me ? { name: me.name, sail: me.sails[s.classId] ?? '01' } : undefined,
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
