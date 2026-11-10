@@ -19,6 +19,7 @@ import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
 import type { SimSequence } from './startbox';
 import type { OpenRoom } from './live';
+import type { PadInfo } from './transmitter';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -151,6 +152,29 @@ function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean;
  */
 /** Race members live: open a room for the race set up above, join one with its code, or pick one of
  *  the club's open races. */
+/** Your transmitter: sail with your own sticks. Which one is plugged in, and the set-up. */
+function TransmitterCard({ pads, onSetUp }: { pads: PadInfo[]; onSetUp: () => void }) {
+  const pad = pads.find(p => p.transmitter) ?? pads[0] ?? null;
+  return (
+    <section className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="tx-title">
+      <div className="flex items-center gap-2.5">
+        <Tile size={36}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
+        </Tile>
+        <div className="min-w-0 flex-1">
+          <h2 id="tx-title" className="m-0 text-[16px] font-semibold">Your transmitter</h2>
+          <p className="m-0 truncate text-[12.5px]" style={{ color: C.mute }}>
+            {pad ? `${pad.name} · ${pad.setUp ? 'ready to sail' : 'not set up yet'}` : 'Sail with your own sticks'}
+          </p>
+        </div>
+        {pad && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: pad.setUp ? C.green : C.orange }} aria-hidden="true" />}
+      </div>
+      {!pad && <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Plug in a RadioMaster or any EdgeTX radio by USB, choose USB Joystick (HID), and move a stick.</p>}
+      <div><Btn small primary={!!pad && !pad.setUp} onClick={onSetUp}>{pad ? (pad.setUp ? 'Check the set-up' : 'Set it up') : 'How to connect'}</Btn></div>
+    </section>
+  );
+}
+
 function LiveSection({ rooms, onOpen, onJoin }: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void }) {
   const [code, setCode] = useState('');
   const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
@@ -209,7 +233,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null, live = null }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null, live = null, transmitter = null }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -229,6 +253,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   startSeq?: SimSequence | null;
   /** Live races with other members (signed in): the club's open rooms, open one, join one. */
   live?: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void } | null;
+  /** Your transmitter: what's plugged in, and the set-up. */
+  transmitter?: { pads: PadInfo[]; onSetUp: () => void } | null;
 }) {
   const [setting, setSetting] = useState(false);
   const stars = drillStars(training);
@@ -391,6 +417,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 </>
               )}
             </section>
+            {transmitter && <TransmitterCard {...transmitter} />}
           </aside>
         </div>
 

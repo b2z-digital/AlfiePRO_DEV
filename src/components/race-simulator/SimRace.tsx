@@ -14,7 +14,8 @@ import type { SceneSpec } from '@/sim/training';
 import { CoachMode, Cue, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
 import { Camera, drawRace } from './render';
 import { BankCam, drawBank, followCam, newBankCam } from './bank';
-import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
+import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './input';
+import { usePads } from './transmitter';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
 import { SequencePlayer, SimSequence } from './startbox';
@@ -176,7 +177,18 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const [sceneOut, setSceneOut] = useState<Outcome | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [padOpen, setPadOpen] = useState(false);
+  // Setting up a transmitter part way through a race of your own pauses it, and carries on after.
+  const padPaused = useRef(false);
   const [mapping, setMapping] = useState<GamepadMapping>(loadMapping);
+  // Transmitters plugged in: the one you steer with uses its own set-up.
+  const pads = usePads();
+  const pad = pads.find(x => x.id === mapping.device) ?? pads.find(x => x.transmitter) ?? pads[0] ?? null;
+  useEffect(() => {
+    const saved = pad ? savedFor(pad.id) : null;
+    if (saved && saved.device !== mapping.device) setMapping(saved);
+  }, [pad, mapping.device]);
+  // Hail and Tack from a switch on the transmitter (set in the frame loop, defined further down).
+  const acts = useRef({ tack: () => {}, hail: () => {} });
   const [ruleSheet, setRuleSheet] = useState<string | null>(null);
   const [coachHidden, setCoachHidden] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -363,6 +375,13 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       }
       const st = R.current;
       ctl.update(dtReal, st.mapping);
+      {
+        // A switch on the transmitter: hail or tack, while racing.
+        const t = ctl.take();
+        const racing = live ? !st.ended : !st.paused && !st.replay && !st.ended;
+        if (racing && t.tack) acts.current.tack();
+        if (racing && t.hail) acts.current.hail();
+      }
       const p = race.player;
       if (race.replaying) {
         // Sailing back to the moment you chose: as fast as the frame allows, quietly. The old
@@ -582,6 +601,23 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (r.text) audio.say(r.text.replace(/!/g, ''), true);
     if (r.note) toast(r.note, r.noteTone ?? 'plain');
   }, [race, audio, toast, live]);
+  acts.current = { tack: doTack, hail: doHail };
+  const openPad = () => {
+    if (!live && !R.current.paused && !moment && !results && !sceneOut) { padPaused.current = true; setPaused(true); R.current.paused = true; }
+    setPadOpen(true);
+  };
+  const closePad = () => {
+    setPadOpen(false);
+    if (padPaused.current) { padPaused.current = false; setPaused(false); R.current.paused = false; }
+  };
+  // A transmitter plugged in: say it's there, or how to set it up.
+  const seenPad = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pad || seenPad.current === pad.id) return;
+    seenPad.current = pad.id;
+    if (pad.setUp) toast(`${pad.name} connected`, 'good');
+    else toast(`${pad.name} found: set it up ${phone ? 'from the menu' : 'with the transmitter button'}`);
+  }, [pad, toast, phone]);
 
   const closeMoment = useCallback(() => {
     setMoment(null); setReplay(null); R.current.replay = null;
@@ -710,7 +746,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" /></svg>
             : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14" /></svg>}
         </Btn>
-        <Btn icon aria-label="Transmitter set-up" onClick={() => setPadOpen(true)} title="Transmitter">
+        <Btn icon aria-label="Transmitter set-up" onClick={openPad} title={pad ? `${pad.name}${pad.setUp ? '' : ': not set up yet'}` : 'Transmitter'} className="relative">
+          {pad && <span className="absolute right-1 top-1 h-2 w-2 rounded-full" style={{ background: pad.setUp ? C.green : C.orange }} aria-hidden="true" />}
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
         </Btn>
         {canFull && (
@@ -886,7 +923,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             fast={live ? null : fast} onFast={() => setFast(v => !v)}
             laylines={view === 'top' ? laylines : null} onLaylines={() => setLaylines(v => !v)}
             full={canFull ? full : null} onFull={toggleFull}
-            onPad={() => setPadOpen(true)}
+            onPad={openPad}
             onRestart={live ? undefined : onAgain}
             onHome={onHome} homeLabel={live ? 'Leave the race' : scene ? backLabel : 'Main menu'}
           />
@@ -929,7 +966,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         )}
 
         {ruleSheet && <RuleSheet rule={ruleSheet} onClose={() => setRuleSheet(null)} />}
-        {padOpen && <GamepadModal mapping={mapping} onSave={m => { setMapping(m); saveMapping(m); }} onClose={() => setPadOpen(false)} />}
+        {padOpen && <GamepadModal mapping={mapping} onSave={m => { setMapping(m); saveMapping(m); }} onClose={closePad} />}
       </main>
     </div>
   );

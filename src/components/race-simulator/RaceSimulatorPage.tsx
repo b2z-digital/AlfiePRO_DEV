@@ -30,6 +30,9 @@ import { raceFacts, writeUp } from './writeup';
 import { SimSequence, chosenSequence, loadClubSequences } from './startbox';
 import { ChannelTransport, ClubRooms, LiveRace, LiveRoom, OpenRoom, RoomSettings, cleanCode, newCode, roomChannel } from './live';
 import SimLive, { roomTitle } from './SimLive';
+import GamepadModal from './GamepadModal';
+import { activePad, loadMapping, saveMapping } from './input';
+import { usePads } from './transmitter';
 
 interface RaceSimulatorPageProps {
   darkMode: boolean;
@@ -214,6 +217,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     sync();
     return room.subscribe(sync);
   }, [room, where, clubRooms, me, startSeq, setup.view]);
+  // Your transmitter, set up from the home page as well as from a race.
+  const pads = usePads();
+  const [padOpen, setPadOpen] = useState(false);
   const refreshChallenges = useCallback(() => {
     if (!userId) return;
     void listChallenges().then(cs => setChallenges(cs));
@@ -433,13 +439,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   return (
     <div className="h-full overflow-y-auto">
+      {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
         training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
         sequences={sequences} startSeq={startSeq}
-        live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null} />
+        live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null}
+        transmitter={{ pads, onSetUp: () => setPadOpen(true) }} />
     </div>
   );
 }
