@@ -1,7 +1,8 @@
 // Challenges: a race everyone sails the same way (the same class, venue, wind and seed), set by a
 // club admin or the platform, with a leaderboard of each member's best result. Every entry keeps its
 // race log, so you can race the leader's ghost. Stored in sim_challenges and sim_challenge_entries;
-// row-level security decides who sees and enters what.
+// row-level security decides who sees and enters what. A virtual race event's races are challenges
+// too (event_id, race_no: see events.ts); its race logs stay private until each race closes.
 import type { RaceLog } from '@/sim/engine';
 import type { RaceSettings } from '@/sim/types';
 import type { RaceSummary } from './stats';
@@ -16,6 +17,9 @@ export interface Challenge {
   opens_at: string;
   closes_at: string | null;
   created_at: string;
+  /** A race of a virtual race event, and its number in it. */
+  event_id?: string | null;
+  race_no?: number | null;
 }
 
 export interface ChallengeEntry {
@@ -25,7 +29,8 @@ export interface ChallengeEntry {
   display_name: string;
   sail_number: string | null;
   place: number | null;
-  status: 'finished' | 'dsq' | 'ocs' | 'dnf';
+  /** 'started': a first try under way (from the gun), not finished yet. */
+  status: 'finished' | 'dsq' | 'ocs' | 'dnf' | 'started';
   elapsed_s: number | null;
   summary: RaceSummary | null;
   sailed_at: string;
@@ -54,7 +59,8 @@ export function closesText(c: Challenge, now = Date.now()): string {
 export async function listChallenges(limit = 12): Promise<Challenge[] | null> {
   try {
     const supabase = await db();
-    const { data, error } = await supabase.from('sim_challenges').select('id, club_id, title, description, settings, opens_at, closes_at, created_at').order('opens_at', { ascending: false }).limit(limit);
+    // (An event's races are listed with their event.)
+    const { data, error } = await supabase.from('sim_challenges').select('id, club_id, title, description, settings, opens_at, closes_at, created_at').is('event_id', null).order('opens_at', { ascending: false }).limit(limit);
     if (error) return null;
     return (data ?? []) as Challenge[];
   } catch { return null; }
@@ -76,9 +82,9 @@ export async function createChallenge(a: Account, c: { clubId: string | null; ti
   } catch (e) { return e instanceof Error ? e.message : 'Something went wrong'; }
 }
 
-/** Finishers by time, then everyone else. */
+/** Finishers by time, then everyone else (a try still under way first among them). */
 export function rankEntries(es: ChallengeEntry[]): ChallengeEntry[] {
-  const rank = (e: ChallengeEntry) => (e.status === 'finished' && e.elapsed_s != null ? e.elapsed_s : 1e9 + (e.status === 'dnf' ? 1 : e.status === 'ocs' ? 2 : 3));
+  const rank = (e: ChallengeEntry) => (e.status === 'finished' && e.elapsed_s != null ? e.elapsed_s : 1e9 + (e.status === 'started' ? 0 : e.status === 'dnf' ? 1 : e.status === 'ocs' ? 2 : 3));
   return [...es].sort((a, b) => rank(a) - rank(b) || Date.parse(a.sailed_at) - Date.parse(b.sailed_at));
 }
 
@@ -91,13 +97,16 @@ export async function leaderboard(challengeId: string): Promise<ChallengeEntry[]
   } catch { return null; }
 }
 
-/** An entry's race log (with the settings it was sailed with), to sail against as a ghost. */
+/**
+ * An entry's race log (with the settings it was sailed with), to sail against as a ghost. Your own,
+ * any challenge's, or an event race's once it has closed (sim_entry_log decides).
+ */
 export async function entryLog(entryId: string): Promise<(RaceLog & { settings: RaceSettings }) | null> {
   try {
     const supabase = await db();
-    const { data, error } = await supabase.from('sim_challenge_entries').select('log').eq('id', entryId).maybeSingle();
-    if (error || !data?.log) return null;
-    const log = data.log as RaceLog;
+    const { data, error } = await supabase.rpc('sim_entry_log', { p_entry: entryId });
+    if (error || !data) return null;
+    const log = data as RaceLog;
     return Array.isArray(log.input) && Array.isArray(log.acts) && log.settings ? (log as RaceLog & { settings: RaceSettings }) : null;
   } catch { return null; }
 }
@@ -112,9 +121,10 @@ export function better(a: { status: string; elapsed_s: number | null }, b: { sta
 
 /**
  * Enter a result: saved if it's your first or better than your best, with the race log for your
- * ghost. Returns where you are on the leaderboard now (1-based), or null if it couldn't be saved.
+ * ghost. In a first-try event it finishes the try you started at the gun, and only that one counts.
+ * Returns where you are on the leaderboard now (1-based), or null if it couldn't be saved.
  */
-export async function submitEntry(a: Account, ch: Challenge, me: { name: string; sail: string | null }, sum: RaceSummary, raceLog: RaceLog, settings: RaceSettings): Promise<{ saved: boolean; rank: number | null; of: number; best: number | null } | null> {
+export async function submitEntry(a: Account, ch: Challenge, me: { name: string; sail: string | null }, sum: RaceSummary, raceLog: RaceLog, settings: RaceSettings, firstTry = false): Promise<{ saved: boolean; rank: number | null; of: number; best: number | null } | null> {
   try {
     const supabase = await db();
     const status = sum.status === 'racing' ? 'dnf' : sum.status;
@@ -123,9 +133,20 @@ export async function submitEntry(a: Account, ch: Challenge, me: { name: string;
       // The log carries the exact settings (your auto-trim, your number), so your ghost sails true.
       place: sum.place, status, elapsed_s: sum.time, summary: sum, log: { ...raceLog, settings }, sailed_at: new Date(sum.at).toISOString(),
     };
-    const { data: mine } = await supabase.from('sim_challenge_entries').select('id, status, elapsed_s').eq('challenge_id', ch.id).eq('user_id', a.userId).maybeSingle();
+    let { data: mine } = await supabase.from('sim_challenge_entries').select('id, status, elapsed_s').eq('challenge_id', ch.id).eq('user_id', a.userId).maybeSingle();
     let saved = false;
-    if (better(row, mine as { status: string; elapsed_s: number | null } | null)) {
+    if (firstTry) {
+      // Your try was held at the gun; if that didn't reach the club (no signal), hold it now.
+      if (!mine) {
+        await supabase.from('sim_challenge_entries').insert({ challenge_id: ch.id, user_id: a.userId, display_name: row.display_name, sail_number: row.sail_number, status: 'started', sailed_at: row.sailed_at });
+        ({ data: mine } = await supabase.from('sim_challenge_entries').select('id, status, elapsed_s').eq('challenge_id', ch.id).eq('user_id', a.userId).maybeSingle());
+      }
+      if (mine && (mine as { status: string }).status === 'started') {
+        const { error } = await supabase.from('sim_challenge_entries').update(row).eq('id', (mine as { id: string }).id);
+        if (error) return null;
+        saved = true;
+      }
+    } else if (better(row, mine as { status: string; elapsed_s: number | null } | null)) {
       const { error } = mine
         ? await supabase.from('sim_challenge_entries').update(row).eq('id', (mine as { id: string }).id)
         : await supabase.from('sim_challenge_entries').insert(row);

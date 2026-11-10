@@ -72,6 +72,8 @@ export interface SimRaceProps {
   live?: LiveRace;
   /** The live race's room code, shown in the top bar. */
   liveCode?: string;
+  /** The starting signal: a first try at an event race starts here. */
+  onGun?: () => void;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
   onSceneWatch?: () => void;
@@ -108,7 +110,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -261,6 +263,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     else toast(inc.kind === 'ocs' ? 'Recall: go back below the line and start again' : mine ? `Rule ${inc.rule}: you owe a One-Turn Penalty` : `Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes you a penalty`, 'warn');
   }, [race, toast, flashes, mode]);
 
+  // Called once, at the gun.
+  const gunRef = useRef(onGun);
   const handleEvents = useCallback(() => {
     const p = race.player;
     const evs = race.events;
@@ -269,7 +273,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       switch (e.type) {
         // The club's recording calls the sequence and fires the gun when it's playing.
         case 'signal': if (!seqPlayer?.working) audio.signal(e.remaining); break;
-        case 'gun': if (!seqPlayer?.working) audio.gun(); break;
+        case 'gun': if (!seqPlayer?.working) audio.gun(); gunRef.current?.(); gunRef.current = undefined; break;
         case 'recall': {
           const sails = e.boats.map(id => race.boatById(id).sail);
           audio.recall(sails);
