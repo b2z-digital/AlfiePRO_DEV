@@ -11,12 +11,13 @@ import { VENUES } from '@/sim/venues';
 import { drawBank, followCam, newBankCam } from './bank';
 import { Smoother } from './smooth';
 import type { Setup } from './SimHome';
+import { windAt } from '@/sim/venue';
 
 /** A fleet racing with nobody at the helm, in the conditions set up. */
 function heroRace(s: Setup, seed: number): Race {
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const settings: RaceSettings = {
-    venue: def?.id, windFrom: def ? def.usualWind : undefined,
+    venue: def?.id, windFrom: def ? windAt(def, s.windPick).from : undefined, venueSpot: def ? s.spots?.[def.id] : undefined,
     classId: s.classId, fleetSize: Math.min(10, Math.max(6, s.fleetSize)), level: s.level,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: 2, length: 'medium', sequenceSeconds: 14, coach: 'off', autoTrim: true, seaState: s.seaState,
@@ -30,7 +31,7 @@ function heroRace(s: Setup, seed: number): Race {
 
 export default function SimHero({ setup, children, className }: { setup: Setup; children?: React.ReactNode; className?: string }) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
-  const key = `${setup.venue}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
+  const key = `${setup.venue}|${setup.windDir === 'usual' ? setup.windPick ?? 0 : 0}|${(setup.spots?.[setup.venue] ?? []).join(',')}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
   const latest = useRef(setup);
   latest.current = setup;
 
