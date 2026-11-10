@@ -272,8 +272,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       const e = evs[R.current.evIdx];
       switch (e.type) {
         // The club's recording calls the sequence and fires the gun when it's playing.
-        case 'signal': if (!seqPlayer?.working) audio.signal(e.remaining); break;
-        case 'gun': if (!seqPlayer?.working) audio.gun(); gunRef.current?.(); gunRef.current = undefined; break;
+        // The club's recording calls the start; if it isn't sounding (still loading, or it failed),
+        // the simulator calls it, so a start is never silent.
+        case 'signal': if (!seqPlayer?.calling) audio.signal(e.remaining); break;
+        case 'gun': if (!seqPlayer?.calling) audio.gun(); gunRef.current?.(); gunRef.current = undefined; break;
         case 'recall': {
           const sails = e.boats.map(id => race.boatById(id).sail);
           audio.recall(sails);

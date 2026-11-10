@@ -1,6 +1,6 @@
 // Race simulator: the club's StartBox sequences, as the simulator uses them. Run with: npm test
-import { describe, expect, it } from 'vitest';
-import { SimSequence, chosenSequence, toSimSequence } from '@/components/race-simulator/startbox';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SequencePlayer, SimSequence, chosenSequence, toSimSequence } from '@/components/race-simulator/startbox';
 import type { StartSequence } from '@/types/startBox';
 
 const base = { is_system_default: false, is_active: true, sort_order: 0, created_at: '', updated_at: '' };
@@ -34,5 +34,77 @@ describe('StartBox sequences', () => {
     expect(chosenSequence([own, sys], 'sys')).toBe(sys);
     expect(chosenSequence([own, sys], null)).toBeNull();
     expect(chosenSequence([own], 'gone')).toBeNull();
+  });
+});
+
+// A stand-in for the browser's audio element whose jumps take time, as they do when the part of
+// the recording jumped to hasn't been fetched yet.
+class SlowAudio {
+  static made: SlowAudio[] = [];
+  static seekTakes = 0.6;
+  paused = true; seeking = false; readyState = 4; playbackRate = 1; muted = false; preload = ''; error = null;
+  played = 0; seeks = 0;
+  private t = 0; private left = 0;
+  private on: Record<string, (() => void)[]> = {};
+  constructor(public src: string) { SlowAudio.made.push(this); }
+  get currentTime() { return this.t; }
+  set currentTime(v: number) { this.t = v; this.seeking = true; this.left = SlowAudio.seekTakes; this.seeks++; }
+  play() { this.paused = false; return Promise.resolve(); }
+  pause() { this.paused = true; }
+  load() { /* nothing to fetch */ }
+  removeAttribute() { /* kept */ }
+  addEventListener(e: string, f: () => void) { (this.on[e] ||= []).push(f); }
+  removeEventListener(e: string, f: () => void) { this.on[e] = (this.on[e] ?? []).filter(x => x !== f); }
+  tick(dt: number) {
+    if (this.seeking) { this.left -= dt; if (this.left <= 0) { this.seeking = false; for (const f of this.on.seeked ?? []) f(); } return; }
+    if (!this.paused) { this.t += dt * this.playbackRate; this.played += dt; }
+  }
+}
+
+describe('a recorded sequence against the race clock', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  const run = (seconds: number, introMs: number, raceSeconds: number, rate = 1) => {
+    let now = 0;
+    vi.stubGlobal('Audio', SlowAudio);
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    SlowAudio.made = [];
+    const seq: SimSequence = { id: `s${seconds}-${introMs}`, name: 'Recorded', seconds, club: true, audio: { url: `https://x/${seconds}-${introMs}.mp3`, startMs: 0, introMs, endMs: null } };
+    const player = new SequencePlayer(seq);
+    const el = SlowAudio.made[0];
+    let t = 0, calledByRecording = 0, steps = 0;
+    const dt = 1 / 60;
+    while (t < raceSeconds) {
+      player.update(seconds - t, true, rate, false);
+      el.tick(dt);
+      now += dt * 1000; t += dt * rate;
+      steps++; if (player.calling) calledByRecording++;
+    }
+    const want = introMs / 1000 + t;
+    player.stop();
+    return { el, want, calling: calledByRecording / steps };
+  };
+
+  it('plays a one-minute start whose recording takes a while to jump to the countdown', () => {
+    // The club's 1 Minute Scratch: 11 s of introduction before the countdown, so the race opens
+    // with a jump into a part of the recording that isn't loaded yet.
+    const { el, want } = run(60, 11022, 20);
+    expect(el.played).toBeGreaterThan(18);
+    expect(el.seeks).toBeLessThan(4);
+    expect(Math.abs(el.currentTime - want)).toBeLessThan(0.35);
+  });
+
+  it('stays in step when the race runs fast', () => {
+    const { el, want } = run(120, 6028, 40, 2.5);
+    expect(el.played).toBeGreaterThan(14);
+    expect(Math.abs(el.currentTime - want)).toBeLessThan(0.5);
+  });
+
+  it("hands the calls to the simulator when the recording won't sound", () => {
+    SlowAudio.seekTakes = 1e6;
+    const { el, calling } = run(60, 9000, 10);
+    SlowAudio.seekTakes = 0.6;
+    expect(el.played).toBe(0);
+    expect(calling).toBeLessThan(0.2);
   });
 });

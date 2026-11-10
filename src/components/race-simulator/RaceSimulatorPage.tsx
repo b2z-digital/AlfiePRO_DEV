@@ -31,7 +31,7 @@ import SimEventPage from './SimEvent';
 import type { EventChoice } from './EventForm';
 import { standings } from './series';
 import { raceFacts, writeUp } from './writeup';
-import { SimSequence, chosenSequence, loadClubSequences } from './startbox';
+import { SimSequence, chosenSequence, loadClubSequences, warmSequence } from './startbox';
 import { ChannelTransport, ClubRooms, LiveRace, LiveRoom, OpenRoom, RoomSettings, cleanCode, newCode, roomChannel } from './live';
 import SimLive, { roomTitle } from './SimLive';
 import GamepadModal from './GamepadModal';
@@ -174,6 +174,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return () => { live = false; };
   }, [clubId]);
   const startSeq = chosenSequence(sequences, setup.startSeq);
+  // Its recording starts loading now, so it's ready the moment a race opens.
+  const startSeqId = startSeq?.id;
+  useEffect(() => { warmSequence(startSeq); }, [startSeqId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Live races: the room you're in, and your club's open rooms.
   const [room, setRoom] = useState<LiveRoom | null>(null);
