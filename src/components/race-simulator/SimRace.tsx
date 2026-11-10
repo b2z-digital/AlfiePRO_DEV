@@ -8,6 +8,7 @@ import { LEVELS, PERSONAS, Skipper } from '@/sim/ai';
 import { Rng } from '@/sim/math';
 import type { Boat, Incident, RaceSettings } from '@/sim/types';
 import { DT } from '@/sim/physics';
+import { Smoother } from './smooth';
 import { dir, dist, n180 } from '@/sim/math';
 import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
 import type { SceneSpec } from '@/sim/training';
@@ -360,6 +361,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     // ever steps down (never back up and down again, which would make the water flicker and the
     // frame rate swing), and only after a steady run of slow frames.
     const perf = { detail: 2, ft: 1 / 60, slow: 0 };
+    // Frames are drawn part-way through the race's steps, so everything moves smoothly.
+    const smooth = new Smoother(), smoothGhost = new Smoother();
+    let running = false;
     const frame = (now: number) => {
       // The frame's timestamp can be a little before the moment the loop started: never negative.
       // A slow frame still moves the race on in real time (up to a quarter of a second at once).
@@ -409,11 +413,12 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           if (live) live.input(ctl.rudder, ctl.sheet);
           else race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim };
           const before = race.step_;
+          smooth.mark(race);
           race.step();
           // A live race waits for everyone's helm: no step this time, try again next frame.
           if (race.step_ === before) { held = true; break; }
           live?.afterStep();
-          if (ghostRace && !ghostRace.ended) ghostRace.step();
+          if (ghostRace && !ghostRace.ended) { smoothGhost.mark(ghostRace); ghostRace.step(); }
           handleEvents();
           if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
           acc -= DT; n++;
@@ -427,6 +432,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         }
         if (n >= 14) acc = 0;
         if (held) acc = Math.min(acc, DT);
+        running = !st.ended && !st.paused;
         // The end of a race or start practice.
         if (!scene) {
           const startDone = mode === 'start' && race.t > race.gunT + 12;
@@ -450,6 +456,11 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         st.replay = { back, playing: back > 0 };
         setReplay(st.replay);
       }
+      // From here to the end of the drawing, the boats and the clock are where they are for this frame.
+      const into = running && !st.replay && !race.replaying ? acc / DT : 1;
+      running = false;
+      smooth.apply(race, into);
+      if (ghostRace) smoothGhost.apply(ghostRace, into);
       // Camera: follow the player (or her replay position), or fit the course.
       if (p) {
         const H = race.hist[race.boats.indexOf(p)];
@@ -521,6 +532,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           });
         }
       }
+      smooth.restore(race);
+      if (ghostRace) smoothGhost.restore(ghostRace);
       // HUD at 10 Hz. The coach line changes at most every 6 s unless something more urgent comes up
       // (a rule risk, or start timing near the gun, which updates every 1.5 s); the rule watch keeps up.
       if (now - hudAt > 100) {

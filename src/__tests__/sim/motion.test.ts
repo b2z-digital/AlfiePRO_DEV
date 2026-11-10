@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
 import { CLASSES, rigPower, iomRig } from '@/sim/classes';
 import { KN } from '@/sim/math';
-import { heelStep, integrate, settleHeel, weatherHelm } from '@/sim/physics';
+import { divePress, heelStep, integrate, settleHeel, weatherHelm } from '@/sim/physics';
 import { twaOf } from '@/sim/math';
 import { hullMotion, makeSea } from '@/sim/sea';
 import type { Boat, RaceSettings } from '@/sim/types';
@@ -31,7 +31,7 @@ describe('Heel', () => {
     b.tws = 30 * KN;
     let peak = 0;
     for (let k = 0; k < 40; k++) { heelStep(b, 0.05, 42); peak = Math.max(peak, Math.abs(b.heel)); }
-    expect(peak).toBeGreaterThan(70);
+    expect(peak).toBeGreaterThan(66);
   });
 
   it('never lays her past flat, however hard it blows', () => {
@@ -85,6 +85,86 @@ describe('Heel', () => {
     expect(maxLuff).toBeLessThan(15);                 // but not into irons
     expect(Math.abs(before - b.twa)).toBeLessThan(1.5); // and came back down afterwards
     expect(b.spd).toBeGreaterThan(0.6);
+  });
+});
+
+/** A boat running square on starboard in `kn` knots, settled, on the rig for a base breeze of `base` knots. */
+function running(kn: number, base = kn, cls: 'IOM' | '10R' = 'IOM'): Boat {
+  const r = new Race({ classId: cls, fleetSize: 2, level: 'state', windStrength: 'medium', windCharacter: 'steady', laps: 1, length: 'short', sequenceSeconds: 30, coach: 'off', autoTrim: true, seed: 3, noPlayer: true } as RaceSettings);
+  const b = r.boats[0];
+  const rp = base >= 20 ? 0.5 : base >= 12.5 ? 0.72 : 1;
+  Object.assign(b, { tws: kn * KN, twd: 0, hdg: 178, twa: -178, tack: 'port', spd: 1.1, sheet: 0.16, rudder: 0, rot: 0, runPower: rp, rigPower: cls === 'IOM' ? rp : 1, dive: 0, pitch: 0 });
+  settleHeel(b);
+  return b;
+}
+/** Sail her for `s` seconds with a helm; returns the most she dived, heeled and turned off her course. */
+function sail(b: Boat, s: number, helm: (t: number, b: Boat) => number) {
+  let dive = 0, heel = 0, off = 0, minSpd = 99;
+  const h0 = b.hdg;
+  for (let k = 0; k < s / 0.05; k++) {
+    b.rudder = helm(k * 0.05, b);
+    integrate(b, 0.05, k * 0.05);
+    b.twa = twaOf(b.hdg, b.twd);
+    dive = Math.max(dive, b.dive); heel = Math.max(heel, Math.abs(b.heel)); off = Math.max(off, Math.abs(((b.hdg - h0 + 540) % 360) - 180));
+    if (k * 0.05 > 2) minSpd = Math.min(minSpd, b.spd);
+  }
+  return { dive, heel, off, minSpd };
+}
+
+describe('Sheeting in', () => {
+  it("leans her into it in a strong breeze: no snapping over past where she'll settle", () => {
+    // Stopped on the line in 18 knots with the sails right out, then sheeted hard in.
+    const b = closeHauled(18);
+    b.spd = 0.2; b.sheet = 0.2; settleHeel(b);
+    b.sheet = 1;
+    let peak = 0, at1 = 0;
+    for (let k = 0; k < 120; k++) { heelStep(b, 0.05, 42); peak = Math.max(peak, b.heel); if (k === 5) at1 = b.heel; }
+    expect(at1).toBeLessThan(0.45 * b.heel);      // a third of a second in, she's under half way over
+    expect(peak).toBeLessThan(b.heel * 1.06);     // and she never throws herself past it
+    // Dumping the sheet still stands her up at once.
+    const was = b.heel;
+    b.sheet = 0.15;
+    for (let k = 0; k < 12; k++) heelStep(b, 0.05, 42);
+    expect(b.heel).toBeLessThan(0.55 * was);
+  });
+});
+
+describe('Running pressed', () => {
+  it('stays on her feet and level in an ordinary breeze', () => {
+    const r = sail(running(10), 12, () => 0);
+    expect(r.dive).toBe(0);
+    expect(r.heel).toBeLessThan(8);
+    expect(r.off).toBeLessThan(6);
+  });
+
+  it("in a gust too strong for her rig she buries her bow instead of rolling over, slows, and darts off to one side", () => {
+    const b = running(19, 10);
+    const r = sail(b, 12, () => 0);
+    expect(r.dive).toBeGreaterThan(0.85);          // bow under
+    expect(r.heel).toBeLessThan(30);               // she didn't just roll onto her side
+    expect(r.minSpd).toBeLessThan(0.85);           // and it stopped her
+    expect(r.off).toBeGreaterThan(30);             // then she broached
+  });
+
+  it('pitches bow down as she dives', () => {
+    const b = running(19, 10);
+    sail(b, 2.5, () => 0);
+    expect(b.pitch).toBeLessThan(-6);
+  });
+
+  it('keeps her bow up if you weave her gently from side to side', () => {
+    const straight = sail(running(17, 10), 10, () => 0);
+    const weaving = sail(running(17, 10), 10, t => 0.32 * Math.sin((2 * Math.PI * t) / 2.6));
+    expect(straight.dive).toBeGreaterThan(0.6);
+    expect(weaving.dive).toBeLessThan(0.75 * straight.dive);
+    expect(weaving.off).toBeLessThan(40);
+  });
+
+  it('presses a smaller rig and a longer hull less, and a boat that has come up onto a reach not at all', () => {
+    const a = running(19, 10), bRig = running(19, 19), ten = running(19, 10, '10R');
+    expect(divePress(bRig, 178)).toBeLessThan(divePress(a, 178) - 0.3);
+    expect(divePress(ten, 178)).toBeLessThan(divePress(a, 178) - 0.2);
+    expect(divePress(a, 110)).toBe(0);
   });
 });
 
@@ -162,4 +242,49 @@ describe('The start', () => {
       expect(CLASSES[r.settings.classId].loa).toBe(me.cls.loa);
     }
   });
+
+  /** Sail a 16-boat fleet's start: where along the line each boat crossed (0 pin, 1 starboard end) and when. */
+  const startOf = (level: 'club' | 'national', seed: number) => {
+    const r = new Race({ classId: 'IOM', fleetSize: 16, level, windStrength: 'medium', windCharacter: 'oscillating', laps: 1, length: 'long', sequenceSeconds: 60, coach: 'off', autoTrim: true, seed, noPlayer: true, venue: 'lmryc' } as RaceSettings);
+    const P = r.course.start.pin, S = r.course.start.stbd, len = Math.hypot(S.x - P.x, S.y - P.y);
+    const at = (b: Boat) => ((b.x - P.x) * (S.x - P.x) + (b.y - P.y) * (S.y - P.y)) / (len * len);
+    const u: number[] = [], when: number[] = [], spots: number[][] = [[], []];
+    const done = new Set<string>();
+    while (r.t < r.gunT + 14) {
+      r.step();
+      for (const [k, T] of [[0, 30], [1, 5]] as const) {
+        if (!spots[k].length && r.gunT - r.t <= T) spots[k] = r.skippers.map(sk => (sk as unknown as { pre: { spot: number } } | null)?.pre.spot ?? 0);
+      }
+      for (const b of r.boats) if (b.started && !done.has(b.id)) { done.add(b.id); u.push(at(b)); when.push(r.t - r.gunT); }
+    }
+    when.sort((a, b) => a - b);
+    return { r, u, median: when[Math.floor(when.length / 2)], lenL: len / r.boats[0].cls.loa, moved: spots[0].map((x, i) => Math.abs(spots[1][i] - x)) };
+  };
+
+  it('has a national fleet fight for the starboard end of a square line, and be on the line at the gun', () => {
+    let atEnd = 0, top = 0, n = 0;
+    const medians: number[] = [];
+    for (const seed of [1, 2, 7, 8]) {
+      const s = startOf('national', seed);
+      // Somebody takes the end itself (within about two and a half lengths of the mark)...
+      atEnd += s.u.some(x => x > 1 - 2.7 / s.lenL) ? 1 : 0;
+      // ...and the front row is fuller towards it than towards the pin.
+      top += s.u.filter(x => x > 0.75).length; n += s.u.length;
+      medians.push(s.median);
+      // They pick their piece of line and hold it: no chasing every swing of the wind from end to end.
+      expect(s.moved.filter(d => d > 0.15).length).toBeLessThanOrEqual(2);
+    }
+    expect(atEnd).toBeGreaterThanOrEqual(3);
+    expect(top / n).toBeGreaterThan(0.22);
+    expect(medians.sort((a, b) => a - b)[1]).toBeLessThan(1.6);
+  }, 120000);
+
+  it('gives a club fleet two or three sharp starters, and they go for the end too', () => {
+    const s = startOf('club', 3);
+    const sharp = s.r.boats.filter(b => (b.persona?.startSense ?? 0) > 0.6);
+    expect(sharp.length).toBeGreaterThanOrEqual(2);
+    expect(sharp.length).toBeLessThanOrEqual(4);
+    expect(s.r.boats.filter(b => b.persona && (b.persona.startSense ?? 0) < 0.2).length).toBeGreaterThanOrEqual(11);
+    expect(s.u.filter(x => x > 0.85).length).toBeGreaterThanOrEqual(1);
+  }, 60000);
 });

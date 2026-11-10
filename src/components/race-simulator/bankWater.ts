@@ -384,11 +384,18 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
     const steps = Math.min(n, Math.round(T / 0.05));
     const pts: { x: number; y: number; nx: number; ny: number; age: number; s: number }[] = [];
     let s0 = 0;
-    for (let k = n; k >= n - steps; k--) {
+    // A frame drawn part-way through a step: she is a little behind the last point of her track,
+    // so the wake starts at her stern as drawn and picks her track up from the point before.
+    const lag = back <= 0 ? race.renderLag : 0;
+    if (lag > 0) {
+      const f = dir(p.hdg);
+      pts.push({ x: p.x - f.x * L * 0.47, y: p.y - f.y * L * 0.47, nx: f.y, ny: -f.x, age: 0, s: 0 });
+    }
+    for (let k = lag > 0 ? n - 1 : n; k >= n - steps; k--) {
       const f = dir(H.hdg[k]);
       const q = { x: H.x[k] - f.x * L * 0.47, y: H.y[k] - f.y * L * 0.47 };
       if (pts.length) s0 += Math.hypot(q.x - pts[pts.length - 1].x, q.y - pts[pts.length - 1].y);
-      pts.push({ ...q, nx: f.y, ny: -f.x, age: (n - k) * 0.05, s: s0 });
+      pts.push({ ...q, nx: f.y, ny: -f.x, age: Math.max(0, (n - k) * 0.05 - lag), s: s0 });
     }
     if (pts.length < 3) continue;
     // ── The lane, smoother and paler than the ripples round it, and white water just behind her ──
