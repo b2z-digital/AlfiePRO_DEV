@@ -17,6 +17,7 @@ import type { VenueWind } from './venueWind';
 import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
+import type { SimSequence } from './startbox';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -28,6 +29,8 @@ export interface Setup {
   venue: string;
   /** At a venue: its usual breeze, today's wind there, or any direction. */
   windDir: 'usual' | 'today' | 'any';
+  /** The StartBox sequence to start with (an id); null for the simulator's own calls; unset, the club's. */
+  startSeq?: string | null;
 }
 
 /** The default race: an IOM against 8 State-level skippers at Lake Macquarie RYC in its sea breeze,
@@ -139,7 +142,22 @@ function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean;
   );
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge }: {
+/**
+ * The starts to offer: the club's own sequences (or StartBox's defaults if it has none) and the one
+ * chosen, then the simulator calling a 1, 2 or 3 minute start for the lengths they don't cover.
+ */
+function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seconds: number): { value: string; label: string }[] {
+  const own = sequences.filter(q => q.club);
+  let shown = own.length ? own.slice(0, 3) : sequences.slice(0, 2);
+  if (chosen && !shown.some(q => q.id === chosen.id)) shown = [...shown, chosen];
+  const called = [60, 120, 180].filter(n => !shown.some(q => q.seconds === n) || (!chosen && seconds === n));
+  return [
+    ...shown.map(q => ({ value: q.id, label: q.name })),
+    ...called.map(n => ({ value: `b${n}`, label: sequences.length ? `${n / 60} min` : `${n / 60} minute${n > 60 ? 's' : ''}` })),
+  ];
+}
+
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -154,6 +172,9 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   /** Can you set challenges, and for every club? */
   canSet?: { everyone: boolean } | null;
   onCreateChallenge?: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>;
+  /** The club's StartBox sequences, and the one this race will use (null: the simulator calls it). */
+  sequences?: SimSequence[];
+  startSeq?: SimSequence | null;
 }) {
   const [setting, setSetting] = useState(false);
   const stars = drillStars(training);
@@ -236,8 +257,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <Field label="Water" hint={s.seaState === 'flat' ? 'Glassy water and clear reflections.' : s.seaState === 'chop' ? 'Waves 4 cm high: a little slower upwind, a little surfing downwind.' : 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'}>
                 <Seg label="Water" value={s.seaState} onChange={v => set({ seaState: v })} options={[{ value: 'flat', label: 'Flat' }, { value: 'chop', label: 'Choppy' }, { value: 'rough', label: 'Rough' }]} />
               </Field>
-              <Field label="Start" hint="The 1-minute scratch sequence from StartBox: calls each minute, every 10 s in the last minute and every second in the last 10 s (Appendix E)">
-                <Seg label="Start sequence" value={s.sequenceSeconds} onChange={v => set({ sequenceSeconds: v })} options={[{ value: 60, label: '1 minute' }, { value: 120, label: '2 minutes' }, { value: 180, label: '3 minutes' }]} />
+              <Field label="Start" hint={startSeq
+                ? `${startSeq.club ? "Your club's" : 'The StartBox'} ${startSeq.name} sequence${startSeq.audio ? ', the recording you hear at the pond' : ''}, in step with the race clock.`
+                : 'Called by the simulator: each minute, every 10 s in the last minute and every second in the last 10 (Appendix E).'}>
+                <Seg label="Start sequence" value={startSeq ? startSeq.id : `b${s.sequenceSeconds}`}
+                  onChange={v => { const q = sequences.find(x => x.id === v); set(q ? { startSeq: q.id, sequenceSeconds: q.seconds } : { startSeq: null, sequenceSeconds: Number(String(v).slice(1)) }); }}
+                  options={startOptions(sequences, startSeq, s.sequenceSeconds)} />
               </Field>
               <Field label="View" hint={s.view === 'bank' ? 'From the control area on the bank, the way you see a race. Press V to switch.' : 'From above, with laylines. Press V to switch.'}>
                 <Seg label="View" value={s.view} onChange={v => set({ view: v })} options={[{ value: 'bank', label: 'From the bank' }, { value: 'top', label: 'From above' }]} />

@@ -17,6 +17,7 @@ import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { SequencePlayer, SimSequence } from './startbox';
 import { Moment, findMoments } from './moments';
 import {
   BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, LineCard, ReplayBar,
@@ -60,6 +61,8 @@ export interface SimRaceProps {
   resume?: { log: RaceLog; step: number };
   /** Race another member's ghost: their race sails again alongside yours, and their boat is drawn faint in yours. */
   ghost?: { log: RaceLog; settings: RaceSettings; label: string };
+  /** The club's StartBox sequence, played in step with the countdown instead of the simulator's own calls. */
+  sequence?: SimSequence | null;
   onAgain: () => void;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
@@ -109,7 +112,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -124,6 +127,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (resume) r.followLog(resume.log, resume.step);
     return r;
   }, [built, settings, resume]);
+  // The club's start sequence, playing against the race clock.
+  const seqPlayer = useMemo(() => (sequence && !scene ? new SequencePlayer(sequence) : null), [sequence, scene]);
+  useEffect(() => () => seqPlayer?.stop(), [seqPlayer]);
   // The ghost's own race, a step behind nobody: it steps with yours.
   const ghostRace = useMemo(() => {
     if (!ghost) return null;
@@ -240,8 +246,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     for (; R.current.evIdx < evs.length; R.current.evIdx++) {
       const e = evs[R.current.evIdx];
       switch (e.type) {
-        case 'signal': audio.signal(e.remaining); break;
-        case 'gun': audio.gun(); break;
+        // The club's recording calls the sequence and fires the gun when it's playing.
+        case 'signal': if (!seqPlayer?.working) audio.signal(e.remaining); break;
+        case 'gun': if (!seqPlayer?.working) audio.gun(); break;
         case 'recall': {
           const sails = e.boats.map(id => race.boatById(id).sail);
           audio.recall(sails);
@@ -267,7 +274,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         default: break;
       }
     }
-  }, [race, audio, toast, onIncident]);
+  }, [race, audio, toast, onIncident, seqPlayer]);
 
   // ── Snapshot for the HUD ──
   const makeHud = useCallback((): HudState | null => {
@@ -373,6 +380,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           }
         }
       }
+      // The club's start sequence keeps time with the race clock.
+      seqPlayer?.update(race.gunT - race.t, !st.paused && !st.replay && !st.ended && !race.replaying, st.fast ? 2.5 : 1, audio.muted);
       // Instant replay playback.
       if (st.replay && st.replay.playing) {
         const back = Math.max(0, st.replay.back - dtReal * 20);
@@ -473,7 +482,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio]);
 
   // ── Canvas size ──
   useEffect(() => {

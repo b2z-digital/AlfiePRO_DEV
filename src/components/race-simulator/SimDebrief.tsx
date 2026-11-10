@@ -38,6 +38,42 @@ function PlacesChart({ pts, of }: { pts: { label: string; place: number }[]; of:
   );
 }
 
+/** "Write it up": Alfie's short report of the race, to keep or share. */
+function WriteUp({ onWrite }: { onWrite: () => Promise<{ text: string } | { error: string }> }) {
+  const [st, setSt] = useState<{ busy: boolean; text?: string; error?: string }>({ busy: false });
+  const [copied, setCopied] = useState(false);
+  const go = async () => {
+    setSt(s => ({ ...s, busy: true, error: undefined }));
+    const r = await onWrite();
+    setSt('text' in r ? { busy: false, text: r.text } : { busy: false, error: r.error });
+    setCopied(false);
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(st.text ?? ''); setCopied(true); } catch { /* clipboard unavailable */ }
+  };
+  return (
+    <div className="flex flex-col gap-2.5 border-t border-white/[0.06] pt-3.5">
+      {!st.text && (
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Btn small onClick={go} disabled={st.busy}><AlfieOrb size={18} />{st.busy ? 'Alfie is writing…' : 'Write it up'}</Btn>
+          <span className="text-[12.5px]" style={{ color: C.faint }}>A short race report to keep or share</span>
+        </div>
+      )}
+      {st.error && <p className="m-0 text-[13px] text-[#FCA5A5]">{st.error}</p>}
+      {st.text && (
+        <>
+          <Cap>Alfie's write-up</Cap>
+          <div className="flex flex-col gap-2 text-[14px] leading-relaxed">{st.text.split(/\n\s*\n/).map((para, i) => <p key={i} className="m-0">{para}</p>)}</div>
+          <div className="flex flex-wrap gap-2">
+            <Btn small onClick={copy}>{copied ? 'Copied' : 'Copy'}</Btn>
+            <Btn small quiet onClick={go} disabled={st.busy}>{st.busy ? 'Writing…' : 'Write it again'}</Btn>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 type Compare = 'winner' | 'ahead' | 'none';
 
 /** The box to show for a moment: where the boats in it sailed from 6 s before to 8 s after, and the mark if it's a rounding. */
@@ -191,12 +227,14 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
   );
 }
 
-export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onTakeOver, challenge = null }: {
+export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onTakeOver, challenge = null, onWriteUp }: {
   race: Race; sum: RaceSummary; moments: Moment[]; onHome: () => void; onAgain: () => void; onLink?: (l: TrainLink) => void;
   /** Sail the race again from this race time, taking over your boat there. */
   onTakeOver?: (t: number) => void;
   /** This was a challenge: its title, how the leaderboard took it, and a way back to it. */
   challenge?: { title: string; note: string | null; onOpen: () => void } | null;
+  /** Ask Alfie to write the race up (signed in only). */
+  onWriteUp?: () => Promise<{ text: string } | { error: string }>;
 }) {
   const [open, setOpen] = useState<number | null>(null);
   const placeText = sum.mode === 'start'
@@ -270,6 +308,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
                   </div>
                 </div>
               ))}
+              {onWriteUp && <WriteUp onWrite={onWriteUp} />}
             </div>
             <div className="flex flex-col rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-4">
               <Cap className="mb-2">Rules incidents</Cap>
