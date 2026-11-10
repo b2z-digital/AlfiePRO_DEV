@@ -9,6 +9,7 @@ import { bankAhead, bow, hullGap, lineSide } from '@/sim/physics';
 import { keepClear } from '@/sim/referee';
 import { lineHit, timeToCover } from '@/sim/ai';
 import { windwardBoat } from '@/sim/scene';
+import { venueWindFor } from '@/sim/venue';
 
 export type CoachMode = 'full' | 'hints' | 'off';
 
@@ -228,6 +229,29 @@ export function ruleWatch(race: Race, p: Boat): string | null {
   return null;
 }
 
+/**
+ * What the club knows about today's wind on its own water, for the opening of the sequence: the
+ * club's note on this wind, and which side of the beat it makes pay. Null on the practice pond, or
+ * in a wind the club has said nothing about.
+ */
+export function localKnowledge(race: Race): { text: string; say?: string } | null {
+  const v = race.venue;
+  if (!v) return null;
+  const w = venueWindFor(v.def, race.course.rot);
+  if (!w || (!w.note && !w.pays)) return null;
+  let side = '', say: string | undefined;
+  // The bank the skippers stand on is to one side of the course, looking upwind (the same test the
+  // wind itself uses: with the bank dead up or down the course, neither side is the bank side).
+  const bankX = (v.control[0].x + v.control[1].x) / 2;
+  if (w.pays && Math.abs(bankX) > 0.25 * race.course.bounds.across) {
+    const bankRight = bankX > 0;
+    const pays = (w.pays === 'bank') === bankRight ? 'right' : 'left';
+    side = w.pays === 'bank' ? ` There's more breeze along your bank, so the ${pays} of the beat should pay.` : ` There's more breeze out from your bank, so the ${pays} of the beat should pay.`;
+    say = `Local knowledge: the ${pays} side should pay.`;
+  }
+  return { text: `${w.name[0].toUpperCase()}${w.name.slice(1)} here: ${w.note ?? ''}${side}`.replace(/\s+/g, ' ').trim(), say };
+}
+
 /** One coaching line for this moment. */
 export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cue {
   const c = race.course, L = p.cls.loa;
@@ -238,6 +262,9 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
   // ── Before the gun ──
   if (T > 0) {
     if (li.belowL < 0 && T > 2.5) return cue('The start', `You're over the line with ${Math.ceil(T)} s to go. Bear away and dip back below it now.`, 'warn', "You're over the line. Dip back below it.");
+    // As the sequence opens at a real venue: what the club knows about this wind on its water.
+    const local = race.t < 9 && T > 30 ? localKnowledge(race) : null;
+    if (local) return cue('This water', local.text, 'plain', local.say);
     if (T > 40) {
       const end = li.favoured === 'pin' ? 'pin' : 'starboard';
       return li.favoured === 'square'

@@ -1,7 +1,8 @@
-// The bank view at a real venue: the lake as you see it from the club's control area. The water is
+// The bank view at a real venue: the water as you see it from where the skippers stand. The water is
 // the real shoreline from OpenStreetMap; along every bank stand trees (thicker where the map has
-// woods), with houses climbing the hills on the far shores and hazy ridges behind them. Piers reach
-// into the water, and places across the lake are named on the skyline.
+// woods), with houses climbing the hills on the far shores and hazy ridges behind them, or, in flat
+// country, a low line of trees under a big sky. The mapped buildings stand where they are, piers
+// reach into the water, bridges cross it, and places across the water are named on the skyline.
 import type { Race } from '@/sim/engine';
 import type { V2 } from '@/sim/math';
 import { wetIn, type VenueScene } from '@/sim/venue';
@@ -9,7 +10,11 @@ import type { BankCam, BankView } from './bank';
 
 interface Tree { x: number; y: number; z: number; h: number; wf: number; col: string; tall: boolean }
 interface House { x: number; y: number; z: number; w: number; h: number; wall: string; roof: string }
-interface Scenery { trees: Tree[]; houses: House[]; piers: V2[][]; rings: V2[][] }
+/** A mapped building as seen from the water: where it is, how wide it is (its longest side) and how tall. */
+interface Block { x: number; y: number; w: number; h: number; wall: string; roof: string }
+/** One span of a bridge: the deck from a to b, with a pier under its start. */
+interface Span { a: V2; b: V2; pier: boolean }
+interface Scenery { trees: Tree[]; houses: House[]; piers: V2[][]; rings: V2[][]; blocks: Block[]; spans: Span[]; hills: number }
 
 const FONT = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
@@ -32,8 +37,11 @@ function mix(a: string, b: string, t: number): string {
   return `#${[16, 8, 0].map(sh => ch(sh).toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** How high the ground is this far back from the water: the hills behind the far shores. */
-const ground = (x: number, y: number, back: number) => Math.min(1, back / 380) * (9 + 22 * nz(x, y, 5));
+/** How high the ground is this far back from the water: the hills behind the far shores (none in flat country). */
+const ground = (x: number, y: number, back: number, hills: number) => hills * Math.min(1, back / 380) * (9 + 22 * nz(x, y, 5));
+
+/** How high a bridge's deck is above the water, m. */
+const DECK = 7.5;
 
 const cache = new WeakMap<VenueScene, Scenery>();
 
@@ -44,6 +52,9 @@ function scenery(v: VenueScene): Scenery {
   const rings = [v.water, ...v.islands];
   const ctl = { x: (v.control[0].x + v.control[1].x) / 2, y: (v.control[0].y + v.control[1].y) / 2 };
   const dry = (x: number, y: number) => !wetIn(rings, x, y);
+  // The country round the water: hilly and wooded with houses up the slopes, or flat and open.
+  const look = v.def.look ?? { hills: 1, trees: 1, houses: 1 };
+  const hills = look.hills;
   const trees: Tree[] = [], houses: House[] = [];
   const greens = ['#3E5C47', '#47664D', '#365240', '#4E6E5A'];
   let k = 0;
@@ -61,23 +72,23 @@ function scenery(v: VenueScene): Scenery {
         if (dCtl < 45) continue; // the skippers' foreshore is open lawn
         // Stands of trees with lawns, beaches and houses between them.
         const stand = nz(px * 1.7, py * 1.7, 7);
-        if (hash(k, 63) > Math.min(1, Math.max(0.06, (stand - 0.22) * 2.2))) continue;
+        if (hash(k, 63) > look.trees * Math.min(1, Math.max(0.06, (stand - 0.22) * 2.2))) continue;
         const back = 5 + 32 * hash(k, 67);
         const tx = px + land.x * back, ty = py + land.y * back;
         if (!dry(tx, ty)) continue;
         const tall = hash(k, 73) > 0.9;
-        trees.push({ x: tx, y: ty, z: ground(tx, ty, back), h: (8 + 10 * hash(k, 71) + 6 * stand) * (tall ? 1.35 : 1), wf: tall ? 0.26 : 0.34 + 0.16 * hash(k, 79), col: greens[k % greens.length], tall });
+        trees.push({ x: tx, y: ty, z: ground(tx, ty, back, hills), h: (8 + 10 * hash(k, 71) + 6 * stand) * (tall ? 1.35 : 1), wf: tall ? 0.26 : 0.34 + 0.16 * hash(k, 79), col: greens[k % greens.length], tall });
         // Houses up the hills behind the far shores.
-        if (dCtl > 350 && hash(k, 41) < 0.55) {
+        if (dCtl > 350 && hash(k, 41) < 0.55 * look.houses) {
           const hb = 60 + 560 * hash(k, 43) ** 1.4;
           const hx = px + land.x * hb, hy = py + land.y * hb;
           if (dry(hx, hy)) {
             const n = Math.floor(hash(k, 45) * 4);
-            houses.push({ x: hx, y: hy, z: ground(hx, hy, hb), w: 8 + 7 * hash(k, 49), h: 4.2 + 2.4 * hash(k, 51), wall: ['#EDE7DA', '#E1DBD0', '#F3EFE7', '#D8D2C6'][n], roof: ['#9A5E4C', '#6E7782', '#8B6A5A', '#5F6B76'][n] });
+            houses.push({ x: hx, y: hy, z: ground(hx, hy, hb, hills), w: 8 + 7 * hash(k, 49), h: 4.2 + 2.4 * hash(k, 51), wall: ['#EDE7DA', '#E1DBD0', '#F3EFE7', '#D8D2C6'][n], roof: ['#9A5E4C', '#6E7782', '#8B6A5A', '#5F6B76'][n] });
             // …and trees between them.
             if (hash(k, 47) < 0.6) {
               const gx = hx + (hash(k, 53) - 0.5) * 40, gy = hy + (hash(k, 55) - 0.5) * 40;
-              if (dry(gx, gy)) trees.push({ x: gx, y: gy, z: ground(gx, gy, hb), h: 8 + 8 * hash(k, 57), wf: 0.42, col: '#4C6A52', tall: false });
+              if (dry(gx, gy)) trees.push({ x: gx, y: gy, z: ground(gx, gy, hb, hills), h: 8 + 8 * hash(k, 57), wf: 0.42, col: '#4C6A52', tall: false });
             }
           }
         }
@@ -90,7 +101,7 @@ function scenery(v: VenueScene): Scenery {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const p of f.pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
     const area = (x1 - x0) * (y1 - y0);
-    const n = Math.min(400, Math.round(area / (f.kind === 'wood' ? 140 : 1400)));
+    const n = Math.round(look.trees * Math.min(400, Math.round(area / (f.kind === 'wood' ? 140 : 1400))));
     for (let j = 0; j < n; j++) {
       k++;
       const tx = x0 + (x1 - x0) * hash(k, 91), ty = y0 + (y1 - y0) * hash(k, 93);
@@ -105,7 +116,34 @@ function scenery(v: VenueScene): Scenery {
     }
   }
   const piers = v.features.filter(f => f.kind === 'pier' && f.pts.length >= 2).map(f => f.pts);
-  const sc = { trees, houses, piers, rings };
+  // The mapped buildings, as blocks: the clubhouse along the bank, the sheds across the water.
+  const blocks: Block[] = [];
+  for (const f of v.features) {
+    if (f.kind !== 'bld' || f.pts.length < 3) continue;
+    let cx = 0, cy = 0, side = 0;
+    for (let i = 0; i < f.pts.length; i++) {
+      const p = f.pts[i], q = f.pts[(i + 1) % f.pts.length];
+      cx += p.x; cy += p.y; side = Math.max(side, Math.hypot(q.x - p.x, q.y - p.y));
+    }
+    cx /= f.pts.length; cy /= f.pts.length;
+    k++;
+    const n = Math.floor(hash(k, 45) * 4);
+    blocks.push({ x: cx, y: cy, w: Math.max(4, Math.min(60, side)), h: side > 22 ? 6.5 + 2.5 * hash(k, 51) : 3.6 + 2.2 * hash(k, 51), wall: ['#E6E0D3', '#D9D4CA', '#EEEAE1', '#CFCBC2'][n], roof: ['#8E9AA5', '#6E7782', '#9A6B5A', '#5F6B76'][n] });
+  }
+  // Bridges, cut into spans with a pier every other one.
+  const spans: Span[] = [];
+  for (const f of v.features) {
+    if (f.kind !== 'bridge') continue;
+    let run = 0;
+    for (let i = 0; i + 1 < f.pts.length; i++) {
+      const a = f.pts[i], b = f.pts[i + 1], len = Math.hypot(b.x - a.x, b.y - a.y);
+      const n = Math.max(1, Math.round(len / 22));
+      for (let j = 0; j < n; j++, run++) {
+        spans.push({ a: { x: a.x + ((b.x - a.x) * j) / n, y: a.y + ((b.y - a.y) * j) / n }, b: { x: a.x + ((b.x - a.x) * (j + 1)) / n, y: a.y + ((b.y - a.y) * (j + 1)) / n }, pier: run % 2 === 1 });
+      }
+    }
+  }
+  const sc = { trees, houses, piers, rings, blocks, spans, hills };
   cache.set(v, sc);
   return sc;
 }
@@ -153,10 +191,12 @@ function farShore(rings: V2[][], v: VenueScene, x0: number, y0: number, ang: num
     }
   }
   hits.sort((p, q) => p.t - q.t);
-  // From the bank, the first crossing is the near shore; the next is the far one.
+  // From the bank, the first crossing is the near shore; the next is the far one. Where the map was
+  // cut the water carries on, and its far shore is taken to lie a way beyond the cut: a lake, a bay
+  // or a river has land on the other side whichever way you look.
   let wet = wetIn(rings, x0, y0);
   for (const h of hits) {
-    if (wet) return h.open ? 6000 : h.t;
+    if (wet) return h.open ? h.t + 900 : h.t;
     wet = true;
   }
   return 6000;
@@ -177,6 +217,16 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
     const a = cam.yaw + Math.atan((x - w / 2) / V.F) / D2R;
     cols.push({ x, a, D: Math.min(4500, farShore(sc.rings, v, cam.x, cam.y, a)) });
   }
+  // Even the distances out a little from one column to the next, so a near point against far water
+  // doesn't stand up as a cliff on the skyline.
+  {
+    const raw = cols.map(c => c.D);
+    for (let i = 0; i < cols.length; i++) {
+      let sum = 0, n = 0;
+      for (let k = -4; k <= 4; k++) { const j = i + k; if (j >= 0 && j < raw.length) { const wgt = 5 - Math.abs(k); sum += raw[j] * wgt; n += wgt; } }
+      cols[i].D = sum / n;
+    }
+  }
   const ridge = (back: (c: { a: number; D: number }) => number, ht: (c: { a: number; D: number }) => number, fill: string) => {
     ctx.fillStyle = fill;
     ctx.beginPath(); ctx.moveTo(cols[0].x, hz + 2);
@@ -187,8 +237,10 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
     }
     ctx.lineTo(cols[cols.length - 1].x, hz + 2); ctx.closePath(); ctx.fill();
   };
-  ridge(c => 1400 + 1800 * nz(sx(c.a, c.D), sy(c.a, c.D), 1), c => (c.D >= 4500 ? 0 : 50 + 80 * nz(sx(c.a, c.D), sy(c.a, c.D), 2)), '#ADBFC8');
-  ridge(c => 450 + 380 * nz(sx(c.a, c.D), sy(c.a, c.D), 4), c => (c.D >= 4500 ? 0 : 16 + 30 * nz(sx(c.a, c.D), sy(c.a, c.D), 5)), '#97AEAC');
+  // In flat country there are none: only a low line of far trees under the sky.
+  const hl = sc.hills;
+  ridge(c => 1400 + 1800 * nz(sx(c.a, c.D), sy(c.a, c.D), 1), c => (c.D >= 4500 ? 0 : hl * (50 + 80 * nz(sx(c.a, c.D), sy(c.a, c.D), 2)) + (1 - hl) * 9), '#ADBFC8');
+  ridge(c => 450 + 380 * nz(sx(c.a, c.D), sy(c.a, c.D), 4), c => (c.D >= 4500 ? 0 : hl * (16 + 30 * nz(sx(c.a, c.D), sy(c.a, c.D), 5)) + (1 - hl) * (6 + 5 * nz(sx(c.a, c.D), sy(c.a, c.D), 5))), '#97AEAC');
 
   // ── The lake: the real shoreline, clipped to the view; islands are holes ──
   const outline: { x: number; y: number }[][] = [];
@@ -256,6 +308,40 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
       ctx.fillRect(p0.x - ww / 2, p1.y - hh * 0.28, ww, hh * 0.36);
     } });
   }
+  for (const bk of sc.blocks) {
+    const d = inView(bk.x, bk.y);
+    if (!d || d < 25) continue;
+    items.push({ d, draw: () => {
+      const p0 = P(bk.x, bk.y, 0), p1 = P(bk.x, bk.y, bk.h);
+      const ww = (bk.w * V.F) / d, hh = Math.max(1.3, p0.y - p1.y);
+      const haze = Math.max(0.06, Math.min(0.7, (d - 150) / 2400));
+      ctx.fillStyle = mix(bk.wall, '#B9C9CF', haze);
+      ctx.fillRect(p0.x - ww / 2, p1.y, ww, hh);
+      ctx.fillStyle = mix(bk.roof, '#A9BAC1', haze);
+      ctx.fillRect(p0.x - ww / 2 - ww * 0.02, p1.y - hh * 0.22, ww * 1.04, hh * 0.3);
+    } });
+  }
+  for (const sp of sc.spans) {
+    const mx = (sp.a.x + sp.b.x) / 2, my = (sp.a.y + sp.b.y) / 2;
+    const d = inView(mx, my);
+    if (!d || d < 30) continue;
+    items.push({ d, draw: () => {
+      const a0 = P(sp.a.x, sp.a.y, DECK), b0 = P(sp.b.x, sp.b.y, DECK), a1 = P(sp.a.x, sp.a.y, DECK - 1.5), b1 = P(sp.b.x, sp.b.y, DECK - 1.5);
+      const haze = Math.max(0.05, Math.min(0.72, (d - 120) / 2200));
+      // The pier first, so the deck sits on it. Over the land it stands on the ground all the same.
+      if (sp.pier) {
+        const foot = P(sp.a.x, sp.a.y, 0);
+        const pw = Math.max(1, (2.2 * V.F) / d);
+        ctx.fillStyle = mix('#8C8F8E', '#B4C2C8', haze);
+        ctx.fillRect(foot.x - pw / 2, a1.y, pw, Math.max(1, foot.y - a1.y));
+      }
+      ctx.fillStyle = mix('#A7A9A6', '#BAC8CE', haze);
+      ctx.beginPath(); ctx.moveTo(a0.x, a0.y); ctx.lineTo(b0.x, b0.y); ctx.lineTo(b1.x, b1.y); ctx.lineTo(a1.x, a1.y); ctx.closePath(); ctx.fill();
+      // The rail along the top catches the light.
+      ctx.strokeStyle = mix('#D9DCD8', '#C6D2D7', haze); ctx.lineWidth = Math.max(0.6, Math.min(2, (0.5 * V.F) / d));
+      ctx.beginPath(); ctx.moveTo(a0.x, a0.y); ctx.lineTo(b0.x, b0.y); ctx.stroke();
+    } });
+  }
   items.sort((p, q) => q.d - p.d);
   // Reflections first, on the water, then the banks.
   const reflA = !race.sea ? 0.16 : race.sea.kind === 'chop' ? 0.08 : 0.04;
@@ -271,6 +357,18 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
 
   // ── Piers: a deck on posts, just above the water ──
   for (const pr of sc.piers) {
+    // A pontoon drawn as its outline is decked right across.
+    if (pr.length >= 4 && Math.hypot(pr[0].x - pr[pr.length - 1].x, pr[0].y - pr[pr.length - 1].y) < 4) {
+      const q = viewClip(cam, V, pr);
+      if (q.length >= 3) {
+        const deck = q.map(p => P(p.x, p.y, 0.7)), foot = q.map(p => P(p.x, p.y, 0));
+        ctx.fillStyle = 'rgba(40,36,32,0.55)';
+        ctx.beginPath(); foot.forEach((p, k2) => (k2 ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#7A6E60';
+        ctx.beginPath(); deck.forEach((p, k2) => (k2 ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath(); ctx.fill();
+      }
+      continue;
+    }
     for (let i = 0; i + 1 < pr.length; i++) {
       const a = pr[i], b = pr[i + 1];
       const ex = b.x - a.x, ey = b.y - a.y, len = Math.hypot(ex, ey) || 1;
