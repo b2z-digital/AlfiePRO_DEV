@@ -4,10 +4,10 @@
 // Marblehead is the Gothic M with a swing rig. DF95 and DF65 are scaled from the IOM for now.
 // Same model as the design board renders.
 import type { ClassId } from '@/sim/classes';
-import { noGoAngle } from '@/sim/classes';
+import { iomRig, noGoAngle } from '@/sim/classes';
 import { DEG, n180 } from '@/sim/math';
 import type { Sea } from '@/sim/sea';
-import { wavePhase } from '@/sim/sea';
+import { hullMotion } from '@/sim/sea';
 
 export type RigId = 'A' | 'B' | 'C';
 
@@ -75,9 +75,9 @@ const MODELS: Record<ClassId, Model> = {
   DF65: { L: 0.65, beam: 0.115, stations: iomStations(0.65), hatches: [[0.0, 0.16, 0.6]], rigs: { A: scaleRig(IOM_A, 0.66, 0.65) } },
 };
 
-/** The rig a class sails with in this wind: IOMs change down to the B rig when it's fresh. */
-export function rigFor(cls: ClassId, wind: 'light' | 'medium' | 'fresh'): RigId {
-  return cls === 'IOM' && wind === 'fresh' ? 'B' : 'A';
+/** The rig a class sails with in this breeze (knots): IOMs change down to the B rig, then the C. */
+export function rigFor(cls: ClassId, knots: number): RigId {
+  return cls === 'IOM' ? iomRig(knots) : 'A';
 }
 
 function deckAt(m: Model, fx: number): number {
@@ -136,13 +136,11 @@ export function sailSet(twa: number, sheet: number, tws: number, disabled: boole
   return { boom, jib, luff, goose, sd: (twa >= 0 ? -1 : 1) as 1 | -1 };
 }
 
-/** Lift, pitch and roll on the waves. */
+/** Lift, pitch and roll on the waves, as her hull rides them (see hullMotion). */
 export function onWaves(p: Pose, sea: Sea | null, t: number): Pose {
   if (!sea) return p;
-  const ph = wavePhase(sea, p.x, p.y, t);
-  const slope = ((2 * Math.PI) / sea.length) * (sea.height / 2) * Math.cos(ph);
-  const rel = (p.hdg - (sea.from + 180)) * DEG;
-  return { ...p, heave: (sea.height / 2) * Math.sin(ph), pitch: (Math.atan(slope * Math.cos(rel)) / DEG) * 0.8, heel: p.heel + (Math.atan(-slope * Math.sin(rel)) / DEG) * 0.6 };
+  const m = hullMotion(sea, p.x, p.y, t, p.hdg, p.spd, (MODELS[p.cls] ?? MODELS.IOM).L);
+  return { ...p, heave: m.heave, pitch: m.pitch, heel: p.heel + m.roll };
 }
 
 class Geo {
@@ -243,6 +241,41 @@ export function drawReflection(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOp
   ctx.restore();
 }
 
+/**
+ * The order to paint the mainsail, jib and mast, far to near. Sorting them by depth flickers when
+ * they're at about the same distance (seen from behind, as the boat pitches), so the order comes from
+ * which side of each sail you're on: from leeward the jib shows in front of the main (its leech is
+ * outside the main's luff), from windward the main hides it; the mast is in front of a sail seen from
+ * its windward side, or from ahead of its luff.
+ */
+function stackOrder<T extends { d: number }>(g: Geo, sails: { kind: 'main' | 'jib'; S: (f: number, h: number) => V3 }[], cam: V3, layers: T[]): T[] {
+  const [lMain, lJib, lMast] = layers; // pushed in that order: the main, the jib, then the mast
+  const main = sails.find(s => s.kind === 'main'), jib = sails.find(s => s.kind === 'jib');
+  if (!main || !jib || layers.length !== 3) return [...layers].sort((a, b) => b.d - a.d);
+  const lee = sub(g.w(0, g.p.sd, 0), g.w(0, 0, 0)); // towards her leeward side
+  const leeward = (S: (f: number, h: number) => V3) => {
+    const p0 = S(0.35, 0), n0 = cross(sub(S(0.35, 1), p0), sub(S(0.75, 0), p0));
+    const n = dot(n0, lee) < 0 ? [-n0[0], -n0[1], -n0[2]] as V3 : n0;
+    return dot(n, sub(cam, S(0.45, 0.4))) > 0;
+  };
+  const leeMain = leeward(main.S), leeJib = leeward(jib.S);
+  const luff = main.S(0.3, 0), chord = sub(main.S(0.3, 1), luff);
+  const aheadOfLuff = dot(chord, sub(cam, luff)) < 0;
+  // "a in front of b", for each pair.
+  const front = new Map<T, Set<T>>([[lMain, new Set()], [lJib, new Set()], [lMast, new Set()]]);
+  if (leeMain) front.get(lJib)!.add(lMain); else front.get(lMain)!.add(lJib);
+  if (!leeMain || aheadOfLuff) front.get(lMast)!.add(lMain); else front.get(lMain)!.add(lMast);
+  if (!leeJib) front.get(lMast)!.add(lJib); else front.get(lJib)!.add(lMast);
+  // Far to near: the one nothing else is behind first.
+  const out: T[] = [], left = [lMain, lJib, lMast];
+  while (left.length) {
+    const k = left.findIndex(a => left.every(b => b === a || front.get(b)!.has(a)));
+    if (k < 0) return [...layers].sort((a, b) => b.d - a.d); // they disagree: fall back to depth
+    out.push(left.splice(k, 1)[0]);
+  }
+  return out;
+}
+
 /** Draw one boat. Returns the screen point above the masthead and at the waterline. */
 export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts): { top: { x: number; y: number }; base: { x: number; y: number }; size: number } {
   const g = new Geo(p);
@@ -256,26 +289,8 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
   ctx.save();
   ctx.globalAlpha = p.alpha;
   const lw = (k: number) => Math.max(1, (o.F * k) / depth);
-  // Wake and bow wave.
-  const fast = p.spd / Math.max(0.1, p.hullSpeed);
+  // (Her wake and bow wave are drawn on the water first: see bankWater.)
   const half = m.beam / 2;
-  if (fast > 0.3 && size > 10) {
-    const bowx = st[Math.min(3, ns - 1)].fx * L;
-    ctx.strokeStyle = 'rgba(230,240,255,0.32)'; ctx.lineWidth = lw(0.012);
-    ctx.beginPath();
-    for (const sd of [1, -1]) {
-      const q0 = o.P(...g.w(-0.45 * L, sd * half * 0.7, 0)), q1 = o.P(...g.w(-(0.5 + 1.8 * fast) * L, sd * (half + 0.25 * L * fast), 0));
-      ctx.moveTo(q0.x, q0.y); ctx.lineTo(q1.x, q1.y);
-    }
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(244,248,255,${Math.min(0.9, fast).toFixed(2)})`; ctx.lineWidth = lw(0.014); ctx.lineCap = 'round';
-    ctx.beginPath();
-    for (const sd of [1, -1]) {
-      const q0 = o.P(...g.w(bowx, 0, 0)), q1 = o.P(...g.w(bowx - 0.18 * L, sd * half * 1.35, 0)), q2 = o.P(...g.w(bowx - 0.42 * L, sd * half * 1.95, 0));
-      ctx.moveTo(q0.x, q0.y); ctx.quadraticCurveTo(q1.x, q1.y, q2.x, q2.y);
-    }
-    ctx.stroke();
-  }
   // Hull: topsides in two strips and the crowned deck, painted far to near and shaded by the sun.
   const step = size < 45 ? 2 : 1;
   const idx: number[] = [];
@@ -293,6 +308,9 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     const cen: V3 = [0, 0, 0];
     for (const q of pts) { cen[0] += q[0] / pts.length; cen[1] += q[1] / pts.length; cen[2] += q[2] / pts.length; }
     if (dot(nrm, sub(cen, ctr)) < 0) nrm = [-nrm[0], -nrm[1], -nrm[2]];
+    // The hull is convex: a face turned away from you is hidden, so it's never drawn (sorting the
+    // far side against the near one by depth can flicker as she pitches).
+    if (dot(nrm, sub(o.cam, cen)) < 0) return;
     const lit = (isDeck ? 0.78 : 0.6) + (isDeck ? 0.22 : 0.4) * Math.max(0, dot(nrm, SUN));
     const d = o.P(cen[0], cen[1], cen[2]).z;
     faces.push({ d, pts, color: shade(color, lit) });
@@ -338,11 +356,11 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     ctx.fillStyle = '#121519';
     poly(ctx, bump); ctx.fill();
   }
-  // Sails, the further one first: shaded panels, seams, leech tape, battens, numbers, tell-tales.
+  // Sails: shaded panels, seams, leech tape, battens, numbers, tell-tales.
   const sails = (['main', 'jib'] as const).map(kind => {
     const s = g.sail(kind);
     return { kind, ...s, d: o.P(...s.S(0.4, 0.45)).z };
-  }).sort((a, b) => b.d - a.d);
+  });
   const nf = size > 70 ? 8 : size > 30 ? 4 : 2, ng = size > 70 ? 5 : size > 30 ? 3 : 1;
   const fill = p.luff ? '#D9DFE8' : '#E4E8EE';
   const tw = Math.max(1, (o.F * 0.006 * L) / depth);
@@ -367,7 +385,10 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       const nrm = norm(cross(sub(grid[i][j + 1], a), sub(grid[i + 1][j], a)));
       quads.push({ d: scr[i][j].z, i, j, c: shade(fill, 0.82 + 0.18 * Math.abs(dot(nrm, SUN))) });
     }
-    quads.sort((a, b) => b.d - a.d);
+    // Far to near along the chord: from behind the leech is nearer, from ahead the luff. A fixed
+    // order (not a depth sort, which flickers when the sail is nearly edge-on to you).
+    const leechNear = dot(sub(grid[nf >> 1][ng], grid[nf >> 1][0]), sub(o.cam, grid[nf >> 1][0])) > 0;
+    quads.sort((a, b) => (leechNear ? a.j - b.j : b.j - a.j) || b.d - a.d);
     ctx.globalAlpha = p.alpha * 0.95;
     for (const q of quads) {
       const { i, j } = q;
@@ -402,7 +423,12 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       const nx = sl.sd * Math.sin(sl.ang * DEG), ny = Math.cos(sl.ang * DEG); // starboard-face normal, boat frame
       const wn = [nx * Math.sin(p.hdg * DEG) + ny * Math.cos(p.hdg * DEG), nx * Math.cos(p.hdg * DEG) - ny * Math.sin(p.hdg * DEG)];
       const cen = sl.S(0.45, 0.45);
-      const stbdVisible = wn[0] * (cen[0] - o.cam[0]) + wn[1] * (cen[1] - o.cam[1]) < 0;
+      // How squarely each face is turned to you: +1 the starboard face, -1 the port face, 0 edge-on.
+      // The numbers fade out as the sail turns edge-on, so they never flick from one side to the other.
+      const toCam = Math.hypot(cen[0] - o.cam[0], cen[1] - o.cam[1]) || 1;
+      const face = Math.max(-1, Math.min(1, -(wn[0] * (cen[0] - o.cam[0]) + wn[1] * (cen[1] - o.cam[1])) / toCam / 0.2));
+      const stbdVisible = face >= 0;
+      const shown = Math.abs(face) * Math.abs(face) * (3 - 2 * Math.abs(face));
       const spots: [boolean, number, number, string, number][] = sl.kind === 'main'
         ? [[true, 0.64, 0.47, p.sail, r.num], [false, 0.5, 0.5, p.sail, r.num], ...(size > 70 && p.country ? [[true, 0.35, 0.42, p.country, r.num * 0.5], [false, 0.26, 0.44, p.country, r.num * 0.5]] as [boolean, number, number, string, number][] : [])]
         : [[true, 0.52, 0.42, p.sail, r.num * 0.9], [false, 0.38, 0.45, p.sail, r.num * 0.9]];
@@ -426,8 +452,8 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
         ctx.font = `800 ${mm * fit}px ${FONT}`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = p.ink;
-        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.26);
-        ctx.fillText(text, 0, 0);
+        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.26) * shown;
+        if (shown > 0.02) ctx.fillText(text, 0, 0);
         ctx.setTransform(D, 0, 0, D, 0, 0);
         ctx.globalAlpha = p.alpha;
       }
@@ -454,8 +480,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(0.011);
     ctx.beginPath(); ctx.moveTo(m0.x, m0.y); ctx.lineTo(m1.x, m1.y); ctx.stroke();
   } });
-  layers.sort((a, b) => b.d - a.d);
-  for (const l of layers) l.draw();
+  for (const l of stackOrder(g, sails, o.cam, layers)) l.draw();
   ctx.restore();
   return { top: { x: top.x, y: top.y }, base: { x: base.x, y: base.y }, size };
 }

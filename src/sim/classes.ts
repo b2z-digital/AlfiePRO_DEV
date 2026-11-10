@@ -17,21 +17,61 @@ export interface ClassDef {
   hullSpeed: number;  // m/s
   eff: number;        // overall efficiency (heavier or simpler boats < 1)
   maxRot: number;     // deg/s with full rudder at full speed
+  /** Righting moment against the rig's heeling force: apparent wind² (m²/s²) per unit of sin(heel)/cos²(heel). */
+  stiffness: number;
+  /** Natural roll period, s: a deep, heavy bulb makes it slow and steady. */
+  rollPeriod: number;
 }
 
-function mk(id: ClassId, name: string, loa: number, beam: number, lwl: number, eff: number): ClassDef {
+function mk(id: ClassId, name: string, loa: number, beam: number, lwl: number, eff: number, stiffness: number): ClassDef {
   const hullSpeed = 0.4 * Math.sqrt(9.81 * lwl);
-  return { id, name, loa, beam, lwl, hullSpeed, eff, maxRot: 105 / Math.sqrt(loa) };
+  return { id, name, loa, beam, lwl, hullSpeed, eff, maxRot: 105 / Math.sqrt(loa), stiffness, rollPeriod: 1.0 * Math.sqrt(loa) };
 }
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   // From the class plans: the LM3 IOM (beam 173.5 mm), the Gothic M and the GothiX 10r (1225 mm waterline).
-  IOM: mk('IOM', 'IOM', 1.0, 0.1735, 0.98, 1.0),
-  M: mk('M', 'Marblehead', 1.27, 0.16, 1.22, 1.0),
-  '10R': mk('10R', '10 Rater', 1.6, 0.18, 1.225, 1.0),
-  DF95: mk('DF95', 'DF95', 0.95, 0.19, 0.9, 0.9),
-  DF65: mk('DF65', 'DF65', 0.65, 0.16, 0.62, 0.88),
+  // Stiffness is set so a boat close-hauled in 9 to 10 knots heels about 16°, as they do.
+  IOM: mk('IOM', 'IOM', 1.0, 0.1735, 0.98, 1.0, 95),
+  M: mk('M', 'Marblehead', 1.27, 0.16, 1.22, 1.0, 98),
+  '10R': mk('10R', '10 Rater', 1.6, 0.18, 1.225, 1.0, 104),
+  DF95: mk('DF95', 'DF95', 0.95, 0.19, 0.9, 0.9, 86),
+  DF65: mk('DF65', 'DF65', 0.65, 0.16, 0.62, 0.88, 82),
 };
+
+/** The rig an IOM sails with in a breeze (knots): the A rig, the B from about 12½ knots, the C from 20. */
+export function iomRig(knots: number): 'A' | 'B' | 'C' {
+  return knots >= 20 ? 'C' : knots >= 12.5 ? 'B' : 'A';
+}
+
+/** The rig's heeling power for the breeze (1 = the class's A rig): IOMs change down as it builds. */
+export function rigPower(cls: ClassId, knots: number): number {
+  if (cls !== 'IOM') return 1;
+  const r = iomRig(knots);
+  return r === 'C' ? 0.38 : r === 'B' ? 0.6 : 1;
+}
+
+/**
+ * How hard the sails heel her (about 0 to 1.3): close-hauled to a close reach the sails mostly push
+ * her over, further off the wind more of their force drives her forward, and head to wind they flog.
+ * Eased past the sweet spot she spills wind; over-sheeted on a reach she heels more.
+ */
+export function heelForce(absTwa: number, sheet: number, tws: number): number {
+  const a = clamp(absTwa, 0, 180);
+  const ng = noGoAngle(tws);
+  if (a < ng - 4) return 0.05;
+  const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 110 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.12 + 0.78 * Math.cos(((a - 110) / 70) * (Math.PI / 2));
+  const fill = clamp((a - (ng - 4)) / 10, 0, 1);
+  const e = sheet - bestSheet(a);
+  const trim = e < 0 ? Math.max(0.08, 1 + 2.6 * e) : 1 + Math.min(0.35, e * (a > 70 ? 1.6 : 0.5));
+  return Math.max(0.05, point * fill * trim);
+}
+
+/** Heel (degrees, 0 to 90) where the bulb's righting moment balances the sails: sin φ / cos² φ = q. */
+export function heelFor(q: number): number {
+  if (q <= 1e-6) return 0;
+  const s = (-1 + Math.sqrt(1 + 4 * q * q)) / (2 * q);
+  return (Math.asin(Math.min(1, s)) * 180) / Math.PI;
+}
 
 /** Best close-hauled true wind angle (deg) for a wind speed in m/s. */
 export function upAngle(tws: number): number {

@@ -1,7 +1,7 @@
 // Boat physics: wind at each boat (with wind shadow and backwind), speed, turning,
 // tacks and gybes as real turns, being caught in irons, and collisions.
 
-import { accelTau, bestSheet, noGoAngle, polarSpeed, trimEfficiency, upAngle } from './classes';
+import { accelTau, bestSheet, heelFor, heelForce, noGoAngle, polarSpeed, trimEfficiency, upAngle } from './classes';
 import { Course } from './course';
 import { V2, clamp, cross, dir, dot, n180, n360, sub, twaOf } from './math';
 import type { Boat } from './types';
@@ -71,9 +71,44 @@ export function localWind(boats: Boat[], wind: WindField, t: number) {
   }
 }
 
+/**
+ * Heel: the sails' heeling force (the apparent wind's pressure times how hard the sails are working)
+ * against the bulb's righting moment, with the roll inertia of a boat with a heavy bulb. She heels
+ * further as a puff arrives (overshooting a little when it hits hard) and comes back up in a lull.
+ */
+function heelWanted(b: Boat, twa: number): number {
+  const a = Math.abs(twa);
+  const side = twa > 0 || (twa === 0 && b.tack === 'stbd') ? 1 : -1;
+  if (b.disabled) return 4 * side;
+  const aws2 = b.tws * b.tws + b.spd * b.spd + 2 * b.tws * b.spd * Math.cos((a * Math.PI) / 180);
+  return side * heelFor((aws2 * heelForce(a, b.sheet, b.tws) * b.rigPower) / b.cls.stiffness);
+}
+
+/** Sit her at the heel her wind and trim give, at rest (a new boat, or one set up for a scene). */
+export function settleHeel(b: Boat) { b.heel = heelWanted(b, twaOf(b.hdg, b.twd)); b.heelRate = 0; }
+
+export function heelStep(b: Boat, dt: number, twa: number) {
+  const c = b.cls;
+  const want = heelWanted(b, twa);
+  const w = (2 * Math.PI) / c.rollPeriod, zeta = 0.38;
+  b.heelRate += (w * w * (want - b.heel) - 2 * zeta * w * b.heelRate) * dt;
+  b.heel += b.heelRate * dt;
+}
+
+/**
+ * Weather helm, deg/s towards the wind: a balanced boat sits happily up to about 20° of heel; past
+ * that her bow wants to come up, a little in a puff and hard when a strong gust lays her over.
+ */
+export function weatherHelm(b: Boat): number {
+  const h = Math.abs(b.heel), ex = Math.max(0, h - 20);
+  const kick = Math.max(0, b.heelRate * Math.sign(b.heel)) * 0.06; // being pushed over
+  return 0.3 * ex + 0.012 * ex * ex + kick;
+}
+
 /** Integrate one boat for one step. Returns 'tack' or 'gybe' when the boat passed through the wind. */
 export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null): 'tack' | 'gybe' | null {
   const c = b.cls;
+  heelStep(b, dt, twaOf(b.hdg, b.twd));
   if (b.disabled) {
     // Out of control: the sail flaps, she stops and drifts slowly downwind.
     b.targetSpd = 0;
@@ -93,14 +128,21 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   let target = perfect * trimEfficiency(b.sheet, a);
   const drag = 1 - 0.3 * b.rudder * b.rudder * clamp(b.spd / c.hullSpeed, 0, 1);
   target *= drag;
+  // Laid over too far she slows: more drag, less drive.
+  const over = Math.max(0, Math.abs(b.heel) - 28);
+  if (over > 0) target *= Math.max(0.55, 1 - 0.008 * over - 0.0004 * over * over);
   const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg) : null;
   if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;
   b.spd += (target - b.spd) * (1 - Math.exp(-dt / tau));
   if (b.spd < 0) b.spd = 0;
 
-  const steer = clamp(b.spd / (0.35 * c.hullSpeed), a < ng + 4 ? 0.32 : 0.16, 1);
+  // Heeled hard, the rudder loses its grip on the water.
+  const grip = 1 - clamp((Math.abs(b.heel) - 32) / 36, 0, 0.55);
+  const steer = clamp(b.spd / (0.35 * c.hullSpeed), a < ng + 4 ? 0.32 : 0.16, 1) * grip;
   let rotTarget = b.rudder * c.maxRot * steer;
+  // Weather helm turns her up towards the wind (less when she's slow and the hull has little grip).
+  if (a >= ng) rotTarget += (twa >= 0 ? 1 : -1) * weatherHelm(b) * clamp(b.spd / (0.5 * c.hullSpeed), 0.3, 1);
   // A slow boat near head to wind has her bow blown off the wind, so holding her there takes work.
   const slow = 1 - clamp(b.spd / (0.45 * c.hullSpeed), 0, 1);
   if (a < ng + 10 && slow > 0) {

@@ -15,7 +15,7 @@ function sail(r: Race, steps: number, rng: Rng) {
   let rudder = 0, sheet = 0.7;
   for (let k = 0; k < steps && !r.ended; k++) {
     if (k % 7 === 0) { rudder = Math.max(-1, Math.min(1, rudder + rng.range(-0.3, 0.3))); sheet = Math.max(0, Math.min(1, sheet + rng.range(-0.1, 0.1))); }
-    r.input = { rudder: rudder * 0.6 + 1e-7 * rng.next(), sheet, autoTrim: false, penaltyAssist: false };
+    r.input = { rudder: rudder * 0.6 + 1e-7 * rng.next(), sheet, autoTrim: false };
     if (k % 211 === 100) r.act('tack');
     if (k % 333 === 150) r.act('hail');
     r.step();

@@ -3,10 +3,10 @@
 // collisions → start/rounding/finish progress → referee → recording.
 
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
-import { CLASSES, bestSheet, vmgAngles } from './classes';
+import { CLASSES, bestSheet, rigPower, vmgAngles } from './classes';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
-import { Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
-import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, stern } from './physics';
+import { KN, Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
+import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, settleHeel, stern } from './physics';
 import { Referee, isRacing, keepClear, spellSail } from './referee';
 import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
 import { WindField } from './wind';
@@ -24,7 +24,7 @@ const HIST = 220; // 11 s of history per boat at 20 Hz
  * they only ever react to what happens on the water. Replays and "sail it from here" use it.
  */
 export interface RaceLog {
-  /** The player's input when it changed: [step it applies from, rudder, sheet, penalty assist 0/1]. */
+  /** The player's input when it changed: [step it applies from, rudder, sheet, 0 (no longer used)]. */
   input: [number, number, number, number][];
   /** Tacks, gybes and hails: [step they were made before, what]. */
   acts: [number, PlayerAct][];
@@ -82,7 +82,7 @@ export class Race implements AiHost {
   step_ = 0;
   events: SimEvent[] = [];
   incidents: Incident[] = [];
-  hist: { x: number[]; y: number[]; hdg: number[]; spd: number[]; rot: number[] }[] = [];
+  hist: { x: number[]; y: number[]; hdg: number[]; spd: number[]; rot: number[]; heel: number[] }[] = [];
   /** Recorded at 5 Hz for the debrief: per frame, [x, y, hdg, spd, leg] per boat. */
   track: { t: number; d: Float32Array; twd: number }[] = [];
   forgot = new Set<string>();
@@ -127,7 +127,7 @@ export class Race implements AiHost {
       settings.seed,
       { cx: c.origin.x + c.up.x * mid, cy: c.origin.y + c.up.y * mid, halfAlong: (c.bounds.alongMax - c.bounds.alongMin) / 2, halfAcross: c.bounds.across },
     );
-    this.sea = makeSea(settings.seaState, axis);
+    this.sea = makeSea(settings.seaState, axis, settings.seed, this.wind.baseTws / KN);
     this.gunT = settings.sequenceSeconds;
     this.referee = new Referee(this);
     this.makeFleet();
@@ -164,7 +164,7 @@ export class Race implements AiHost {
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
         id: `b${i}`, sail, name: isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
-        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6,
+        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN),
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
         started: false, ocs: false, returning: false, legIndex: 0, progress: 0, progress2: 0, lastBearing: 0, lastBearing2: 0,
@@ -172,8 +172,9 @@ export class Race implements AiHost {
         penalty: { owed: 0, active: false, rot: 0, passedHtw: false, passedDdw: false, taken: 0 },
         contactWith: {}, roundedAt: [], placeAtLeg: [], distSailed: 0, hail: null,
       };
+      settleHeel(b);
       this.boats.push(b);
-      this.hist.push({ x: [], y: [], hdg: [], spd: [], rot: [] });
+      this.hist.push({ x: [], y: [], hdg: [], spd: [], rot: [], heel: [] });
       if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
       else {
         const lv = LEVELS[s.level];
@@ -182,9 +183,34 @@ export class Race implements AiHost {
         this.skippers.push(sk);
       }
     }
+    // You start nearest the bank, in front of the fleet as you look out, so you can find your boat.
+    const me = this.player;
+    if (me) {
+      const ca = this.controlArea();
+      const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
+      const toBank = (b: Boat) => {
+        const u = Math.max(0, Math.min(1, ((b.x - ca.a.x) * ex + (b.y - ca.a.y) * ey) / el2));
+        return Math.hypot(b.x - (ca.a.x + ex * u), b.y - (ca.a.y + ey * u));
+      };
+      let near = me;
+      for (const b of this.boats) if (toBank(b) < toBank(near)) near = b;
+      if (near !== me) {
+        for (const k of ['x', 'y', 'hdg', 'twa', 'tack'] as const) { const v = me[k]; (me as unknown as Record<string, unknown>)[k] = near[k]; (near as unknown as Record<string, unknown>)[k] = v; }
+        settleHeel(me); settleHeel(near);
+      }
+    }
   }
 
   get player(): Boat | null { return this.playerIndex >= 0 ? this.boats[this.playerIndex] : null; }
+
+  /** The control area, the stretch of bank the skippers stand on: at a venue, the club's own; on the
+   *  practice pond, the right-hand bank (looking upwind) either side of the start line. */
+  controlArea(): { a: V2; b: V2 } {
+    if (this.venue) return { a: this.venue.control[0], b: this.venue.control[1] };
+    const c = this.course, B = c.bounds, L = c.L;
+    const at = (along: number, across: number): V2 => ({ x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across });
+    return { a: at(-8 * L, B.across + 1.2 * L), b: at(14 * L, B.across + 1.2 * L) };
+  }
 
   perceived(i: number, delaySteps: number): Perceived {
     const H = this.hist[i];
@@ -317,16 +343,16 @@ export class Race implements AiHost {
     // Whatever the screen sets meanwhile, the log's input it is. Past the end of the log she
     // carries on with the last input, as she did then.
     while (f.i < input.length && input[f.i][0] <= this.step_) f.cur = input[f.i++];
-    if (f.cur) this.input = { rudder: f.cur[1], sheet: f.cur[2], autoTrim: this.settings.autoTrim, penaltyAssist: f.cur[3] === 1 };
+    if (f.cur) this.input = { rudder: f.cur[1], sheet: f.cur[2], autoTrim: this.settings.autoTrim };
   }
 
   /** Quantise the input (so a replay is exact to the bit) and record it when it changes. */
   private recordInput() {
     const q = (v: number) => Math.round(v * 1000) / 1000;
-    const rudder = q(this.input.rudder), sheet = q(this.input.sheet), pen = this.input.penaltyAssist ? 1 : 0;
+    const rudder = q(this.input.rudder), sheet = q(this.input.sheet);
     this.input = { ...this.input, rudder, sheet };
     const last = this.log.input[this.log.input.length - 1];
-    if (!last || last[1] !== rudder || last[2] !== sheet || last[3] !== pen) this.log.input.push([this.step_, rudder, sheet, pen]);
+    if (!last || last[1] !== rudder || last[2] !== sheet) this.log.input.push([this.step_, rudder, sheet, 0]);
   }
 
   /** Helm assist for the player: turn through a tack or gybe at a good rate. */
@@ -370,10 +396,7 @@ export class Race implements AiHost {
         else rudder = Math.max(-0.82, Math.min(0.82, err / 22));
         if (Math.abs(this.input.rudder) > 0.5) this.helmAssist = null; // the player took over
       }
-      if (this.input.penaltyAssist && p.penalty.owed > 0) {
-        const up = Math.abs(p.twa) < 90;
-        rudder = (up ? (p.tack === 'stbd' ? 1 : -1) : (p.tack === 'stbd' ? -1 : 1)) * 0.95;
-      }
+      // Penalties are the skipper's own: she sails her turn herself (the referee sees it done).
       p.rudder = rudder;
       const best = bestSheet(Math.abs(p.twa));
       p.sheet = this.input.autoTrim ? Math.min(best, this.input.sheet >= 0.98 ? best : this.input.sheet) : this.input.sheet;
@@ -400,8 +423,8 @@ export class Race implements AiHost {
   private recordHist() {
     this.boats.forEach((b, i) => {
       const H = this.hist[i];
-      H.x.push(b.x); H.y.push(b.y); H.hdg.push(b.hdg); H.spd.push(b.spd); H.rot.push(b.rot);
-      if (H.x.length > HIST) { H.x.shift(); H.y.shift(); H.hdg.shift(); H.spd.shift(); H.rot.shift(); }
+      H.x.push(b.x); H.y.push(b.y); H.hdg.push(b.hdg); H.spd.push(b.spd); H.rot.push(b.rot); H.heel.push(b.heel);
+      if (H.x.length > HIST) { H.x.shift(); H.y.shift(); H.hdg.shift(); H.spd.shift(); H.rot.shift(); H.heel.shift(); }
     });
   }
 

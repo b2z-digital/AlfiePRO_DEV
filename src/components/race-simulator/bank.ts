@@ -5,11 +5,11 @@
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
 import { DEG, dir, n180 } from '@/sim/math';
-import { noGoAngle } from '@/sim/classes';
-import { wavePhase } from '@/sim/sea';
+import { seaLevel } from '@/sim/sea';
 import type { WorldOverlay } from '@/sim/scene';
 import { DrawOpts, Pose, drawBoat3d, drawReflection, onWaves, rigFor, sailSet, twaFor } from './boat3d';
 import { drawCredit, drawVenueScene } from './bankVenue';
+import { drawGusts, drawRipples, drawWakes, drawWaves } from './bankWater';
 
 interface V2 { x: number; y: number }
 interface Proj { x: number; y: number; z: number }
@@ -29,24 +29,20 @@ const NEAR = 0.35;
 
 export function newBankCam(): BankCam { return { x: 0, y: 0, z: EYE, yaw: 0, pitch: 3, fov: 50, ready: false }; }
 
-/** The control area, the stretch of bank the skippers stand on: at a venue, the club's own; on the
- *  practice pond, the right-hand bank (looking upwind) either side of the start line. */
-export function controlArea(race: Race): { a: V2; b: V2 } {
-  if (race.venue) return { a: race.venue.control[0], b: race.venue.control[1] };
-  const c = race.course, B = c.bounds, L = c.L;
-  const at = (along: number, across: number): V2 => ({ x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across });
-  return { a: at(-8 * L, B.across + 1.2 * L), b: at(14 * L, B.across + 1.2 * L) };
-}
 
 /** Walk along the control area towards your boat and turn to keep her in view, glancing towards
  *  where she's going. Zoom narrows the view; it also narrows on its own when she's far off. */
 export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, look: V2 | null, w: number) {
   const L = race.course.L;
   // Stand where the control area comes closest to her.
-  const ca = controlArea(race);
+  const ca = race.controlArea();
   const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
   const u = Math.max(0, Math.min(1, ((target.x - ca.a.x) * ex + (target.y - ca.a.y) * ey) / el2));
   const want = { x: ca.a.x + ex * u, y: ca.a.y + ey * u };
+  // With your boat right in at the bank, step back up it a little, so you can still see her whole.
+  const ox = want.x - target.x, oy = want.y - target.y, od = Math.hypot(ox, oy);
+  const stepBack = Math.max(0, 7 * L - od);
+  if (stepBack > 0 && od > 0.01) { want.x += (ox / od) * stepBack; want.y += (oy / od) * stepBack; }
   const snap = !cam.ready;
   const kWalk = snap ? 1 : Math.min(1, dt * 0.7);
   cam.x += (want.x - cam.x) * kWalk; cam.y += (want.y - cam.y) * kWalk;
@@ -59,11 +55,12 @@ export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom
     yaw = yawBoat + Math.max(-lim, Math.min(lim, n180(yawLook - yawBoat) * 0.35));
   }
   const d = Math.hypot(target.x - cam.x, target.y - cam.y);
-  // Keep your boat big enough to see: at least about 3% of the screen width long.
-  const minPx = Math.max(16, Math.min(34, w * 0.025));
-  const fovAuto = (2 * Math.atan((w * L) / (2 * minPx * Math.max(1, d)))) / DEG;
-  // Narrow the view to keep her big enough, but not past a natural lens: zoom in yourself for more.
-  const fov = Math.max(10, Math.min(75, Math.min(50 / zoom, Math.max(40 / zoom, fovAuto))));
+  // Zoom in with her as she sails away, the way you'd follow your boat with your eyes: keep her
+  // about 4½% of the screen wide, so you can still judge her distances off the marks and the boats
+  // round her. Close in it's a natural lens; you can zoom in or out from there yourself.
+  const sizePx = Math.max(28, Math.min(64, w * 0.045));
+  const fovBoat = (2 * Math.atan((w * L) / (2 * sizePx * Math.max(1, d)))) / DEG;
+  const fov = Math.max(6, Math.min(75, Math.max(11, Math.min(50, fovBoat)) / zoom));
   const pitch = (Math.atan2(cam.z, Math.max(1.5, d)) / DEG) * 0.82 + 0.4;
   if (snap) { cam.yaw = yaw; cam.pitch = pitch; cam.fov = fov; cam.ready = true; return; }
   cam.yaw += n180(yaw - cam.yaw) * Math.min(1, dt * 2.4);
@@ -155,18 +152,6 @@ function label(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, c
   ctx.fillStyle = color; ctx.fillText(s, x, y);
 }
 
-/** How far a boat heels, degrees: + is to port, the way she leans on starboard tack. */
-export function heelOf(b: { twa: number; tws: number; sheet: number; disabled?: boolean }): number {
-  const a = Math.abs(b.twa);
-  if (b.disabled) return 4 * Math.sign(b.twa || 1);
-  const ng = noGoAngle(b.tws);
-  const kn = b.tws / 0.514444;
-  const power = a < ng ? 0.1 : Math.sin(Math.min(Math.PI, ((a - ng + 10) / 120) * Math.PI)) * (a > 140 ? 0.35 : 1);
-  const trim = Math.max(0.2, Math.min(1, b.sheet * 1.2));
-  const heel = Math.min(30, (4 + kn * 1.8) * power * trim);
-  return b.twa >= 0 ? heel : -heel;
-}
-
 export interface BankOptions {
   w: number; h: number; dpr: number; cam: BankCam;
   /** What you're sailing to: drawn with its name, and pointed to when it's out of view. */
@@ -180,6 +165,8 @@ export interface BankOptions {
   back: number;
   /** A ghost to race: another member's boat from their own race (her race, for her pose), drawn faint. */
   ghost?: { race: Race; b: Boat; label: string } | null;
+  /** How much detail the water gets: 2 full, 1 less, 0 the least (for slower devices). */
+  detail?: number;
 }
 
 export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptions) {
@@ -189,15 +176,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   const { P } = V;
   const c = race.course, B = c.bounds, L = c.L;
   const t = race.t;
-  const twd = race.wind.meanTwd(t);
-  const tws = race.wind.meanTws(t);
   const at = (al: number, ac: number): V2 => ({ x: c.origin.x + c.up.x * al + c.right.x * ac, y: c.origin.y + c.up.y * al + c.right.y * ac });
-  const shore = c.shore;
-  const inPond = shore ? (x: number, y: number) => shore.grid.wet(x, y) : (x: number, y: number) => {
-    const dx = x - c.origin.x, dy = y - c.origin.y;
-    const al = dx * c.up.x + dy * c.up.y, ac = dx * c.right.x + dy * c.right.y;
-    return al > B.alongMin && al < B.alongMax && Math.abs(ac) < B.across;
-  };
 
   // ── Sky, haze and the land ──
   const fw = dir(cam.yaw);
@@ -276,49 +255,12 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
       ctx.fillStyle = wg;
       path(ctx, water); ctx.fill();
       ctx.strokeStyle = 'rgba(220,235,220,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+      waterClip = () => path(ctx, water);
     }
     trees(4, 52, 1.4, 1.8, '#2F4A32', 3);
   }
 
-  // ── Puffs: darker patches of rippled water, stretched along the wind. Each one is the ellipse its
-  // outline makes on the screen, filled with a soft radial gradient (a blur filter is far slower) ──
-  const wv = dir(twd), xv = { x: wv.y, y: -wv.x };
-  ctx.save();
-  if (waterClip) { waterClip(); ctx.clip('evenodd'); }
-  for (const p of race.wind.puffs) {
-    const life = Math.sin(Math.PI * Math.min(1, Math.max(0, p.age / p.life)));
-    const a = Math.min(1, Math.abs(p.strength) * 3 + 0.2) * life;
-    if (a < 0.04 || V.depth(p.x, p.y) < -p.r * 1.6) continue;
-    const ring: V2[] = [];
-    for (let k = 0; k < 16; k++) {
-      const ang = (k / 16) * Math.PI * 2;
-      const along = Math.cos(ang) * p.r * 1.5, acr = Math.sin(ang) * p.r;
-      ring.push({ x: p.x + wv.x * along + xv.x * acr, y: p.y + wv.y * along + xv.y * acr });
-    }
-    const q = V.ground(ring);
-    if (q.length < 3) continue;
-    // Centre and principal axes of the outline on the screen.
-    let mx = 0, my = 0;
-    for (const pt of q) { mx += pt.x; my += pt.y; }
-    mx /= q.length; my /= q.length;
-    let sxx = 0, syy = 0, sxy = 0;
-    for (const pt of q) { const dx = pt.x - mx, dy = pt.y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
-    sxx /= q.length; syy /= q.length; sxy /= q.length;
-    const tr = sxx + syy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy)));
-    const ra = Math.sqrt(2 * (tr / 2 + disc)), rb = Math.sqrt(2 * Math.max(1e-6, tr / 2 - disc));
-    if (ra < 1.5 || mx + ra < -40 || mx - ra > w + 40 || my - ra > h + 40 || my + ra < hz - 4) continue;
-    const rgb = p.strength > 0 ? '6,18,38' : '215,232,255', k = p.strength > 0 ? 0.5 : 0.1;
-    ctx.save();
-    ctx.translate(mx, my); ctx.rotate(0.5 * Math.atan2(2 * sxy, sxx - syy)); ctx.scale(1, Math.max(0.02, rb / ra));
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ra);
-    g.addColorStop(0, `rgba(${rgb},${k * a * 0.95})`); g.addColorStop(0.55, `rgba(${rgb},${k * a * 0.6})`); g.addColorStop(1, `rgba(${rgb},0)`);
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(0, 0, ra, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-  ctx.restore();
-
-  // ── Every boat's pose (live, or from her history in a replay), and her reflection ──
+  // ── Every boat's pose (live, or from her history in a replay) ──
   const o: DrawOpts = { P, F: V.F, dpr, cam: [cam.x, cam.y, cam.z], t };
   const posed: { b: Boat; pose: Pose; d: number }[] = [];
   race.boats.forEach((b, i) => {
@@ -328,68 +270,23 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
     const bx = live ? b.x : H.x[kk], by = live ? b.y : H.y[kk], bh = live ? b.hdg : H.hdg[kk];
     const d = V.depth(bx, by);
     if (d < 0.7) return;
-    posed.push({ b, pose: poseOf(race, b, bx, by, bh, live ? b.spd : H.spd[kk]), d });
+    posed.push({ b, pose: poseOf(race, b, bx, by, bh, live ? b.spd : H.spd[kk], live ? b.heel : H.heel[kk] ?? b.heel), d });
   });
-  const reflect = !race.sea ? 0.3 : race.sea.kind === 'chop' ? 0.13 : 0.05;
-  for (const q of posed) drawReflection(ctx, q.pose, o, reflect);
 
-  // ── Ripples and waves, fixed to the water: each one drifts downwind and fades in and out ──
-  const sea = race.sea;
-  const seaK = sea ? sea.height / 0.1 : 0;
-  const drift = dir(twd + 180);
-  const ripple = (cell: number, reach: number, len0: number, alpha: number) => {
-    const i0 = Math.floor((cam.x - reach) / cell), i1 = Math.ceil((cam.x + reach) / cell);
-    const j0 = Math.floor((cam.y - reach) / cell), j1 = Math.ceil((cam.y + reach) / cell);
-    const flow = (t * Math.max(0.15, tws * 0.05)) / cell;
-    ctx.beginPath();
-    let crestPts = 0;
-    for (let i = i0; i <= i1; i++) {
-      for (let j = j0; j <= j1; j++) {
-        const ph = (flow + hash(i, j)) % 1;
-        const fade = Math.sin(Math.PI * ph);
-        if (fade < 0.2) continue;
-        const x = (i + hash(j, i + 5)) * cell + drift.x * ph * cell, y = (j + hash(i + 9, j)) * cell + drift.y * ph * cell;
-        const d = V.depth(x, y);
-        if (d < 0.8 || d > reach) continue;
-        if (!inPond(x, y)) continue;
-        let len = len0 * (0.6 + hash(i - 3, j + 1) * 0.8);
-        if (sea) {
-          const lift = (1 + Math.sin(wavePhase(sea, x, y, t))) / 2;
-          if (lift < 0.45) continue;
-          len *= 1 + 2.2 * seaK * lift;
-          crestPts++;
-        }
-        const a1 = P(x - xv.x * len, y - xv.y * len, 0), a2 = P(x + xv.x * len, y + xv.y * len, 0);
-        if (a1.x < -40 || a1.x > w + 40 || a1.y > h + 10) continue;
-        ctx.moveTo(a1.x, a1.y); ctx.lineTo(a2.x, a2.y);
-      }
-    }
-    ctx.strokeStyle = `rgba(222,236,255,${alpha * (sea ? 1.3 : 1)})`;
-    ctx.stroke();
-    return crestPts;
-  };
-  ctx.lineWidth = 1; ctx.lineCap = 'round';
-  ripple(0.7, 11, 0.12, 0.16);
-  ripple(2.6, 70, 0.4, 0.11);
-  // Out on the open lake: the wind on the water, fading into the distance.
-  if (shore) ripple(9, 420, 1.5, 0.07);
-  // Whitecaps in rough water.
-  if (sea && sea.kind === 'rough') {
-    ctx.fillStyle = 'rgba(240,248,255,0.5)';
-    const cell = 1.6;
-    for (let i = Math.floor((cam.x - 40) / cell); i <= Math.ceil((cam.x + 40) / cell); i++) {
-      for (let j = Math.floor((cam.y - 40) / cell); j <= Math.ceil((cam.y + 40) / cell); j++) {
-        if (hash(i * 3, j * 7) < 0.82) continue;
-        const x = (i + hash(j, i)) * cell, y = (j + hash(i, j + 2)) * cell;
-        const d = V.depth(x, y);
-        if (d < 1 || d > 40 || !inPond(x, y)) continue;
-        if (Math.sin(wavePhase(sea, x, y, t)) < 0.92) continue;
-        const q = P(x, y, 0.01);
-        const rr = Math.max(0.8, (0.09 / d) * V.F);
-        ctx.beginPath(); ctx.ellipse(q.x, q.y, rr * 1.6, rr * 0.45, 0, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-  }
+  // ── On the water, under one clip to its shore (clipping is the slow part): the wind's ripples,
+  // gusts and lulls, the waves, each boat's reflection, then the wakes ──
+  ctx.save();
+  if (waterClip) { waterClip(); ctx.clip('evenodd'); }
+  const detail = v.detail ?? 2;
+  if (detail > 0) drawRipples(ctx, V, race, cam, hz, detail);
+  drawGusts(ctx, V, race, hz, detail);
+  if (detail > 0) drawWaves(ctx, V, race, cam);
+  // Waves break a boat's reflection up: clear on flat water, a faint shimmer in waves.
+  // And a breeze ripples them away even on flat water.
+  const reflect = (!race.sea ? 0.3 : race.sea.kind === 'chop' ? 0.08 : 0.035) * (1 - 0.7 * Math.min(1, Math.max(0, (race.wind.meanTws(t) / 0.514444 - 3) / 11)));
+  for (const q of posed) drawReflection(ctx, q.pose, o, reflect);
+  drawWakes(ctx, V, race, posed.map(q => ({ i: race.boats.indexOf(q.b), pose: q.pose, L: q.b.cls.loa, beam: q.b.cls.beam, hullSpeed: q.b.cls.hullSpeed })), v.back, detail);
+  ctx.restore();
 
   // ── The course: start line, zone, teaching marks ──
   ctx.lineCap = 'butt';
@@ -433,7 +330,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
     if (base.z < NEAR) continue;
     const isNext = !!nextAt && Math.hypot(nextAt.x - m.p.x, nextAt.y - m.p.y) < 0.01;
     items.push({ z: base.z, draw: () => {
-      const bob = sea ? sea.height * 0.4 * Math.sin(wavePhase(sea, m.p.x, m.p.y, t)) : 0;
+      const bob = race.sea ? seaLevel(race.sea, m.p.x, m.p.y, t) * 0.8 : 0;
       const b0 = P(m.p.x, m.p.y, bob), top = P(m.p.x, m.p.y, bob + 0.34);
       const rpx = Math.max(2.2, (m.r / base.z) * V.F);
       const hgt = Math.max(4, b0.y - top.y);
@@ -463,7 +360,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   if (v.ghost && v.back === 0) {
     const g = v.ghost.b, d = V.depth(g.x, g.y);
     if (d > 0.7) {
-      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd), color: '#E8F1FF', tape: '#B9C7DA', deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
+      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd, g.heel), color: '#E8F1FF', tape: '#B9C7DA', deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
       items.push({ z: d, draw: () => {
         const { top } = drawBoat3d(ctx, pose, o);
         label(ctx, v.ghost!.label, top.x, top.y - 10, 'rgba(232,241,255,0.75)', 11.5, 600);
@@ -507,14 +404,14 @@ function trim(color: string): { tape: string; deck: string } {
 }
 
 /** Where a boat is and how she's sitting, for the 3D model: heel, waves, sails set to her sheet. */
-function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: number): Pose {
+function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: number, heel: number): Pose {
   const twa = twaFor(b.twd, bh);
   const set = sailSet(twa, b.sheet, b.tws, !!b.disabled);
   const t = trim(b.color);
   const p: Pose = {
-    cls: b.cls.id, rig: rigFor(b.cls.id, race.settings.windStrength),
+    cls: b.cls.id, rig: rigFor(b.cls.id, race.wind.baseTws / 0.514444),
     x: bx, y: by, hdg: bh,
-    heel: heelOf({ twa, tws: b.tws, sheet: b.sheet, disabled: b.disabled }), pitch: 0, heave: 0,
+    heel, pitch: 0, heave: 0,
     sd: set.sd, boom: set.boom, jib: set.jib, goose: set.goose, luff: set.luff,
     color: b.color, tape: b.isPlayer ? '#2A93FF' : t.tape, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
     sail: b.sail, country: 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
@@ -522,14 +419,61 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
   return onWaves(p, race.sea, race.t);
 }
 
+/** How long "You" is called out when the race opens, seconds. */
+export const YOU_INTRO = 7;
+export const ALFIE = ['#2E7BFF', '#8A4DFF', '#FF3E9A', '#FF8A2B'];
+
+/** A rounded pill in Alfie's colours with white text, pointing down at (x, y). */
+export function alfieCallout(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, pulse: number) {
+  ctx.save();
+  ctx.font = `800 ${15}px ${FONT}`;
+  const tw = ctx.measureText(text).width + 30, hh = 30;
+  const k = 1 + 0.06 * pulse;
+  ctx.translate(x, y); ctx.scale(k, k);
+  const g = ctx.createLinearGradient(-tw / 2, 0, tw / 2, 0);
+  ALFIE.forEach((c, i) => g.addColorStop(i / (ALFIE.length - 1), c));
+  ctx.shadowColor = 'rgba(255,62,154,0.55)'; ctx.shadowBlur = 10 + 10 * pulse;
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-tw / 2, -hh - 9, tw, hh, hh / 2); else ctx.rect(-tw / 2, -hh - 9, tw, hh);
+  ctx.moveTo(-7, -10); ctx.lineTo(7, -10); ctx.lineTo(0, -1); ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, -hh / 2 - 9 + 0.5);
+  ctx.restore();
+}
+
 function drawBankBoat(ctx: CanvasRenderingContext2D, V: BankView, race: Race, b: Boat, pose: Pose, o: DrawOpts, v: BankOptions) {
   const t = race.t;
+  // When the race opens: rings spreading on the water round your boat, in Alfie's colours.
+  const intro = b.isPlayer && v.back === 0 && t < YOU_INTRO;
+  if (intro) {
+    const L = b.cls.loa;
+    for (const ph of [0, 0.5]) {
+      const u = (t * 0.9 + ph) % 1;
+      const ring: V2[] = [];
+      for (let k = 0; k < 32; k++) { const ang = (k / 32) * Math.PI * 2; ring.push({ x: pose.x + Math.cos(ang) * L * (0.7 + 1.8 * u), y: pose.y + Math.sin(ang) * L * (0.7 + 1.8 * u) }); }
+      ctx.strokeStyle = ALFIE[Math.floor((t * 0.9 + ph) % ALFIE.length)];
+      ctx.globalAlpha = (1 - u) * 0.9 * Math.min(1, (YOU_INTRO - t) / 1.5);
+      ctx.lineWidth = 2.4;
+      groundLine(ctx, V, ring, true);
+      ctx.globalAlpha = 1;
+    }
+  }
   const { top, base, size } = drawBoat3d(ctx, pose, o);
   // Labels over the masthead.
   if (b.isPlayer) {
-    ctx.fillStyle = '#4DA3FF';
-    ctx.beginPath(); ctx.moveTo(top.x - 6, top.y - 12); ctx.lineTo(top.x + 6, top.y - 12); ctx.lineTo(top.x, top.y - 5); ctx.closePath(); ctx.fill();
-    label(ctx, 'You', top.x, top.y - 22, '#FFFFFF', 13);
+    if (intro) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 7);
+      ctx.globalAlpha = Math.min(1, (YOU_INTRO - t) / 1.2);
+      alfieCallout(ctx, 'This is you', top.x, top.y - 4 - 3 * pulse, pulse);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = '#4DA3FF';
+      ctx.beginPath(); ctx.moveTo(top.x - 6, top.y - 12); ctx.lineTo(top.x + 6, top.y - 12); ctx.lineTo(top.x, top.y - 5); ctx.closePath(); ctx.fill();
+      label(ctx, 'You', top.x, top.y - 22, '#FFFFFF', 13);
+    }
   } else if (size > 9) {
     label(ctx, v.names && b.name && b.name !== b.sail ? `${b.name} · ${b.sail}` : b.sail, top.x, top.y - 9, 'rgba(255,255,255,0.85)', 11.5, 600);
   }

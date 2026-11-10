@@ -17,14 +17,15 @@ import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { SequencePlayer, SimSequence } from './startbox';
 import { Moment, findMoments } from './moments';
 import {
-  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, LineCard, ReplayBar,
+  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, LineCard, PenaltyProgress, ReplayBar,
   ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, SceneResult, Toast, Toasts, WindCard,
 } from './hud';
 import GamepadModal from './GamepadModal';
 import CourseMap from './CourseMap';
-import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, compassName, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Chip, Hud, Seg, clock, compassName, cx, ordinal } from './ui';
 
 export type SimView = 'bank' | 'top';
 
@@ -60,6 +61,8 @@ export interface SimRaceProps {
   resume?: { log: RaceLog; step: number };
   /** Race another member's ghost: their race sails again alongside yours, and their boat is drawn faint in yours. */
   ghost?: { log: RaceLog; settings: RaceSettings; label: string };
+  /** The club's StartBox sequence, played in step with the countdown instead of the simulator's own calls. */
+  sequence?: SimSequence | null;
   onAgain: () => void;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
@@ -75,7 +78,8 @@ interface HudState {
   fleet: FleetRow[];
   boat: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string };
   rudder: number; sheet: number; twa: number;
-  owed: boolean; finished: boolean;
+  /** The penalty turn you owe, and how far round you are (null when you owe none). */
+  penalty: PenaltyProgress | null; finished: boolean;
   goal: { progress: string | null; timeLeft: number | null } | null;
 }
 
@@ -109,7 +113,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -124,6 +128,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (resume) r.followLog(resume.log, resume.step);
     return r;
   }, [built, settings, resume]);
+  // The club's start sequence, playing against the race clock.
+  const seqPlayer = useMemo(() => (sequence && !scene ? new SequencePlayer(sequence) : null), [sequence, scene]);
+  useEffect(() => () => seqPlayer?.stop(), [seqPlayer]);
   // The ghost's own race, a step behind nobody: it steps with yours.
   const ghostRace = useMemo(() => {
     if (!ghost) return null;
@@ -184,7 +191,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const [full, setFull] = useState(false);
 
   // Mirrors of state for the animation loop.
-  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, penaltyAssist: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
+  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
   R.current.paused = paused; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
   R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
   R.current.view = view; R.current.glance = glance;
@@ -227,11 +234,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       if (p && inc.kind !== 'ocs' && dist(inc.at, p) < 10 * p.cls.loa) toast(`Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes a penalty`);
       return;
     }
-    const m = R.current.coach;
-    // In a drill or lesson the goal decides what happens next; incidents show as a banner.
-    if (m === 'full' && mode !== 'scene') { R.current.paused = true; setPaused(true); setMoment(inc); }
-    else if (m !== 'off' || mode === 'scene') setBanner(inc);
-    else toast(inc.kind === 'ocs' ? 'Recall: you were over at the gun' : mine ? `Rule ${inc.rule}: you owe a One-Turn Penalty` : `Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes you a penalty`, 'warn');
+    // The race never stops for an incident: it shows as a banner (Alfie explains it if you ask),
+    // and a penalty is yours to sail, or a recall yours to go back for.
+    if (R.current.coach !== 'off' || mode === 'scene') setBanner(inc);
+    else toast(inc.kind === 'ocs' ? 'Recall: go back below the line and start again' : mine ? `Rule ${inc.rule}: you owe a One-Turn Penalty` : `Rule ${inc.rule}: ${race.boatById(inc.offender).sail} owes you a penalty`, 'warn');
   }, [race, toast, flashes, mode]);
 
   const handleEvents = useCallback(() => {
@@ -240,8 +246,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     for (; R.current.evIdx < evs.length; R.current.evIdx++) {
       const e = evs[R.current.evIdx];
       switch (e.type) {
-        case 'signal': audio.signal(e.remaining); break;
-        case 'gun': audio.gun(); break;
+        // The club's recording calls the sequence and fires the gun when it's playing.
+        case 'signal': if (!seqPlayer?.working) audio.signal(e.remaining); break;
+        case 'gun': if (!seqPlayer?.working) audio.gun(); break;
         case 'recall': {
           const sails = e.boats.map(id => race.boatById(id).sail);
           audio.recall(sails);
@@ -260,14 +267,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           if (p && e.to === p.id) toast(`${race.boatById(e.from).sail} replied "You tack": tack as soon as you can (T)`, 'warn');
           break;
         case 'incident': onIncident(e.incident); break;
-        case 'penalty-done': if (p && e.boat === p.id) { R.current.penaltyAssist = false; toast('Penalty done. Back to racing.', 'good'); } break;
+        case 'penalty-done': if (p && e.boat === p.id) toast('Penalty done. Back to racing.', 'good'); break;
         case 'rounded': if (p && e.boat === p.id) toast(`${legLabel(race, e.leg)} done · ${ordinal(e.place)}`); break;
         case 'finish': if (p && e.boat === p.id) { toast(`Finished ${ordinal(e.place)}`, 'good'); audio.beep(1200, 300); R.current.playerDoneAt = race.t; } break;
         case 'started': if (p && e.boat === p.id) toast(e.late < 0.3 ? 'Started right on the gun' : `Started ${e.late.toFixed(1)} s after the gun`, e.late < 2 ? 'good' : 'plain'); break;
         default: break;
       }
     }
-  }, [race, audio, toast, onIncident]);
+  }, [race, audio, toast, onIncident, seqPlayer]);
 
   // ── Snapshot for the HUD ──
   const makeHud = useCallback((): HudState | null => {
@@ -306,7 +313,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       fleet,
       boat: { tack: p.tack === 'stbd' ? 'Starboard' : 'Port', pos: pointOfSail(p), spdPct: p.targetSpd > 0.05 * p.cls.hullSpeed ? Math.min(1.25, p.spd / p.targetSpd) : 0, kn: p.spd / KN, trim: trimAdvice(p) },
       rudder: ctl.rudder, sheet: ctl.sheet, twa: p.twa,
-      owed: p.penalty.owed > 0, finished: p.finished,
+      penalty: p.penalty.owed > 0 ? { owed: p.penalty.owed, deg: Math.abs(p.penalty.rot), tack: p.penalty.passedHtw, gybe: p.penalty.passedDdw } : null, finished: p.finished,
       goal,
     };
   }, [race, mem, ctl, scene, built, goalMemo]);
@@ -321,10 +328,19 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       const mid = (B.alongMin + B.alongMax) / 2;
       return { x: race.course.origin.x + race.course.up.x * mid, y: race.course.origin.y + race.course.up.y * mid, scale: s };
     };
+    // How much detail the water gets: full, unless frames are coming too slowly on this device.
+    const perf = { detail: 2, ft: 1 / 60, slow: 0, fast: 0 };
     const frame = (now: number) => {
       // The frame's timestamp can be a little before the moment the loop started: never negative.
       const dtReal = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
+      if (dtReal > 0 && !document.hidden) {
+        perf.ft += (dtReal - perf.ft) * 0.05;
+        perf.slow = perf.ft > 1 / 38 ? perf.slow + dtReal : 0;
+        perf.fast = perf.ft < 1 / 55 ? perf.fast + dtReal : 0;
+        if (perf.slow > 2 && perf.detail > 0) { perf.detail--; perf.slow = 0; }
+        if (perf.fast > 8 && perf.detail < 2) { perf.detail++; perf.fast = 0; }
+      }
       const st = R.current;
       ctl.update(dtReal, st.mapping);
       const p = race.player;
@@ -345,7 +361,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         acc += dtReal * (st.fast ? 2.5 : 1);
         let n = 0;
         while (acc >= DT && n < 10) {
-          race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim, penaltyAssist: st.penaltyAssist };
+          race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim };
           race.step();
           if (ghostRace && !ghostRace.ended) ghostRace.step();
           handleEvents();
@@ -373,6 +389,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           }
         }
       }
+      // The club's start sequence keeps time with the race clock.
+      seqPlayer?.update(race.gunT - race.t, !st.paused && !st.replay && !st.ended && !race.replaying, st.fast ? 2.5 : 1, audio.muted);
       // Instant replay playback.
       if (st.replay && st.replay.playing) {
         const back = Math.max(0, st.replay.back - dtReal * 20);
@@ -433,6 +451,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             showZones: T <= 0 && !!nx?.isMark, preStart: T > 0, flashes, overlays, names: !!scene,
             back: st.replay ? Math.round(st.replay.back) : 0,
             ghost: ghostRace?.player ? { race: ghostRace, b: ghostRace.player, label: ghost!.label } : null,
+            detail: perf.detail,
           });
         } else {
           drawRace(ctx, race, {
@@ -444,6 +463,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
             overlays, names: !!scene,
             ghost: ghostRace?.player ? { b: ghostRace.player, label: ghost!.label } : null,
+            detail: perf.detail,
           });
         }
       }
@@ -473,7 +493,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio]);
 
   // ── Canvas size ──
   useEffect(() => {
@@ -515,12 +535,6 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     race.act(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
   }, [race]);
 
-  const doPenalty = useCallback(() => {
-    const p = race.player; if (!p || p.penalty.owed <= 0) return;
-    R.current.penaltyAssist = true;
-    toast('Turning: one tack and one gybe');
-  }, [race, toast]);
-
   // Hails: the race works out what she calls (answer a room-to-tack hail, protest, room to tack at
   // the bank, mark-room, right of way), so a replay calls the same; here we say it and show it.
   const doHail = useCallback(() => {
@@ -530,8 +544,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (r.note) toast(r.note, r.noteTone ?? 'plain');
   }, [race, audio, toast]);
 
-  const closeMoment = useCallback((takePenalty: boolean) => {
-    if (takePenalty) R.current.penaltyAssist = true;
+  const closeMoment = useCallback(() => {
     setMoment(null); setReplay(null); R.current.replay = null;
     setPaused(false); R.current.paused = false;
   }, []);
@@ -565,7 +578,6 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       else if (k === 'arrowdown' || k === 's') ctl.up = true;     // stick down = sail in
       else if (k === 't' || k === 'g') { if (!e.repeat) doTack(); }
       else if (k === 'h') { if (!e.repeat) doHail(); }
-      else if (k === 'p') { if (!e.repeat) doPenalty(); }
       else if (k === ' ' || k === 'escape') { if (!e.repeat) togglePause(); }
       else if (k === 'l') { if (!e.repeat) setLaylines(v => !v); }
       else if (k === 'v') { if (!e.repeat) onViewChange(R.current.view === 'bank' ? 'top' : 'bank'); }
@@ -590,7 +602,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
-  }, [ctl, doTack, doHail, doPenalty, togglePause, onViewChange]);
+  }, [ctl, doTack, doHail, togglePause, onViewChange]);
 
   const s = race.settings;
   const windText = s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength[0].toUpperCase()}${s.windStrength.slice(1)} wind`;
@@ -618,7 +630,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           <p className="m-0 truncate text-[15px] font-semibold">{title}{paused && !moment && <Chip tone="warn" className="ml-2">Paused</Chip>}{watching && <Chip tone="blue" className="ml-2">Watching</Chip>}</p>
           <p className="m-0 mt-0.5 hidden truncate text-[12.5px] sm:block" style={{ color: C.mute }} title={sub}>{sub}</p>
         </div>
-        <span className="ml-auto hidden text-[12.5px] 2xl:inline" style={{ color: C.mute }}>← → steer · ↑ ↓ sail out / in · T tack · H hail · P penalty · Space pause</span>
+        <span className="ml-auto hidden text-[12.5px] 2xl:inline" style={{ color: C.mute }}>← → steer · ↑ ↓ sail out / in · T tack · H hail · Space pause</span>
         <div className="ml-auto flex items-center gap-2 2xl:ml-0">
           <Seg size="sm" label="View" value={view} onChange={onViewChange} options={[{ value: 'bank', label: 'Bank view', title: 'From the control area on the bank (V)' }, { value: 'top', label: 'Top view', title: 'From above (V)' }]} />
           <span className="hidden h-[22px] min-w-[22px] items-center justify-center rounded-[7px] border border-white/10 bg-white/[0.08] px-1.5 text-[11.5px] font-bold text-white/85 lg:inline-flex" title="Switch view">V</span>
@@ -676,7 +688,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
                 <span className="text-[11px]" style={{ color: C.mute }}>kn</span>
               </Hud>
             </div>
-            <div className="absolute bottom-[236px] right-6 top-5 hidden flex-col gap-4 lg:flex">
+            <div className={cx('absolute right-6 top-5 hidden flex-col gap-4 lg:flex', hud.penalty ? 'bottom-[290px]' : 'bottom-[236px]')}>
               {hud.line ? <LineCard line={hud.line} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} /> : <CourseCard {...hud.course} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} />}
               <FleetCard rows={hud.fleet} preStart={hud.preStart} />
             </div>
@@ -721,7 +733,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
                   onRudder={v => { ctl.touchRudder = v; }} onRudderEnd={() => { ctl.touchRudder = null; }}
                   onSheet={v => { ctl.sheet = v; }}
                   onTack={doTack} onHail={doHail} tackLabel={Math.abs(hud.twa) < 90 ? 'Tack' : 'Gybe'}
-                  penalty={hud.owed && !R.current.penaltyAssist} onPenalty={doPenalty}
+                  penalty={hud.penalty}
                 />
               </div>
             )}
@@ -742,7 +754,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         {moment && (
           <div className="absolute bottom-4 right-4 top-4 flex sm:right-6 sm:top-5">
             <RulesMomentPanel inc={moment} mine={moment.offender === p?.id} otherSail={otherSail}
-              onPenalty={() => closeMoment(true)} onContinue={() => closeMoment(false)} onReplay={startReplay} onLearn={() => setRuleSheet(moment.rule)} />
+              onContinue={closeMoment} onReplay={startReplay} onLearn={() => setRuleSheet(moment.rule)} />
           </div>
         )}
         {replay && (

@@ -57,7 +57,7 @@ function scenario(specs: Spec[], twd = 0): Race {
       b.progress = initialProgress(leg.options[0], m0, b); b.lastBearing = bearing(m0, b);
       b.progress2 = initialProgress(leg.options[1], m1, b); b.lastBearing2 = bearing(m1, b);
     }
-    race.hist[i] = { x: [], y: [], hdg: [], spd: [], rot: [] };
+    race.hist[i] = { x: [], y: [], hdg: [], spd: [], rot: [], heel: [] };
     (race.skippers as unknown[])[i] = new Scripted(b, sp.plan ?? (() => ({ hdg: sp.hdg })), t0);
   });
   race.events.length = 0;

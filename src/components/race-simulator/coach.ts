@@ -179,7 +179,7 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
   if (p.finished) return cue('Finish', 'Finished. Sail clear of the line and watch the rest come in.');
 
   // ── Penalty owed ──
-  if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn through one tack and one gybe. Press P and the helm will do it.`, 'warn');
+  if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn');
 
   const leg = c.legs[p.legIndex];
   if (!leg) return cue('Racing', '');
