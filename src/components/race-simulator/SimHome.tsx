@@ -17,6 +17,8 @@ import type { VenueWind } from './venueWind';
 import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
+import { SimEvent, eventLine, eventState, eventStatusText } from './events';
+import EventForm, { EventChoice } from './EventForm';
 import type { SimSequence } from './startbox';
 import type { OpenRoom } from './live';
 import type { PadInfo } from './transmitter';
@@ -47,6 +49,8 @@ export const DEFAULT_SETUP: Setup = {
 };
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
+
+const LEVEL_NAME: Record<SkipperLevel, string> = { club: 'Club', state: 'State', national: 'National', world: 'World' };
 
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
   club: 'Learning the ropes: late starts, wide roundings, and the odd foul you can protest.',
@@ -233,7 +237,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null, live = null, transmitter = null }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -248,6 +252,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   /** Can you set challenges, and for every club? */
   canSet?: { everyone: boolean } | null;
   onCreateChallenge?: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>;
+  /** Virtual race events you can see (null when you're not signed in, or they couldn't be loaded). */
+  events?: SimEvent[] | null;
+  onEvent?: (e: SimEvent) => void;
+  onCreateEvent?: (c: EventChoice) => Promise<string | null>;
   /** The club's StartBox sequences, and the one this race will use (null: the simulator calls it). */
   sequences?: SimSequence[];
   startSeq?: SimSequence | null;
@@ -257,6 +265,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   transmitter?: { pads: PadInfo[]; onSetUp: () => void } | null;
 }) {
   const [setting, setSetting] = useState(false);
+  const [settingEvent, setSettingEvent] = useState(false);
   const stars = drillStars(training);
   const lic = licence(training);
   const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
@@ -422,6 +431,38 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         </div>
 
         {live && <LiveSection {...live} />}
+
+        {events && (events.length > 0 || canSet) && (
+          <section className="flex flex-col gap-3.5" aria-labelledby="ev-title">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="ev-title" className="m-0 font-display text-[22px] font-bold">Events</h2>
+                <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>A series of races, each open for a while and the same race for everyone, scored like a regatta with drops.</p>
+              </div>
+              {canSet && !settingEvent && <Btn onClick={() => setSettingEvent(true)}>Set up an event</Btn>}
+            </div>
+            {settingEvent && canSet && onCreateEvent && (
+              <EventForm canEveryone={canSet.everyone} onCreate={onCreateEvent} onDone={() => setSettingEvent(false)}
+                line={`${CLASS_LABEL[s.classId]} · ${s.fleetSize} boats · ${LEVEL_NAME[s.level]} skippers · ${venue ? venue.short : 'the practice pond'} · ${s.laps} lap${s.laps > 1 ? 's' : ''}`} />
+            )}
+            {events.length === 0 && !settingEvent && <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>No events yet. Set up the first from the race you've set up above.</p>}
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
+              {events.slice(0, 6).map(e => {
+                const st = eventState(e);
+                return (
+                  <button key={e.id} type="button" onClick={() => onEvent?.(e)} className="flex cursor-pointer flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 text-left hover:bg-white/[0.05]">
+                    <div className="flex items-center gap-2">
+                      <Cap>{e.club_id ? 'Club event' : 'Open event'}</Cap>
+                      <Chip tone={st.open.length ? 'blue' : 'plain'} className="ml-auto">{eventStatusText(e)}</Chip>
+                    </div>
+                    <p className="m-0 text-[16px] font-semibold text-[#F1F4FA]">{e.title}</p>
+                    <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{eventLine(e)} · {e.tries === 'first' ? 'first try counts' : 'best try counts'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {challenges && (challenges.length > 0 || canSet) && (
           <section className="flex flex-col gap-3.5" aria-labelledby="ch-title">
