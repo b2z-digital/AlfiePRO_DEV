@@ -472,8 +472,12 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
           quadTo(dark, e0, e1, { x: e1.x - ox * 1.6, y: e1.y - oy * 1.6 }, { x: e0.x - ox * 1.6, y: e0.y - oy * 1.6 });
         }
       }
-      ctx.fillStyle = 'rgba(3,15,32,0.13)'; ctx.fill(dark);
-      ctx.fillStyle = 'rgba(214,232,250,0.32)'; ctx.fill(lit);
+      // Close to the bank they'd read as rows of dashes, so they fade out as she comes near.
+      const far = smooth(4, 14, V.depth(p.x, p.y));
+      if (far > 0.02) {
+        ctx.fillStyle = `rgba(3,15,32,${(0.13 * far).toFixed(3)})`; ctx.fill(dark);
+        ctx.fillStyle = `rgba(214,232,250,${(0.32 * far).toFixed(3)})`; ctx.fill(lit);
+      }
     }
     // ── Bow buried in a dive: a mound of white water piled up over it and thrown out to each side ──
     const dive = p.dive ?? 0;
@@ -481,20 +485,24 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
       const f = dir(p.hdg), sd = { x: f.y, y: -f.x };
       const k = Math.min(1.3, (dive - 0.3) / 0.6);
       const c0 = { x: p.x + f.x * L * 0.44, y: p.y + f.y * L * 0.44 };
-      const ring = (rx: number, ry: number, fwd: number): Path2D | null => {
-        const pth = new Path2D();
-        for (let i = 0; i < 14; i++) {
-          const ang = (i / 14) * Math.PI * 2, wob = 0.82 + 0.36 * hash(i * 7 + wb.i, Math.floor(race.t * 9));
-          const q = V.P(c0.x + f.x * (fwd + Math.cos(ang) * ry * wob) + sd.x * Math.sin(ang) * rx * wob, c0.y + f.y * (fwd + Math.cos(ang) * ry * wob) + sd.y * Math.sin(ang) * rx * wob, 0.01);
-          if (q.z < 0.4) return null;
-          if (i) pth.lineTo(q.x, q.y); else pth.moveTo(q.x, q.y);
-        }
-        pth.closePath();
-        return pth;
+      // Soft-edged, like spray and foam, and steady (it swells and settles, it doesn't flicker).
+      const swell = 1 + 0.08 * Math.sin(race.t * 6.5 + wb.i);
+      const blob = (rx: number, ry: number, fwd: number, alpha: number) => {
+        const c1 = { x: c0.x + f.x * fwd, y: c0.y + f.y * fwd };
+        const pc = V.P(c1.x, c1.y, 0.01), px = V.P(c1.x + sd.x * rx, c1.y + sd.y * rx, 0.01), py = V.P(c1.x + f.x * ry, c1.y + f.y * ry, 0.01);
+        if (Math.min(pc.z, px.z, py.z) < 0.4) return;
+        const ax = Math.hypot(px.x - pc.x, px.y - pc.y), ay = Math.hypot(py.x - pc.x, py.y - pc.y);
+        if (ax < 1 || ay < 0.3) return;
+        ctx.save();
+        ctx.translate(pc.x, pc.y); ctx.rotate(Math.atan2(px.y - pc.y, px.x - pc.x)); ctx.scale(1, Math.max(0.05, ay / ax));
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ax);
+        g.addColorStop(0, `rgba(250,253,255,${alpha.toFixed(3)})`); g.addColorStop(0.55, `rgba(238,246,255,${(alpha * 0.6).toFixed(3)})`); g.addColorStop(1, 'rgba(232,242,252,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, ax, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
       };
-      const outer = ring(beam * (0.9 + 1.5 * k), L * (0.1 + 0.14 * k), L * 0.02), inner = ring(beam * (0.5 + 0.8 * k), L * (0.06 + 0.08 * k), L * 0.05);
-      if (outer) { ctx.fillStyle = `rgba(232,242,252,${(0.28 * Math.min(1, k)).toFixed(3)})`; ctx.fill(outer); }
-      if (inner) { ctx.fillStyle = `rgba(250,253,255,${(0.7 * Math.min(1, k)).toFixed(3)})`; ctx.fill(inner); }
+      blob(beam * (1.3 + 2.0 * k) * swell, L * (0.16 + 0.2 * k), L * 0.0, 0.34 * Math.min(1, k));
+      blob(beam * (0.7 + 1.0 * k) * swell, L * (0.09 + 0.1 * k), L * 0.05, 0.8 * Math.min(1, k));
     }
     // ── Bow wave: white water peeling off both sides of the bow ──
     if (fast > 0.12) {

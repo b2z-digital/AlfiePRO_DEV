@@ -1,6 +1,6 @@
 // Simulator home: set up a quick race, open the Start Trainer, Rules Academy or Scenario Lab, and
 // see your skipper profile (kept on this device for now).
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ClassId } from '@/sim/classes';
 import type { SkipperLevel } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
@@ -11,7 +11,7 @@ import { LAB } from '@/sim/training';
 import { Profile, clearProfile, skills } from './profile';
 import { TrainingProgress, drillStars, licence } from './progress';
 import type { SimView } from './SimRace';
-import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, compassName, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Cap, Chip, Seg, Tile, compassName, cx, ordinal } from './ui';
 import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
 import type { VenueWind } from './venueWind';
 import type { SimIdentity } from './identity';
@@ -22,6 +22,7 @@ import EventForm, { EventChoice } from './EventForm';
 import type { SimSequence } from './startbox';
 import type { OpenRoom } from './live';
 import type { PadInfo } from './transmitter';
+import SimHero from './SimHero';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -66,16 +67,6 @@ function minutes(s: Setup) {
   return Math.round(perLap * s.laps * cls * wind + 0.6);
 }
 
-function Field({ label, children, hint }: { label: React.ReactNode; children: React.ReactNode; hint?: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Cap>{label}</Cap>
-      {children}
-      {hint && <p className="m-0 text-[12.5px] leading-snug" style={{ color: C.mute }}>{hint}</p>}
-    </div>
-  );
-}
-
 function Toggle({ on, onChange, label, text }: { on: boolean; onChange: (v: boolean) => void; label: string; text: string }) {
   return (
     <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5">
@@ -103,17 +94,124 @@ function SkillBar({ label, v }: { label: string; v: number }) {
   );
 }
 
-function TrainCard({ title, text, icon, action, actionLabel, soon, badge }: { title: string; text: string; icon: React.ReactNode; action?: () => void; actionLabel?: string; soon?: boolean; badge?: React.ReactNode }) {
+// ───────────────────────── The set-up board ─────────────────────────
+type Pick = 'venue' | 'boat' | 'fleet' | 'skippers' | 'wind' | 'water' | 'course' | 'start' | 'aids';
+
+const GLYPH: Record<Pick | 'academy' | 'flag' | 'book' | 'flask' | 'pin', string> = {
+  venue: 'M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
+  boat: 'M12 3v13M12 4l6.5 10H12M12 7l-5 7h5M4 18.5c2 1.4 4 1.4 6 0s4-1.4 6 0 4 1.4 4 0',
+  fleet: 'M6 4v8M6 5l3.5 6H6M15 8v9M15 9l4.5 7H15M3 15c1.2.9 2.4.9 3.6 0M11 20c1.5 1 3 1 4.5 0s3-1 4.5 0',
+  skippers: 'M12 3l2.5 5.2 5.7.8-4.1 4 1 5.7L12 16l-5.1 2.7 1-5.7-4.1-4 5.7-.8z',
+  wind: 'M3 9h10.5a2.5 2.5 0 10-2.5-2.5M3 13h15a3 3 0 11-3 3M3 17h7',
+  water: 'M3 9c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M3 14c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0M3 19c2-1.6 4-1.6 6 0s4 1.6 6 0 4-1.6 6 0',
+  course: 'M7 4v16M17 4v16M7 6a5 5 0 0110 0M17 18a5 5 0 01-10 0',
+  start: 'M12 7v5l3 2M12 21a8 8 0 100-16 8 8 0 000 16zM9 2h6',
+  aids: 'M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1M15 5v4M9 10v4M17 15v4',
+  academy: 'M3 9l9-4 9 4-9 4-9-4zM7 11v4.5c1.6 1.5 3.3 2 5 2s3.4-.5 5-2V11M21 9v5',
+  flag: 'M5 21V4M5 4h11l-2 4 2 4H5',
+  book: 'M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zM4 19a2 2 0 012-2h13',
+  flask: 'M9 3h6M10 3v6L4 19a1.5 1.5 0 001.3 2h13.4a1.5 1.5 0 001.3-2L14 9V3',
+  pin: 'M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z',
+};
+function Glyph({ name, size = 20 }: { name: keyof typeof GLYPH; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={GLYPH[name]} /></svg>;
+}
+
+/** One thing about the race, as a tile: what it is and what it's set to. Tap it to change it. */
+function SetupTile({ icon, label, value, sub, onClick }: { icon: Pick; label: string; value: string; sub?: string; onClick: () => void }) {
   return (
-    <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
-      <div className="flex items-center gap-2.5">
-        <Tile size={36}>{icon}</Tile>
-        <p className="m-0 text-[15px] font-semibold">{title}</p>
-        {soon ? <Chip className="ml-auto">Coming next</Chip> : badge ? <span className="ml-auto">{badge}</span> : null}
-      </div>
-      <p className="m-0 flex-1 text-[13.5px] leading-normal" style={{ color: C.mute }}>{text}</p>
-      {action && <div><Btn small primary onClick={action}>{actionLabel ?? 'Open'}</Btn></div>}
+    <button type="button" onClick={onClick} aria-haspopup="dialog"
+      className="group flex min-h-[92px] cursor-pointer flex-col justify-between gap-2 rounded-[18px] border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-3.5 text-left text-[#F1F4FA] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[transform,border-color,background-color] duration-150 hover:-translate-y-0.5 hover:border-[rgba(77,163,255,0.5)] active:translate-y-0 active:scale-[0.985]">
+      <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: C.mute }}>
+        <span className="text-[#9CCBFF]"><Glyph name={icon} size={16} /></span>{label}
+        <svg className="ml-auto opacity-40 transition-opacity group-hover:opacity-90" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate font-display text-[17px] font-bold leading-tight">{value}</span>
+        {sub && <span className="mt-0.5 block truncate text-[12.5px]" style={{ color: C.mute }}>{sub}</span>}
+      </span>
+    </button>
+  );
+}
+
+/** A choice in a sheet: a big card you tap, lit when it's the one chosen. */
+function Opt({ on, onClick, title, text, badge, wide }: { on: boolean; onClick: () => void; title: React.ReactNode; text?: React.ReactNode; badge?: React.ReactNode; wide?: boolean }) {
+  return (
+    <button type="button" aria-pressed={on} onClick={onClick}
+      className={cx('relative flex cursor-pointer flex-col gap-1 rounded-2xl border p-3.5 text-left text-[#F1F4FA] transition-[transform,border-color,background-color] duration-150 active:scale-[0.985]', wide && 'col-span-full',
+        on ? 'border-[#4DA3FF] bg-[rgba(46,123,255,0.16)] shadow-[0_0_0_1px_rgba(77,163,255,0.35),0_8px_24px_rgba(30,108,255,0.18)]' : 'border-white/[0.08] bg-white/[0.035] hover:border-white/25 hover:bg-white/[0.06]')}>
+      <span className="flex items-center gap-2">
+        <span className="font-display text-[16px] font-bold leading-tight">{title}</span>
+        {badge && <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold" style={{ color: C.mute }}>{badge}</span>}
+        <span aria-hidden="true" className={cx('ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', on ? 'border-[#4DA3FF] bg-[#2E7BFF]' : 'border-white/25')}>
+          {on && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+        </span>
+      </span>
+      {text && <span className="text-[12.5px] leading-snug" style={{ color: C.mute }}>{text}</span>}
+    </button>
+  );
+}
+
+function Opts({ label, children, cols = 2 }: { label?: string; children: React.ReactNode; cols?: 1 | 2 | 3 | 4 }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {label && <Cap>{label}</Cap>}
+      <div className={cx('grid gap-2.5', cols === 1 ? 'grid-cols-1' : cols === 2 ? 'grid-cols-1 sm:grid-cols-2' : cols === 3 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-4')}>{children}</div>
     </div>
+  );
+}
+
+/** A sheet over the page for one choice: slides up from the bottom on a phone, sits in the middle on a bigger screen. */
+function Sheet({ title, text, icon, onClose, children }: { title: string; text?: React.ReactNode; icon: Pick; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('keydown', k); document.body.style.overflow = prev; };
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[9985] flex items-end justify-center sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 cursor-default border-0 bg-[rgba(3,7,16,0.72)] backdrop-blur-[6px]" />
+      <div className="relative flex max-h-[88vh] w-full flex-col overflow-hidden rounded-t-[26px] border border-white/10 bg-[#0B1322] text-[#F1F4FA] shadow-[0_30px_80px_rgba(0,0,0,0.6)] sm:max-w-[680px] sm:rounded-[26px]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+        <div className="flex items-start gap-3 border-b border-white/[0.07] px-5 pb-4 pt-5">
+          <Tile size={40}><Glyph name={icon} /></Tile>
+          <div className="min-w-0 flex-1">
+            <h2 className="m-0 font-display text-[21px] font-bold leading-tight">{title}</h2>
+            {text && <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>{text}</p>}
+          </div>
+          <Btn primary onClick={onClose} autoFocus>Done</Btn>
+        </div>
+        <div className="flex flex-col gap-5 overflow-y-auto px-5 pb-6 pt-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────── The Sailing Academy ─────────────────────────
+function AcademyCard({ icon, kicker, title, text, progress, progressText, action, actionLabel, tint }: {
+  icon: keyof typeof GLYPH; kicker: string; title: string; text: string; progress: number; progressText: string; action: () => void; actionLabel: string; tint: string;
+}) {
+  return (
+    <button type="button" onClick={action}
+      className="group relative flex min-h-[214px] cursor-pointer flex-col overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0C1424] p-0 text-left text-[#F1F4FA] transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-white/25 active:translate-y-0 active:scale-[0.99]">
+      <span aria-hidden="true" className="relative flex h-[76px] items-end overflow-hidden px-4 pb-3" style={{ background: `linear-gradient(135deg, ${tint}55, ${tint}14 60%, transparent)` }}>
+        <span className="absolute -right-3 -top-4 opacity-[0.16]" style={{ color: tint }}><Glyph name={icon} size={104} /></span>
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(6,11,22,0.55)]" style={{ color: tint }}><Glyph name={icon} size={21} /></span>
+        <span className="ml-3 text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: 'rgba(241,244,250,.82)' }}>{kicker}</span>
+      </span>
+      <span className="flex flex-1 flex-col gap-2 px-4 pb-4 pt-3">
+        <span className="font-display text-[18px] font-bold leading-tight">{title}</span>
+        <span className="flex-1 text-[13px] leading-snug" style={{ color: C.mute }}>{text}</span>
+        <span className="mt-1 flex items-center gap-3">
+          <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.08]"><span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%`, background: tint }} /></span>
+          <span className="text-[12px] font-semibold tabular-nums" style={{ color: C.mute }}>{progressText}</span>
+        </span>
+        <span className="mt-1 inline-flex items-center gap-1.5 text-[13.5px] font-semibold" style={{ color: tint }}>{actionLabel}
+          <svg className="transition-transform group-hover:translate-x-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -300,101 +398,152 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     setS(n); onSetup(n); onStart('race', n);
   };
 
+  // ── What each tile says, and the sheet that changes it ──
+  const [pick, setPick] = useState<Pick | null>(null);
+  const closePick = React.useCallback(() => setPick(null), []);
+  const STRENGTH: Record<WindStrength, string> = { light: 'Light 3–6 kn', medium: 'Medium 7–12 kn', fresh: 'Fresh 13–18 kn' };
+  const CHARACTER: Record<WindCharacter, [string, string]> = {
+    steady: ['Steady', 'Little changes: a race of boat speed and clean air.'],
+    oscillating: ['Oscillating', 'It swings back and forth: tack on the headers.'],
+    puffy: ['Puffy', 'Gusts and lulls sweep down the course: sail for the dark water.'],
+    persistent: ['Persistent shift', 'It goes one way and stays there: get to that side early.'],
+  };
+  const WATER: Record<SeaKind, [string, string]> = {
+    flat: ['Flat', 'Glassy water and clear reflections.'],
+    chop: ['Choppy', 'Waves 4 cm high: a little slower upwind, a little surfing downwind.'],
+    rough: ['Rough', 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'],
+  };
+  const CLASS_TEXT: Record<ClassId, string> = {
+    IOM: 'One metre. The most raced class in the world, with three rigs for the breeze.',
+    DF95: '95 cm one-design. Quick, light and lively.',
+    DF65: '65 cm one-design. The way most people start.',
+    '10R': 'The big one: long, powerful and fast in a straight line.',
+    M: 'Marblehead: tall rig, slim hull, a thoroughbred.',
+  };
+  const windDirName = !venue ? 'Up the pond' : s.windDir === 'usual' ? `${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}` : s.windDir === 'today' ? "Today's wind" : 'Any direction';
+  const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
+  const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
+  const summary = [CLASS_LABEL[s.classId], `${s.fleetSize} boats`, `${LEVEL_NAME[s.level]} skippers`, venue ? venue.short : 'Practice pond', `${strengthName}, ${CHARACTER[s.windCharacter][0].toLowerCase()}`];
+
+  // Alfie's pick: the session that works on what your racing says you need most.
+  const advice: { where: 'trainer' | 'academy' | 'lab'; title: string; text: string } = !sk
+    ? { where: 'trainer', title: 'Start with the Start Trainer', text: 'Most races are won or lost in the first thirty seconds. Twelve short drills, starting with time on distance.' }
+    : weakest && weakest[0] === 'starts' ? { where: 'trainer', title: 'Work on your starts', text: `Starts are where you have most to gain (${weakest[1]} of 100). Ten minutes in the Start Trainer is worth a morning of racing.` }
+      : weakest && weakest[0] === 'rules' ? { where: 'academy', title: 'Sharpen your rules', text: `Your rules score is ${weakest[1]} of 100. The next Rules Academy module takes about five minutes: answer it, then sail it.` }
+        : { where: 'lab', title: `Work on your ${weakest ? weakest[0] : 'racecraft'}`, text: `${weakest ? `${weakest[0][0].toUpperCase()}${weakest[0].slice(1)} is where you have most to gain (${weakest[1]} of 100). ` : ''}Replay a tricky moment in the Scenario Lab until you win it.` };
+
   return (
-    <div className="min-h-full text-[14px] text-[#F1F4FA]" style={{ backgroundColor: C.bg, backgroundImage: 'radial-gradient(1100px 700px at 12% -10%, rgba(30,108,255,.2), transparent 60%)', fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1360px] flex-col gap-7 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-4">
-          <Tile size={52}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v14M12 3l7 11h-7M12 6L6 14h6M4 19c2 1.4 4 1.4 6 0s4-1.4 6 0 4 1.4 4 0" /></svg>
-          </Tile>
-          <div className="min-w-0 flex-1">
-            <h1 className="m-0 font-display text-[32px] font-bold tracking-[-0.02em]">Race Simulator</h1>
-            <p className="m-0 mt-1 text-[15px]" style={{ color: C.mute }}>Race AI skippers who sail like real radio sailors, and learn the rules as you go.</p>
-          </div>
-        </header>
-
-        <div className="flex flex-wrap items-start gap-5">
-          {/* Quick race */}
-          <section className="flex min-w-0 flex-[999_1_640px] flex-col gap-5 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="qr-title">
-            <div>
-              <Cap>Quick race</Cap>
-              <h2 id="qr-title" className="m-0 mt-1 font-display text-[24px] font-bold">Set up a race</h2>
-              <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Every skipper in the fleet has a game plan, a personality and the rules in their head. Pick who you race and in what.</p>
+    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+      <div className="flex flex-col gap-6 px-4 pb-16 pt-4 sm:px-6 sm:pt-5 2xl:px-8">
+        {/* ── The front window: your race, live ── */}
+        <SimHero setup={s} className="min-h-[clamp(340px,44vh,500px)] rounded-[28px] border border-white/[0.09] shadow-[0_24px_70px_rgba(0,0,0,0.5)]">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(4,9,20,.88) 0%, rgba(4,9,20,.62) 34%, rgba(4,9,20,.08) 68%, rgba(4,9,20,0) 100%), linear-gradient(0deg, rgba(4,9,20,.72) 0%, rgba(4,9,20,0) 42%)' }} />
+          <div className="relative flex h-full min-h-[inherit] flex-col justify-between gap-6 p-5 sm:p-8">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[rgba(6,11,22,0.6)] px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-[0.12em] backdrop-blur-[8px]">
+                <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#34D399]" />On the water now
+              </span>
+              <span className="hidden text-[12.5px] sm:inline" style={{ color: 'rgba(241,244,250,.78)' }}>AI skippers racing in the conditions you've set</span>
             </div>
-            <div className="grid gap-5 md:grid-cols-2">
-              <Field label="Where" hint={venue ? `${venue.place}, from the club's control area. The course is laid for the wind, with every mark well off the bank. Map data ${venue.credit}.` : 'A sheltered practice pond, lined with trees.'}>
-                <Seg label="Where" value={s.venue} onChange={v => set({ venue: v })} options={[...Object.values(VENUES).map(d => ({ value: d.id, label: d.short })), { value: 'pond', label: 'Practice pond' }]} />
-              </Field>
-              {venue ? (
-                <Field label="Wind direction" hint={windHint}>
-                  <Seg label="Wind direction" value={s.windDir} onChange={v => set({ windDir: v })} options={[{ value: 'usual', label: `${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}` }, { value: 'today', label: "Today's wind" }, { value: 'any', label: 'Any direction' }]} />
-                </Field>
-              ) : <div className="hidden md:block" />}
-              <Field label="Class">
-                <Seg label="Class" value={s.classId} onChange={v => set({ classId: v })} options={[{ value: 'IOM', label: 'IOM' }, { value: 'DF95', label: 'DF95' }, { value: 'DF65', label: 'DF65' }, { value: '10R', label: '10 Rater' }, { value: 'M', label: 'Marblehead' }]} />
-              </Field>
-              <Field label="Fleet" hint="boats including you">
-                <Seg label="Fleet size" value={s.fleetSize} onChange={v => set({ fleetSize: v })} options={[6, 8, 12, 16].map(n => ({ value: n, label: String(n) }))} />
-              </Field>
-              <Field label="Skippers" hint={LEVEL_TEXT[s.level]}>
-                <Seg label="Skipper level" value={s.level} onChange={v => set({ level: v })} options={[{ value: 'club', label: 'Club' }, { value: 'state', label: 'State' }, { value: 'national', label: 'National' }, { value: 'world', label: 'World' }]} />
-              </Field>
-              <Field label="Wind" hint={strengthHint}>
-                <Seg label="Wind strength" value={useToday ? 'today' : s.windStrength}
-                  onChange={v => (v === 'today' ? set({ todayStrength: true }) : set({ windStrength: v as WindStrength, todayStrength: false }))}
-                  options={[...(todayKn !== null ? [{ value: 'today', label: `Today's ${Math.round(todayKn)} kn` }] : []), { value: 'light', label: 'Light 3–6 kn' }, { value: 'medium', label: 'Medium 7–12 kn' }, { value: 'fresh', label: 'Fresh 13–18 kn' }]} />
-                <Seg label="Wind character" value={s.windCharacter} onChange={v => set({ windCharacter: v })} options={[{ value: 'steady', label: 'Steady' }, { value: 'oscillating', label: 'Oscillating' }, { value: 'puffy', label: 'Puffy' }, { value: 'persistent', label: 'Persistent shift' }]} />
-              </Field>
-              <Field label="Course" hint={`Windward–leeward with offset and gate · finish upwind · about ${minutes(s)} minutes`}>
-                <div className="flex flex-wrap gap-2">
-                  <Seg label="Laps" value={s.laps} onChange={v => set({ laps: v })} options={[1, 2, 3].map(n => ({ value: n, label: `${n} lap${n > 1 ? 's' : ''}` }))} />
-                  <Seg label="Course length" value={s.length} onChange={v => set({ length: v })} options={[{ value: 'short', label: 'Short' }, { value: 'medium', label: 'Medium' }, { value: 'long', label: 'Long' }]} />
-                </div>
-              </Field>
-              <Field label="Water" hint={s.seaState === 'flat' ? 'Glassy water and clear reflections.' : s.seaState === 'chop' ? 'Waves 4 cm high: a little slower upwind, a little surfing downwind.' : 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'}>
-                <Seg label="Water" value={s.seaState} onChange={v => set({ seaState: v })} options={[{ value: 'flat', label: 'Flat' }, { value: 'chop', label: 'Choppy' }, { value: 'rough', label: 'Rough' }]} />
-              </Field>
-              <Field label="Start" hint={startSeq
-                ? `${startSeq.club ? "Your club's" : 'The StartBox'} ${startSeq.name} sequence${startSeq.audio ? ', the recording you hear at the pond' : ''}, in step with the race clock.`
-                : 'Called by the simulator: each minute, every 10 s in the last minute and every second in the last 10 (Appendix E).'}>
-                <Seg label="Start sequence" value={startSeq ? startSeq.id : `b${s.sequenceSeconds}`}
-                  onChange={v => { const q = sequences.find(x => x.id === v); set(q ? { startSeq: q.id, sequenceSeconds: q.seconds } : { startSeq: null, sequenceSeconds: Number(String(v).slice(1)) }); }}
-                  options={startOptions(sequences, startSeq, s.sequenceSeconds)} />
-              </Field>
-              <Field label="View" hint={s.view === 'bank' ? 'From the control area on the bank, the way you see a race. Press V to switch.' : 'From above, with laylines. Press V to switch.'}>
-                <Seg label="View" value={s.view} onChange={v => set({ view: v })} options={[{ value: 'bank', label: 'From the bank' }, { value: 'top', label: 'From above' }]} />
-              </Field>
-              <Field label={<span className="inline-flex items-center gap-2"><AlfieOrb size={18} />Alfie's coaching</span>} hint={s.coach === 'full' ? 'Alfie talks you through the race as you sail and flags any rules incident you are in. The race never stops: you sail your own penalty turns.' : s.coach === 'hints' ? 'Alfie gives tips as you sail; rules incidents show as a banner.' : 'No tips. Incidents still show briefly.'}>
-                <Seg label="Alfie's coaching" value={s.coach} onChange={v => set({ coach: v })} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints only' }, { value: 'off', label: 'Off' }]} />
-              </Field>
-              <div className="flex flex-col gap-2">
-                <Cap>Options</Cap>
-                <Toggle on={s.autoTrim} onChange={v => set({ autoTrim: v })} label="Auto-trim" text="Off: the sails go where your stick puts them, like the real thing. On: they trim themselves with the stick right in." />
-                <Toggle on={s.forgetfulSkippers} onChange={v => set({ forgetfulSkippers: v })} label="Forgetful skippers" text="Some skippers forget their penalty, so hail a protest when they foul you." />
+            <div className="max-w-[640px]">
+              <h1 className="m-0 font-display text-[clamp(34px,4.6vw,60px)] font-extrabold leading-[1.02] tracking-[-0.03em]">Race Simulator</h1>
+              <p className="m-0 mt-3 max-w-[520px] text-[clamp(15px,1.25vw,18px)] leading-snug" style={{ color: 'rgba(241,244,250,.86)' }}>
+                Race skippers who sail like real radio sailors, on your own water, with Alfie coaching from the bank.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => onStart('race', s)}
+                  className="inline-flex h-[54px] cursor-pointer items-center gap-3 rounded-2xl border-0 bg-gradient-to-b from-[#3D8BFF] to-[#1E6CFF] px-7 font-display text-[18px] font-bold text-white shadow-[0_10px_30px_rgba(30,108,255,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
+                  Start race
+                </button>
+                <button type="button" onClick={surprise}
+                  className="inline-flex h-[54px] cursor-pointer items-center rounded-2xl border border-white/20 bg-[rgba(6,11,22,0.55)] px-5 text-[15px] font-semibold text-white backdrop-blur-[8px] transition-colors hover:bg-[rgba(6,11,22,0.8)]">
+                  Surprise me
+                </button>
               </div>
+              <p className="m-0 mt-4 flex flex-wrap gap-x-2 gap-y-1 text-[13px] font-medium" style={{ color: 'rgba(241,244,250,.82)' }}>
+                {summary.map((x, k) => <span key={x} className="inline-flex items-center gap-2">{k > 0 && <span aria-hidden="true" className="opacity-50">·</span>}{x}</span>)}
+              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <Btn primary onClick={() => onStart('race', s)} className="!h-11 !px-5 !text-[14.5px]">Start race</Btn>
-              <Btn onClick={surprise} className="!h-11">Surprise me</Btn>
-              <span className="ml-auto text-[12.5px]" style={{ color: C.mute }}>Keyboard, touch, or a USB transmitter</span>
-            </div>
-          </section>
+          </div>
+        </SimHero>
 
-          {/* Profile */}
-          <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
-            <section className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="pf-title">
-              <div className="flex items-center gap-2.5">
-                <Tile size={36}><CoachGlyph size={18} /></Tile>
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,26vw)]">
+          <div className="flex min-w-0 flex-col gap-6">
+            {/* ── Race set-up ── */}
+            <section className="flex flex-col gap-3.5" aria-labelledby="qr-title">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2 id="qr-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Your race</h2>
+                  <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Tap anything to change it. Every skipper in the fleet has a game plan, a personality and the rules in their head.</p>
+                </div>
+                <span className="hidden text-[12.5px] md:inline" style={{ color: C.mute }}>About {minutes(s)} minutes · keyboard, touch or a USB transmitter</span>
+              </div>
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(176px, 46%), 1fr))' }}>
+                <SetupTile icon="venue" label="Where" value={venue ? venue.short : 'Practice pond'} sub={venue ? windDirName : 'Sheltered, tree-lined'} onClick={() => setPick('venue')} />
+                <SetupTile icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'} onClick={() => setPick('boat')} />
+                <SetupTile icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
+                <SetupTile icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
+                <SetupTile icon="wind" label="Wind" value={strengthName} sub={CHARACTER[s.windCharacter][0]} onClick={() => setPick('wind')} />
+                <SetupTile icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
+                <SetupTile icon="course" label="Course" value={`${s.laps} lap${s.laps > 1 ? 's' : ''} · ${s.length}`} sub="Windward–leeward, gate" onClick={() => setPick('course')} />
+                <SetupTile icon="start" label="Start" value={startName} sub={startSeq ? (startSeq.club ? "Your club's sequence" : 'StartBox sequence') : 'Called by the simulator'} onClick={() => setPick('start')} />
+                <SetupTile icon="aids" label="Coaching" value={`Alfie: ${s.coach === 'full' ? 'full' : s.coach === 'hints' ? 'hints' : 'off'}`} sub={`${s.autoTrim ? 'Auto-trim' : 'Sails on your stick'} · ${s.view === 'bank' ? 'bank view' : 'from above'}`} onClick={() => setPick('aids')} />
+              </div>
+            </section>
+
+            {/* ── Sailing Academy ── */}
+            <section className="flex flex-col gap-3.5 rounded-[26px] border border-white/[0.08] bg-gradient-to-br from-[rgba(138,77,255,0.12)] via-[rgba(46,123,255,0.06)] to-transparent p-4 sm:p-6" aria-labelledby="train-title">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(138,77,255,0.22)] text-[#C9B4FF]"><Glyph name="academy" size={24} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="m-0 text-[11px] font-bold uppercase tracking-[0.12em] text-[#C9B4FF]">Coaching and drills</p>
+                  <h2 id="train-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Sailing Academy</h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Chip tone={lic.level ? 'blue' : 'plain'}>Rules licence · level {lic.level} of 6</Chip>
+                  <Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} start stars</Chip>
+                </div>
+              </div>
+              <button type="button" onClick={() => onOpen(advice.where)}
+                className="group flex cursor-pointer flex-wrap items-center gap-4 rounded-[20px] border border-white/10 bg-[rgba(6,11,22,0.55)] p-4 text-left text-[#F1F4FA] transition-colors hover:border-white/25">
+                <AlfieOrb size={44} />
+                <span className="min-w-[200px] flex-1">
+                  <span className="block text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: C.mute }}>Alfie's pick for you</span>
+                  <span className="mt-0.5 block font-display text-[18px] font-bold leading-tight">{advice.title}</span>
+                  <span className="mt-1 block text-[13.5px] leading-snug" style={{ color: C.mute }}>{advice.text}</span>
+                </span>
+                <span className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-[14px] font-semibold transition-colors group-hover:bg-white/[0.16]">Start the session
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </span>
+              </button>
+              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
+                <AcademyCard icon="flag" tint="#4DA3FF" kicker="12 drills" title="Start Trainer" text="Time on distance, the favoured end, port-tack starts, crowded lines, and getting back after a recall."
+                  progress={stars.of ? stars.got / stars.of : 0} progressText={`${stars.got}/${stars.of} stars`} action={() => onOpen('trainer')} actionLabel={stars.got ? 'Carry on' : 'Begin'} />
+                <AcademyCard icon="book" tint="#B692FF" kicker="6 modules" title="Rules Academy" text="26 situations from the Racing Rules with Appendix E. Answer each one, then sail it, and earn your licence."
+                  progress={lic.level / 6} progressText={`Level ${lic.level}/6`} action={() => onOpen('academy')} actionLabel={lic.level ? 'Next module' : 'Begin'} />
+                <AcademyCard icon="flask" tint="#FF9F43" kicker={`${LAB.length} moments`} title="Scenario Lab" text="Port-tack approaches, crowded roundings, gate choices. Replay a moment until you win it."
+                  progress={LAB.length ? labWon / LAB.length : 0} progressText={`${labWon}/${LAB.length} won`} action={() => onOpen('lab')} actionLabel={labWon ? 'Carry on' : 'Begin'} />
+                <AcademyCard icon="pin" tint="#34D399" kicker="Today's wind" title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water in the wind blowing there today. Rehearse the shifts before you get to the club.`}
+                  progress={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? 1 : 0} progressText={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? 'Set up' : 'Live wind'}
+                  action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today', todayStrength: true }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' }); }} actionLabel="Use today's wind" />
+              </div>
+            </section>
+          </div>
+
+          {/* ── You ── */}
+          <aside className="flex min-w-0 flex-col gap-5">
+            <section className="flex flex-col gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-5" aria-labelledby="pf-title">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>
                 <div className="min-w-0">
-                  <h2 id="pf-title" className="m-0 text-[16px] font-semibold">{me ? me.name : 'Your skipper profile'}</h2>
+                  <h2 id="pf-title" className="m-0 truncate font-display text-[18px] font-bold">{me ? me.name : 'Your skipper profile'}</h2>
                   <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
                 </div>
               </div>
-              {me && (
+              {me && !me.sails[s.classId] && (
                 <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
-                  {me.sails[s.classId]
-                    ? <>You're sailing <b className="text-[#F1F4FA]">{CLASS_LABEL[s.classId]} {me.sails[s.classId]}</b>, from your boats in My Garage.</>
-                    : <>Add your {CLASS_LABEL[s.classId]} in My Garage to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.</>}
+                  Add your {CLASS_LABEL[s.classId]} in My Garage to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.
                 </p>
               )}
               {!sk ? (
@@ -490,28 +639,105 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           </section>
         )}
 
-        <section className="flex flex-col gap-3.5" aria-labelledby="train-title">
-          <div>
-            <h2 id="train-title" className="m-0 font-display text-[22px] font-bold">Train</h2>
-            <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Short, focused sessions. Each one feeds your skipper profile.</p>
-          </div>
-          <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(260px, 100%), 1fr))' }}>
-            <TrainCard title="Start Trainer" text="Twelve start drills: time on distance, the favoured end, port-tack starts, crowded lines and getting back after a recall." action={() => onOpen('trainer')} actionLabel="Open the drills"
-              badge={<Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} stars</Chip>}
-              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>} />
-            <TrainCard title="Rules Academy" text="Six modules and 26 situations from the Racing Rules of Sailing with Appendix E. Answer each one, then sail it." action={() => onOpen('academy')} actionLabel="Open the Academy"
-              badge={<Chip tone={lic.level ? 'blue' : 'plain'}>Licence level {lic.level} of 6</Chip>}
-              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5zM4 19a2 2 0 012-2h13" /></svg>} />
-            <TrainCard title="Scenario Lab" text="Port-tack approaches, crowded roundings, gate choices. Replay a moment until you win it." action={() => onOpen('lab')} actionLabel="Open the Lab"
-              badge={<Chip tone={labWon ? 'blue' : 'plain'}>{labWon} of {LAB.length} won</Chip>}
-              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6L4 19a1.5 1.5 0 001.3 2h13.4a1.5 1.5 0 001.3-2L14 9V3" /></svg>} />
-            <TrainCard title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water from the control area, in the wind blowing there today. Rehearse the shifts before you get to the club.`}
-              action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today', todayStrength: true }); document.getElementById('qr-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} actionLabel="Use today's wind"
-              badge={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? <Chip tone="blue">Set up</Chip> : undefined}
-              icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 1114 0c0 4.8-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></svg>} />
-          </div>
-        </section>
       </div>
+
+      {/* ── The sheets ── */}
+      {pick === 'venue' && (
+        <Sheet icon="venue" title="Where you're sailing" text="A real club's water, seen from its control area, or a sheltered practice pond." onClose={closePick}>
+          <Opts>
+            {Object.values(VENUES).map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id })} title={d.short} text={`${d.place}. The course is laid for the wind, with every mark well off the bank.`} />)}
+            <Opt on={s.venue === 'pond'} onClick={() => set({ venue: 'pond' })} title="Practice pond" text="A sheltered pond lined with trees. The wind blows straight up it." />
+          </Opts>
+          {venue && (
+            <Opts label="Wind direction" cols={3}>
+              <Opt on={s.windDir === 'usual'} onClick={() => set({ windDir: 'usual' })} title={`${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}`} text={`The club's usual breeze, from ${String(venue.usualWind).padStart(3, '0')}°.`} />
+              <Opt on={s.windDir === 'today'} onClick={() => set({ windDir: 'today' })} title="Today's wind" text="What's blowing at the club right now." />
+              <Opt on={s.windDir === 'any'} onClick={() => set({ windDir: 'any' })} title="Any direction" text="Different every race, so you learn the whole lake." />
+            </Opts>
+          )}
+          {windHint && <p className="m-0 text-[13px]" style={{ color: C.mute }}>{windHint}{venue ? ` Map data ${venue.credit}.` : ''}</p>}
+        </Sheet>
+      )}
+      {pick === 'boat' && (
+        <Sheet icon="boat" title="Your boat" text="The whole fleet sails the same class." onClose={closePick}>
+          <Opts>
+            {(['IOM', 'DF95', 'DF65', '10R', 'M'] as ClassId[]).map(c => <Opt key={c} on={s.classId === c} onClick={() => set({ classId: c })} title={CLASS_LABEL[c]} text={CLASS_TEXT[c]} badge={me?.sails[c] ? `Sail ${me.sails[c]}` : undefined} />)}
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'fleet' && (
+        <Sheet icon="fleet" title="Fleet" text="Boats on the line, including you." onClose={closePick}>
+          <Opts cols={4}>
+            {[6, 8, 12, 16].map(n => <Opt key={n} on={s.fleetSize === n} onClick={() => set({ fleetSize: n })} title={String(n)} text={n === 6 ? 'Room to learn' : n === 8 ? 'A club day' : n === 12 ? 'A busy line' : 'A championship fleet'} />)}
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'skippers' && (
+        <Sheet icon="skippers" title="Who you race" text="How good the other skippers are." onClose={closePick}>
+          <Opts>
+            {(['club', 'state', 'national', 'world'] as SkipperLevel[]).map(l => <Opt key={l} on={s.level === l} onClick={() => set({ level: l })} title={LEVEL_NAME[l]} text={LEVEL_TEXT[l]} />)}
+          </Opts>
+          <Toggle on={s.forgetfulSkippers} onChange={v => set({ forgetfulSkippers: v })} label="Forgetful skippers" text="Some skippers forget their penalty, so hail a protest when they foul you." />
+        </Sheet>
+      )}
+      {pick === 'wind' && (
+        <Sheet icon="wind" title="Wind" text={strengthHint ?? 'How hard it blows, and what it does.'} onClose={closePick}>
+          <Opts label="Strength" cols={3}>
+            {todayKn !== null && <Opt on={useToday} onClick={() => set({ todayStrength: true })} title={`Today's ${Math.round(todayKn)} kn`} text="The real breeze at the club." />}
+            <Opt on={!useToday && s.windStrength === 'light'} onClick={() => set({ windStrength: 'light', todayStrength: false })} title="Light" badge="3–6 kn" text="Keep her moving. Quiet water, birdsong." />
+            <Opt on={!useToday && s.windStrength === 'medium'} onClick={() => set({ windStrength: 'medium', todayStrength: false })} title="Medium" badge="7–12 kn" text="A proper sailing breeze." />
+            <Opt on={!useToday && s.windStrength === 'fresh'} onClick={() => set({ windStrength: 'fresh', todayStrength: false })} title="Fresh" badge="13–18 kn" text="Boats heel hard, and nose-dive downwind in the gusts." />
+          </Opts>
+          <Opts label="What it does">
+            {(Object.keys(CHARACTER) as WindCharacter[]).map(c => <Opt key={c} on={s.windCharacter === c} onClick={() => set({ windCharacter: c })} title={CHARACTER[c][0]} text={CHARACTER[c][1]} />)}
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'water' && (
+        <Sheet icon="water" title="Water" text="Waves slow her upwind and let her surf downwind." onClose={closePick}>
+          <Opts cols={3}>
+            {(Object.keys(WATER) as SeaKind[]).map(w => <Opt key={w} on={s.seaState === w} onClick={() => set({ seaState: w })} title={WATER[w][0]} text={WATER[w][1]} />)}
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'course' && (
+        <Sheet icon="course" title="Course" text={`Windward–leeward with an offset mark and a gate, finishing upwind. About ${minutes(s)} minutes as set.`} onClose={closePick}>
+          <Opts label="Laps" cols={3}>
+            {[1, 2, 3].map(n => <Opt key={n} on={s.laps === n} onClick={() => set({ laps: n })} title={`${n} lap${n > 1 ? 's' : ''}`} />)}
+          </Opts>
+          <Opts label="Length of the beat" cols={3}>
+            <Opt on={s.length === 'short'} onClick={() => set({ length: 'short' })} title="Short" text="Quick races, lots of corners." />
+            <Opt on={s.length === 'medium'} onClick={() => set({ length: 'medium' })} title="Medium" text="A club course." />
+            <Opt on={s.length === 'long'} onClick={() => set({ length: 'long' })} title="Long" text="Room for the shifts to pay." />
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'start' && (
+        <Sheet icon="start" title="Start sequence" onClose={closePick}
+          text={startSeq ? `${startSeq.club ? "Your club's" : 'The StartBox'} ${startSeq.name} sequence${startSeq.audio ? ', the recording you hear at the pond' : ''}, in step with the race clock.` : 'Called by the simulator: each minute, every 10 s in the last minute and every second in the last 10 (Appendix E).'}>
+          <Opts>
+            {startOptions(sequences, startSeq, s.sequenceSeconds).map(o => {
+              const q = sequences.find(x => x.id === o.value);
+              return <Opt key={o.value} on={(startSeq ? startSeq.id : `b${s.sequenceSeconds}`) === o.value} title={o.label} text={q ? (q.club ? "Your club's sequence" : 'A StartBox sequence') : 'Called by the simulator'}
+                onClick={() => set(q ? { startSeq: q.id, sequenceSeconds: q.seconds } : { startSeq: null, sequenceSeconds: Number(String(o.value).slice(1)) })} />;
+            })}
+          </Opts>
+        </Sheet>
+      )}
+      {pick === 'aids' && (
+        <Sheet icon="aids" title="Coaching and aids" text="How much help you get, and how you see the race." onClose={closePick}>
+          <Opts label="Alfie's coaching" cols={3}>
+            <Opt on={s.coach === 'full'} onClick={() => set({ coach: 'full' })} title="Full" text="Alfie calls it aloud as you sail (bear away, ease, tack on the header) and explains every rules incident." />
+            <Opt on={s.coach === 'hints'} onClick={() => set({ coach: 'hints' })} title="Hints" text="Written tips as you sail. Incidents show as a banner." />
+            <Opt on={s.coach === 'off'} onClick={() => set({ coach: 'off' })} title="Off" text="No tips. Incidents still show briefly." />
+          </Opts>
+          <Opts label="View">
+            <Opt on={s.view === 'bank'} onClick={() => set({ view: 'bank' })} title="From the bank" text="From the control area, the way you see a race. Press V to switch." />
+            <Opt on={s.view === 'top'} onClick={() => set({ view: 'top' })} title="From above" text="A chart view with laylines." />
+          </Opts>
+          <Toggle on={s.autoTrim} onChange={v => set({ autoTrim: v })} label="Auto-trim" text="Off: the sails go where your stick puts them, like the real thing. On: they trim themselves with the stick right in." />
+        </Sheet>
+      )}
     </div>
   );
 }

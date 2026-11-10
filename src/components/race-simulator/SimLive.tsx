@@ -46,7 +46,7 @@ export default function SimLive({ room, myId, onLeave }: { room: LiveRoom; myId:
       : others.length ? "Everyone's ready." : 'Nobody else is in yet. You can race on your own, or wait for others.';
 
   return (
-    <div className="min-h-full text-[14px] text-[#F1F4FA]" style={{ backgroundColor: C.bg, backgroundImage: 'radial-gradient(1100px 700px at 12% -10%, rgba(30,108,255,.2), transparent 60%)', fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       <div className="mx-auto flex max-w-[1100px] flex-col gap-7 px-4 pb-16 pt-8 sm:px-8">
         <header className="flex flex-wrap items-center gap-4">
           <Btn onClick={onLeave} aria-label="Leave the room">
