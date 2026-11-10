@@ -138,11 +138,13 @@ export class Race implements AiHost {
     const n = Math.max(2, Math.min(16, s.fleetSize));
     const personas = [...PERSONAS];
     for (let i = personas.length - 1; i > 0; i--) { const j = this.rng.int(0, i); [personas[i], personas[j]] = [personas[j], personas[i]]; }
-    const numbers = new Set<string>();
+    // The player sails her own number when we know it; the AI boats never share it.
+    const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? s.player.sail : '01';
+    const numbers = new Set<string>(s.noPlayer ? [] : [mySail]);
     for (let i = 0; i < n; i++) {
       const isPlayer = !s.noPlayer && i === 0;
-      let sail = isPlayer ? '01' : String(this.rng.int(2, 98)).padStart(2, '0');
-      while (numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
+      let sail = isPlayer ? mySail : String(this.rng.int(2, 98)).padStart(2, '0');
+      while (!isPlayer && numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
       numbers.add(sail);
       // Start sailing round below the line like a fleet does: half reaching towards the pin on
       // starboard in a nearer lane, half back on port in a farther one, spread along the line.
@@ -155,7 +157,7 @@ export class Race implements AiHost {
       const persona = isPlayer ? undefined : { ...personas[i % personas.length] };
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
-        id: `b${i}`, sail, name: isPlayer ? 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
+        id: `b${i}`, sail, name: isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
         x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6,
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,

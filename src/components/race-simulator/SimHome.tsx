@@ -14,6 +14,7 @@ import type { SimView } from './SimRace';
 import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, compassName, cx, ordinal } from './ui';
 import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
 import type { VenueWind } from './venueWind';
+import type { SimIdentity } from './identity';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -35,6 +36,8 @@ export const DEFAULT_SETUP: Setup = {
   laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'full', autoTrim: false, forgetfulSkippers: false,
   seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
+
+const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
 
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
   club: 'Learning the ropes: late starts, wide roundings, and the odd foul you can protest.',
@@ -101,11 +104,15 @@ function TrainCard({ title, text, icon, action, actionLabel, soon, badge }: { ti
   );
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
   today: VenueWind | 'loading' | 'failed' | null;
+  /** The signed-in member: their name and sail numbers. */
+  me?: SimIdentity | null;
+  /** Races and training are being kept in the member's account. */
+  synced?: boolean;
 }) {
   const stars = drillStars(training);
   const lic = licence(training);
@@ -215,10 +222,17 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <div className="flex items-center gap-2.5">
                 <Tile size={36}><CoachGlyph size={18} /></Tile>
                 <div className="min-w-0">
-                  <h2 id="pf-title" className="m-0 text-[16px] font-semibold">Your skipper profile</h2>
-                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''} on this device` : 'Kept on this device'}</p>
+                  <h2 id="pf-title" className="m-0 text-[16px] font-semibold">{me ? me.name : 'Your skipper profile'}</h2>
+                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
                 </div>
               </div>
+              {me && (
+                <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                  {me.sails[s.classId]
+                    ? <>You're sailing <b className="text-[#F1F4FA]">{CLASS_LABEL[s.classId]} {me.sails[s.classId]}</b>, from your boats in My Garage.</>
+                    : <>Add your {CLASS_LABEL[s.classId]} in My Garage to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.</>}
+                </p>
+              )}
               {!sk ? (
                 <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Sail a race and your profile starts here: starts, upwind, roundings, downwind and rules, worked out from how you race.</p>
               ) : (

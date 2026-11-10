@@ -1,5 +1,5 @@
-// Your skipper profile, kept on this device for now (no database yet): the last races you sailed
-// and a simple score for each part of racing, worked out from them.
+// Your skipper profile: the last races you sailed and a simple score for each part of racing,
+// worked out from them. Kept on this device, and in your account when you're signed in (sync.ts).
 import type { RaceSummary } from './stats';
 
 const KEY = 'alfie-race-sim-profile-v1';
@@ -22,6 +22,16 @@ export function saveRace(sum: RaceSummary): Profile {
 }
 
 export function clearProfile() { try { localStorage.removeItem(KEY); } catch { /* storage unavailable */ } }
+
+/** Add the races from your account that this device hasn't seen (the newest 30 are kept). */
+export function mergeRaces(remote: RaceSummary[]): Profile {
+  const p = loadProfile();
+  const byAt = new Map(p.races.map(r => [r.at, r]));
+  for (const r of remote) if (!byAt.has(r.at)) byAt.set(r.at, r);
+  p.races = [...byAt.values()].sort((a, b) => b.at - a.at).slice(0, 30);
+  try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ }
+  return p;
+}
 
 export interface Skills { starts: number; upwind: number; roundings: number; downwind: number; rules: number; races: number; avgPlace: number | null; wins: number }
 

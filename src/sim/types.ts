@@ -18,6 +18,8 @@ export interface RaceSettings {
   windFrom?: number;
   /** A real venue (see src/sim/venues): the course is laid on its water for the day's wind. */
   venue?: string;
+  /** Who's sailing: the member's name and their sail number in this class (from their boats). */
+  player?: { name: string; sail: string };
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length

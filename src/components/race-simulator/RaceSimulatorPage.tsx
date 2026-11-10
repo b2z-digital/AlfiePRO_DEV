@@ -17,14 +17,18 @@ import SimTrainer from './SimTrainer';
 import SimAcademy from './SimAcademy';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
-import { Profile, loadProfile, saveRace } from './profile';
-import { TrainingProgress, loadTraining, recordAnswer, recordScene } from './progress';
+import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
+import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining } from './progress';
+import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
+import { SimIdentity, loadIdentity } from './identity';
 import { C } from './ui';
 import { VENUES } from '@/sim/venues';
 import { VenueWind, fetchVenueWind } from './venueWind';
 
 interface RaceSimulatorPageProps {
   darkMode: boolean;
+  /** The signed-in member, to sail under their own name and sail number and keep progress in their account. */
+  account?: Account | null;
 }
 
 // v2: the new defaults (sails on your stick, choppy water, the bank view). Old v1 settings are
@@ -46,13 +50,15 @@ function storeSetup(s: Setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
 }
 
-function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null): RaceSettings {
+function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, me: SimIdentity | null): RaceSettings {
   // At a venue: its usual breeze, today's wind there (direction and strength), or any direction.
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const live = def && s.windDir === 'today' && today ? today : null;
   const windFrom = !def ? undefined : live ? live.from : s.windDir === 'any' ? Math.floor(Math.random() * 360) : def.usualWind;
   return {
     venue: def?.id, windFrom, windKnots: live ? live.kn : undefined,
+    // Your own name, and your sail number when you have a boat in this class.
+    player: me ? { name: me.name, sail: me.sails[s.classId] ?? '01' } : undefined,
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
@@ -85,7 +91,7 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
   return n ? { spec: n, label: `Next: ${n.title}` } : null;
 }
 
-export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) {
+export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimulatorPageProps) {
   void darkMode; // the simulator is always on the water: one dark look
   const [where, setWhere] = useState<Where>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
@@ -109,6 +115,24 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   }, [setup.venue, setup.windDir]);
   const todayWind = today && today !== 'loading' && today !== 'failed' ? today : null;
 
+  // Signed in: who you are (name and sail numbers), and your races and training from your account.
+  const [me, setMe] = useState<SimIdentity | null>(null);
+  const [synced, setSynced] = useState(false);
+  const userId = account?.userId ?? null, clubId = account?.clubId ?? null;
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    const a = { userId, clubId };
+    void loadIdentity(userId, clubId).then(id => { if (live) setMe(id); });
+    void pullRaces(a).then(rs => { if (live && rs) { setProfile(mergeRaces(rs)); setSynced(true); } });
+    void syncTraining(a, loadTraining()).then(t => { if (live && t) setTraining(saveTraining(t)); });
+    return () => { live = false; };
+  }, [userId, clubId]);
+  const trainingChanged = useCallback((t: TrainingProgress) => {
+    setTraining(t);
+    if (userId) void syncTraining({ userId, clubId }, t);
+  }, [userId, clubId]);
+
   const changeSetup = useCallback((s: Setup) => { setSetup(s); storeSetup(s); }, []);
   const changeView = useCallback((v: SimView) => {
     setRunView(v);
@@ -117,10 +141,10 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   }, [run]);
 
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
-    setRun({ settings: toSettings(s, mode, todayWind), mode, key: Date.now() });
+    setRun({ settings: toSettings(s, mode, todayWind, me), mode, key: Date.now() });
     setRunView(s.view);
     setWhere('race');
-  }, [todayWind]);
+  }, [todayWind, me]);
 
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
@@ -148,9 +172,10 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
 
   const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
     setProfile(saveRace(sum));
+    if (userId) void pushRace({ userId, clubId }, sum, race.settings);
     setDebrief({ race, sum, moments });
     setWhere('debrief');
-  }, []);
+  }, [userId, clubId]);
 
   // Sail a finished race again from a moment: the same settings (and seed) and your log up to
   // there, then you have the helm.
@@ -164,8 +189,8 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
 
   const sceneResult = useCallback((o: Outcome) => {
     if (!run?.scene) return;
-    setTraining(recordScene(run.scene.spec, o, run.scene.higherIsBetter));
-  }, [run]);
+    trainingChanged(recordScene(run.scene.spec, o, run.scene.higherIsBetter));
+  }, [run, trainingChanged]);
 
   const openLink = useCallback((l: TrainLink) => {
     if (l.kind === 'lesson') { setAcademyAt(l.id); setWhere('academy'); return; }
@@ -232,7 +257,7 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
     return (
       <div className="h-full overflow-y-auto">
         <SimAcademy progress={training} initial={academyAt}
-          onAnswer={(id, ok) => setTraining(recordAnswer(id, ok))}
+          onAnswer={(id, ok) => trainingChanged(recordAnswer(id, ok))}
           onPlay={(id, watch) => { const spec = findScene('lesson', id); if (spec) playScene(spec, 'Rules Academy', watch); }}
           onBack={() => setWhere('home')} />
       </div>
@@ -249,8 +274,9 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
 
   return (
     <div className="h-full overflow-y-auto">
-      <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile} onProfileCleared={() => setProfile(loadProfile())}
-        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} />
+      <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
+        onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
+        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced} />
     </div>
   );
 }

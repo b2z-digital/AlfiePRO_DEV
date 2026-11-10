@@ -421,7 +421,9 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
         if ((ux > 0) !== vis) { ux = -ux; uy = -uy; }
         const D = o.dpr;
         ctx.setTransform(ux * D, uy * D, vx * D, vy * D, p0.x * D, p0.y * D);
-        ctx.font = `800 ${mm}px ${FONT}`;
+        // Three or four digits fit the same space as two.
+        const fit = text === p.sail && text.length > 2 ? (text.length === 3 ? 0.86 : 0.7) : 1;
+        ctx.font = `800 ${mm * fit}px ${FONT}`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = p.ink;
         ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.26);
