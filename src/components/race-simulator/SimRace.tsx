@@ -164,7 +164,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const log = useRef(new PlayerLog()).current;
   const cam = useRef<Camera>({ x: 0, y: -4, scale: 30 }).current;
   const bcam = useRef<BankCam>(newBankCam()).current;
-  const size = useRef({ w: 800, h: 600, dpr: 1 }).current;
+  // The canvas: its size in CSS pixels, and its resolution (lowered on a device that can't keep up).
+  const size = useRef<{ w: number; h: number; dpr: number; maxDpr: number; refit?: () => void }>({ w: 800, h: 600, dpr: 1, maxDpr: 2 }).current;
   const flashes = useRef<{ x: number; y: number; t: number }[]>([]).current;
   const goalMemo = useRef<GoalCtx['memo']>({}).current;
 
@@ -328,18 +329,28 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       const mid = (B.alongMin + B.alongMax) / 2;
       return { x: race.course.origin.x + race.course.up.x * mid, y: race.course.origin.y + race.course.up.y * mid, scale: s };
     };
-    // How much detail the water gets: full, unless frames are coming too slowly on this device.
-    const perf = { detail: 2, ft: 1 / 60, slow: 0, fast: 0 };
+    // How much detail the water gets: full, unless frames come too slowly on this device. It only
+    // ever steps down (never back up and down again, which would make the water flicker and the
+    // frame rate swing), and only after a steady run of slow frames.
+    const perf = { detail: 2, ft: 1 / 60, slow: 0 };
     const frame = (now: number) => {
       // The frame's timestamp can be a little before the moment the loop started: never negative.
-      const dtReal = Math.max(0, Math.min(0.1, (now - last) / 1000));
+      // A slow frame still moves the race on in real time (up to a quarter of a second at once).
+      const raw = Math.max(0, (now - last) / 1000);
+      const dtReal = Math.min(0.25, raw);
       last = now;
-      if (dtReal > 0 && !document.hidden) {
-        perf.ft += (dtReal - perf.ft) * 0.05;
-        perf.slow = perf.ft > 1 / 38 ? perf.slow + dtReal : 0;
-        perf.fast = perf.ft < 1 / 55 ? perf.fast + dtReal : 0;
-        if (perf.slow > 2 && perf.detail > 0) { perf.detail--; perf.slow = 0; }
-        if (perf.fast > 8 && perf.detail < 2) { perf.detail++; perf.fast = 0; }
+      // Development only: hold the water at one level of detail (for screenshots on a slow machine).
+      const lock = import.meta.env.DEV ? (window as unknown as { __simDetail?: number }).__simDetail : undefined;
+      if (typeof lock === 'number') perf.detail = lock;
+      else if (raw > 0 && raw < 0.5 && !document.hidden) {
+        perf.ft += (raw - perf.ft) * 0.05;
+        perf.slow = perf.ft > 1 / 40 ? perf.slow + raw : 0;
+        if (perf.slow > 1.5 && perf.detail > 0) {
+          // Less detail on the water, and fewer pixels to fill: a big, sharp screen is the costly part.
+          perf.detail--; perf.slow = 0; perf.ft = 1 / 50;
+          size.maxDpr = perf.detail === 1 ? 1.5 : 1;
+          size.refit?.();
+        }
       }
       const st = R.current;
       ctl.update(dtReal, st.mapping);
@@ -360,7 +371,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       } else if (!st.paused && !st.replay && !st.ended) {
         acc += dtReal * (st.fast ? 2.5 : 1);
         let n = 0;
-        while (acc >= DT && n < 10) {
+        while (acc >= DT && n < 14) {
           race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim };
           race.step();
           if (ghostRace && !ghostRace.ended) ghostRace.step();
@@ -375,7 +386,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           }
           if (st.paused) { acc = 0; break; }
         }
-        if (n >= 10) acc = 0;
+        if (n >= 14) acc = 0;
         // The end of a race or start practice.
         if (!scene) {
           const startDone = mode === 'start' && race.t > race.gunT + 12;
@@ -501,12 +512,15 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (!el || !cv) return;
     const fit = () => {
       const r = el.getBoundingClientRect();
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      size.w = Math.max(320, r.width); size.h = Math.max(240, r.height); size.dpr = dpr;
+      size.w = Math.max(320, r.width); size.h = Math.max(240, r.height);
+      // Sharp on a high-resolution screen, but no more than about 6 million pixels to draw.
+      const dpr = Math.max(1, Math.min(size.maxDpr, window.devicePixelRatio || 1, Math.sqrt(6e6 / (size.w * size.h))));
+      size.dpr = dpr;
       cv.width = Math.round(size.w * dpr); cv.height = Math.round(size.h * dpr);
       cv.style.width = `${size.w}px`; cv.style.height = `${size.h}px`;
     };
     fit();
+    size.refit = fit;
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();

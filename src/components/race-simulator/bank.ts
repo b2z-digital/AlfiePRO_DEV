@@ -406,13 +406,15 @@ function trim(color: string): { tape: string; deck: string } {
 /** Where a boat is and how she's sitting, for the 3D model: heel, waves, sails set to her sheet. */
 function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: number, heel: number): Pose {
   const twa = twaFor(b.twd, bh);
-  const set = sailSet(twa, b.sheet, b.tws, !!b.disabled);
+  // Live, the sails are on the side her tack puts them; in a replay, the side her heading then did.
+  const live = bx === b.x && by === b.y;
+  const set = sailSet(twa, b.sheet, b.tws, !!b.disabled, live ? b.tack : undefined);
   const t = trim(b.color);
   const p: Pose = {
     cls: b.cls.id, rig: rigFor(b.cls.id, race.wind.baseTws / 0.514444),
     x: bx, y: by, hdg: bh,
     heel, pitch: 0, heave: 0,
-    sd: set.sd, boom: set.boom, jib: set.jib, goose: set.goose, luff: set.luff,
+    sd: set.sd, boom: set.boom, jib: set.jib, luff: set.luff,
     color: b.color, tape: b.isPlayer ? '#2A93FF' : t.tape, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
     sail: b.sail, country: 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
   };

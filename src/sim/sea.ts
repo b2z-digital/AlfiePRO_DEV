@@ -33,9 +33,16 @@ export interface Sea {
   trains: WaveTrain[];
 }
 
+/**
+ * How fast the waves roll, as a share of deep-water wave speed. Sailors who race on these lakes find
+ * full-speed waves look and feel far too quick next to a model yacht, so they roll at about 60%:
+ * a long, easy procession of waves that she meets about once a second punching upwind.
+ */
+export const WAVE_PACE = 0.6;
+
 function train(amp: number, length: number, from: number, phase: number): WaveTrain {
   const k = (2 * Math.PI) / length, d = dir(from + 180);
-  return { amp, length, k, omega: Math.sqrt(G * k), dx: d.x, dy: d.y, phase };
+  return { amp, length, k, omega: WAVE_PACE * Math.sqrt(G * k), dx: d.x, dy: d.y, phase };
 }
 
 /**
@@ -119,7 +126,8 @@ export function hullMotion(sea: Sea, x: number, y: number, t: number, hdg: numbe
     const au = Math.abs(u);
     const sinc = au < 1e-4 ? 1 : Math.sin(u) / u;
     const tilt = au < 1e-4 ? (2 * u) / L : (6 / L) * ((Math.sin(u) - u * Math.cos(u)) / (u * u));
-    const h = respond(enc, 0.5, 0.6), p = respond(enc, 0.7, 0.6), rl = respond(enc, 1.1, 0.3);
+    // A heavy bulb deep under her and a fine hull: slow to pitch and heave, and well damped.
+    const h = respond(enc, 0.6, 0.75), p = respond(enc, 0.9, 0.75), rl = respond(enc, 1.1, 0.35);
     heave += h.g * w.amp * sinc * Math.sin(ph + dirn * h.lag);
     pitch += p.g * w.amp * tilt * Math.cos(ph + dirn * p.lag);
     // Across her the waves tip her; the heavy bulb answers slowly.

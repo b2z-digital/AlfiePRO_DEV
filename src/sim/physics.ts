@@ -90,9 +90,15 @@ export function settleHeel(b: Boat) { b.heel = heelWanted(b, twaOf(b.hdg, b.twd)
 export function heelStep(b: Boat, dt: number, twa: number) {
   const c = b.cls;
   const want = heelWanted(b, twa);
-  const w = (2 * Math.PI) / c.rollPeriod, zeta = 0.38;
+  // Lightly damped: a gust that hits hard throws her over past where she settles, then she comes back.
+  const w = (2 * Math.PI) / c.rollPeriod, zeta = 0.25;
   b.heelRate += (w * w * (want - b.heel) - 2 * zeta * w * b.heelRate) * dt;
   b.heel += b.heelRate * dt;
+  // Laid flat, the mast and sails in the water stop her going any further.
+  if (Math.abs(b.heel) > 86) {
+    b.heel = Math.sign(b.heel) * 86;
+    if (b.heelRate * b.heel > 0) b.heelRate = 0;
+  }
 }
 
 /**
@@ -102,7 +108,7 @@ export function heelStep(b: Boat, dt: number, twa: number) {
 export function weatherHelm(b: Boat): number {
   const h = Math.abs(b.heel), ex = Math.max(0, h - 20);
   const kick = Math.max(0, b.heelRate * Math.sign(b.heel)) * 0.06; // being pushed over
-  return 0.3 * ex + 0.012 * ex * ex + kick;
+  return Math.min(45, 0.3 * ex + 0.012 * ex * ex + kick);
 }
 
 /** Integrate one boat for one step. Returns 'tack' or 'gybe' when the boat passed through the wind. */
@@ -128,9 +134,9 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   let target = perfect * trimEfficiency(b.sheet, a);
   const drag = 1 - 0.3 * b.rudder * b.rudder * clamp(b.spd / c.hullSpeed, 0, 1);
   target *= drag;
-  // Laid over too far she slows: more drag, less drive.
+  // Laid over too far she slows: more drag, less drive, and nearly stopped when she's knocked flat.
   const over = Math.max(0, Math.abs(b.heel) - 28);
-  if (over > 0) target *= Math.max(0.55, 1 - 0.008 * over - 0.0004 * over * over);
+  if (over > 0) target *= Math.max(0.3, 1 - 0.004 * over - 0.00022 * over * over);
   const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg) : null;
   if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;

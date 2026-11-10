@@ -99,7 +99,10 @@ export interface Pose {
   heel: number; pitch: number; heave: number;
   /** Sails out to starboard (+1) or port (-1). */
   sd: 1 | -1;
-  boom: number; jib: number; goose: boolean; luff: boolean;
+  /** The jib's angle off the centreline: negative when it's goose-winged out on the other side. */
+  boom: number; jib: number;
+  /** How much the sails are luffing, 0 (full) to 1 (flogging). */
+  luff: number;
   color: string; tape: string; ink: string; deck: string;
   sail: string; country: string;
   spd: number; hullSpeed: number;
@@ -117,23 +120,39 @@ const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a: V3): V3 => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
+function mixHex(a: string, b: string, t: number): string {
+  const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16);
+  const ch = (sh: number) => Math.round(((p >> sh) & 255) * (1 - t) + ((q >> sh) & 255) * t);
+  return `#${[16, 8, 0].map(sh => ch(sh).toString(16).padStart(2, '0')).join('')}`;
+}
+
 function shade(hex: string, k: number): string {
   const v = parseInt(hex.slice(1), 16);
   const r = Math.min(255, Math.round(((v >> 16) & 255) * k)), g = Math.min(255, Math.round(((v >> 8) & 255) * k)), b = Math.min(255, Math.round((v & 255) * k));
   return `rgb(${r},${g},${b})`;
 }
 
-/** How the sails sit for a true wind angle and sheet, as on the top view: both off one sheet. */
-export function sailSet(twa: number, sheet: number, tws: number, disabled: boolean) {
+const ramp = (a: number, b: number, x: number) => { const u = Math.max(0, Math.min(1, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
+
+/**
+ * How the sails sit for a true wind angle and sheet, as on the top view: both off one sheet. The
+ * sails are on the side her tack puts them (which already waits until she's well by the lee before
+ * it changes), and luffing and goose-winging come on gradually, so a boat sailing close to either
+ * never flickers between the two looks.
+ */
+export function sailSet(twa: number, sheet: number, tws: number, disabled: boolean, tack?: 'stbd' | 'port') {
   const a = Math.abs(twa);
   const ease = 1 - Math.min(1, Math.max(0, disabled ? 0 : sheet));
   const maxBoom = 8 + ease * 82;
   const natural = Math.min(88, Math.max(0, a - 4));
   const boom = Math.min(maxBoom, natural);
-  const luff = disabled || maxBoom > natural + 6 || a < noGoAngle(tws) + 2;
-  const goose = a > 156 && ease > 0.6 && !luff;
-  const jib = goose ? Math.min(85, maxBoom) : Math.min(maxBoom * 1.08 + 2, natural + 2);
-  return { boom, jib, luff, goose, sd: (twa >= 0 ? -1 : 1) as 1 | -1 };
+  const ng = noGoAngle(tws);
+  const luff = disabled ? 1 : Math.max(ramp(2, 10, maxBoom - natural), 1 - ramp(ng, ng + 5, a));
+  // Running deep with the sheet eased, the jib swings across to goose-wing on the other side.
+  const goose = ramp(150, 162, a) * ramp(0.5, 0.68, ease) * (1 - luff);
+  const jib = (1 - goose) * Math.min(maxBoom * 1.08 + 2, natural + 2) - goose * Math.min(85, maxBoom);
+  const sd: 1 | -1 = tack ? (tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
+  return { boom, jib, luff, sd };
 }
 
 /** Lift, pitch and roll on the waves, as her hull rides them (see hullMotion). */
@@ -167,7 +186,7 @@ class Geo {
     let x0: number, y0 = 0, z0: number, x1: number, y1 = 0, z1: number, foot: number, ang: number, roach: number, head: number, twist: number, depth: number, sd: number;
     if (kind === 'main') {
       x0 = r.mastX * L; z0 = deck + r.boomH; z1 = z0 + r.mainLuff; x1 = x0 - 0.018 * L;
-      foot = r.boom; ang = p.boom; roach = r.roach; head = r.head; twist = 11; depth = p.luff ? 0.015 : 0.09; sd = p.sd;
+      foot = r.boom; ang = p.boom; roach = r.roach; head = r.head; twist = 11; depth = 0.09 - 0.075 * p.luff; sd = p.sd;
     } else {
       const hx = r.mastX * L, hz = deck + r.hounds;
       let tx: number, ty: number, tz: number;
@@ -185,10 +204,12 @@ class Geo {
       const sl = Math.hypot(hx - tx, hz - tz);
       const k = Math.min(1, r.jibLuff / sl);
       x0 = tx; y0 = ty; z0 = tz; x1 = tx + (hx - tx) * k; y1 = ty * (1 - k); z1 = tz + (hz - tz) * k;
-      foot = r.jibFoot; ang = r.swing ? p.boom : p.jib; roach = 0; head = r.jibHead; twist = 8; depth = p.luff ? 0.015 : 0.095;
-      sd = p.goose ? -p.sd : p.sd;
+      // A goose-winged jib has a negative angle: out on the other side, with its belly that way too.
+      foot = r.jibFoot; ang = r.swing ? p.boom : p.jib; roach = 0; head = r.jibHead; twist = 8; depth = 0.095 - 0.08 * p.luff;
+      sd = p.sd;
+      if (ang < 0) { ang = -ang; sd = -p.sd; }
     }
-    const flapK = p.luff ? 0.014 * L : 0;
+    const flapK = 0.014 * L * p.luff;
     const S = (f: number, g: number): V3 => {
       const lx = x0 + (x1 - x0) * f, ly = y0 + (y1 - y0) * f, lz = z0 + (z1 - z0) * f;
       const ch = foot * (1 - f) * (1 + roach * f) + head * f;
@@ -362,7 +383,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     return { kind, ...s, d: o.P(...s.S(0.4, 0.45)).z };
   });
   const nf = size > 70 ? 8 : size > 30 ? 4 : 2, ng = size > 70 ? 5 : size > 30 ? 3 : 1;
-  const fill = p.luff ? '#D9DFE8' : '#E4E8EE';
+  const fill = mixHex('#E4E8EE', '#D9DFE8', p.luff);
   const tw = Math.max(1, (o.F * 0.006 * L) / depth);
   // Sails, mast and boom are painted far to near, so a sail in front of the mast hides it.
   const layers: { d: number; draw: () => void }[] = [];
@@ -461,8 +482,8 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     if (size > 55) {
       for (const [f, col] of [[0.3, '#E5484D'], [0.62, '#3E7BFA']] as const) {
         const a = o.P(...sl.S(f, 0.16));
-        const flutter = p.luff ? Math.sin(o.t * 19 + f * 7) * 3 : 0;
-        const b = o.P(...sl.S(f - (p.luff ? 0.04 : 0), 0.25));
+        const flutter = Math.sin(o.t * 19 + f * 7) * 3 * p.luff;
+        const b = o.P(...sl.S(f - 0.04 * p.luff, 0.25));
         ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, tw * 1.3);
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 - 1.2 + flutter, b.x, b.y + flutter); ctx.stroke();
       }

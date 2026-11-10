@@ -30,12 +30,12 @@ function mk(id: ClassId, name: string, loa: number, beam: number, lwl: number, e
 
 export const CLASSES: Record<ClassId, ClassDef> = {
   // From the class plans: the LM3 IOM (beam 173.5 mm), the Gothic M and the GothiX 10r (1225 mm waterline).
-  // Stiffness is set so a boat close-hauled in 9 to 10 knots heels about 16°, as they do.
-  IOM: mk('IOM', 'IOM', 1.0, 0.1735, 0.98, 1.0, 95),
-  M: mk('M', 'Marblehead', 1.27, 0.16, 1.22, 1.0, 98),
-  '10R': mk('10R', '10 Rater', 1.6, 0.18, 1.225, 1.0, 104),
-  DF95: mk('DF95', 'DF95', 0.95, 0.19, 0.9, 0.9, 86),
-  DF65: mk('DF65', 'DF65', 0.65, 0.16, 0.62, 0.88, 82),
+  // Stiffness is set so a boat close-hauled in 9 to 10 knots heels about 22°, as they do.
+  IOM: mk('IOM', 'IOM', 1.0, 0.1735, 0.98, 1.0, 79),
+  M: mk('M', 'Marblehead', 1.27, 0.16, 1.22, 1.0, 81),
+  '10R': mk('10R', '10 Rater', 1.6, 0.18, 1.225, 1.0, 86),
+  DF95: mk('DF95', 'DF95', 0.95, 0.19, 0.9, 0.9, 72),
+  DF65: mk('DF65', 'DF65', 0.65, 0.16, 0.62, 0.88, 68),
 };
 
 /** The rig an IOM sails with in a breeze (knots): the A rig, the B from about 12½ knots, the C from 20. */
@@ -47,7 +47,7 @@ export function iomRig(knots: number): 'A' | 'B' | 'C' {
 export function rigPower(cls: ClassId, knots: number): number {
   if (cls !== 'IOM') return 1;
   const r = iomRig(knots);
-  return r === 'C' ? 0.38 : r === 'B' ? 0.6 : 1;
+  return r === 'C' ? 0.5 : r === 'B' ? 0.72 : 1;
 }
 
 /**
@@ -66,11 +66,13 @@ export function heelForce(absTwa: number, sheet: number, tws: number): number {
   return Math.max(0.05, point * fill * trim);
 }
 
-/** Heel (degrees, 0 to 90) where the bulb's righting moment balances the sails: sin φ / cos² φ = q. */
+/**
+ * Heel (degrees) where the bulb's righting moment balances the sails: tan φ = q. The bulb rights her
+ * harder the further she goes over, but a big enough gust still lays her nearly flat.
+ */
 export function heelFor(q: number): number {
   if (q <= 1e-6) return 0;
-  const s = (-1 + Math.sqrt(1 + 4 * q * q)) / (2 * q);
-  return (Math.asin(Math.min(1, s)) * 180) / Math.PI;
+  return Math.min(85, (Math.atan(q) * 180) / Math.PI);
 }
 
 /** Best close-hauled true wind angle (deg) for a wind speed in m/s. */
