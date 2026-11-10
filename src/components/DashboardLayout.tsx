@@ -2179,7 +2179,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
               } />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
-              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null } : null} />} />}
+              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />

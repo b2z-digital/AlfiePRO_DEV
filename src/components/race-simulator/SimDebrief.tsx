@@ -191,10 +191,12 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
   );
 }
 
-export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onTakeOver }: {
+export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onTakeOver, challenge = null }: {
   race: Race; sum: RaceSummary; moments: Moment[]; onHome: () => void; onAgain: () => void; onLink?: (l: TrainLink) => void;
   /** Sail the race again from this race time, taking over your boat there. */
   onTakeOver?: (t: number) => void;
+  /** This was a challenge: its title, how the leaderboard took it, and a way back to it. */
+  challenge?: { title: string; note: string | null; onOpen: () => void } | null;
 }) {
   const [open, setOpen] = useState<number | null>(null);
   const placeText = sum.mode === 'start'
@@ -214,8 +216,16 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
             <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">{sum.mode === 'start' ? 'Start report' : 'Race debrief'}</h1>
             <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>{sum.title} · {sum.cls} · {sum.level[0].toUpperCase()}{sum.level.slice(1)} skippers · {sum.wind}</p>
           </div>
-          <Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : 'Race again'}</Btn>
+          <Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? 'Sail it again' : 'Race again'}</Btn>
         </header>
+
+        {challenge && (
+          <section className="flex flex-wrap items-center gap-3 rounded-[20px] border border-[rgba(77,163,255,0.3)] bg-[rgba(42,147,255,0.08)] px-5 py-4">
+            <Cap>Challenge</Cap>
+            <p className="m-0 min-w-0 flex-[1_1_260px] text-[14.5px]"><b>{challenge.title}</b>{challenge.note ? ` · ${challenge.note}` : ''}</p>
+            <Btn small onClick={challenge.onOpen}>Leaderboard</Btn>
+          </section>
+        )}
 
         <section className="flex flex-wrap items-center gap-7 rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-6 py-5">
           <div className="flex items-baseline gap-2.5">

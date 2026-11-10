@@ -28,6 +28,8 @@ export interface RaceLog {
   input: [number, number, number, number][];
   /** Tacks, gybes and hails: [step they were made before, what]. */
   acts: [number, PlayerAct][];
+  /** The settings it was sailed with, when the log travels on its own (a challenge ghost). */
+  settings?: RaceSettings;
 }
 export type PlayerAct = 'tack' | 'gybe' | 'hail';
 
@@ -138,14 +140,18 @@ export class Race implements AiHost {
     const n = Math.max(2, Math.min(16, s.fleetSize));
     const personas = [...PERSONAS];
     for (let i = personas.length - 1; i > 0; i--) { const j = this.rng.int(0, i); [personas[i], personas[j]] = [personas[j], personas[i]]; }
-    // The player sails her own number when we know it; the AI boats never share it.
+    // Numbers are drawn as if the player were 01, so the rest of the race (positions, personas)
+    // comes out the same whatever her real number: everyone in a challenge sails the same race.
+    // Then she gets her own, and an AI boat that drew it takes 01, which no AI boat ever draws.
     const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? s.player.sail : '01';
-    const numbers = new Set<string>(s.noPlayer ? [] : [mySail]);
+    const numbers = new Set<string>();
     for (let i = 0; i < n; i++) {
       const isPlayer = !s.noPlayer && i === 0;
-      let sail = isPlayer ? mySail : String(this.rng.int(2, 98)).padStart(2, '0');
-      while (!isPlayer && numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
+      let sail = isPlayer ? '01' : String(this.rng.int(2, 98)).padStart(2, '0');
+      while (numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
       numbers.add(sail);
+      if (isPlayer) sail = mySail;
+      else if (!s.noPlayer && sail === mySail) sail = '01';
       // Start sailing round below the line like a fleet does: half reaching towards the pin on
       // starboard in a nearer lane, half back on port in a farther one, spread along the line.
       const frac = (i + 0.5) / n;

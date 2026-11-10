@@ -21,14 +21,17 @@ import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
 import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
-import { C } from './ui';
+import { C, ordinal } from './ui';
 import { VENUES } from '@/sim/venues';
 import { VenueWind, fetchVenueWind } from './venueWind';
+import { Challenge, ChallengeEntry, createChallenge, entryLog, listChallenges, submitEntry } from './challenges';
+import SimChallenge from './SimChallenge';
 
 interface RaceSimulatorPageProps {
   darkMode: boolean;
-  /** The signed-in member, to sail under their own name and sail number and keep progress in their account. */
-  account?: Account | null;
+  /** The signed-in member, to sail under their own name and sail number and keep progress in their
+   *  account; `admin` when they can set challenges for their club, `superAdmin` for every club. */
+  account?: (Account & { admin?: boolean; superAdmin?: boolean }) | null;
 }
 
 // v2: the new defaults (sails on your stick, choppy water, the bank view). Old v1 settings are
@@ -68,7 +71,12 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
   };
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief' | 'challenge';
+
+/** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
+function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
+  return { ...c.settings, autoTrim, player: me ? { name: me.short, sail: me.sails[c.settings.classId] ?? '01' } : undefined };
+}
 type Group = ActiveScene['group'];
 
 const GROUP_PAGE: Record<Group, Where> = { 'Start Trainer': 'trainer', 'Rules Academy': 'academy', 'Scenario Lab': 'lab' };
@@ -95,8 +103,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   void darkMode; // the simulator is always on the water: one dark look
   const [where, setWhere] = useState<Where>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
-  const [run, setRun] = useState<{ settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number; resume?: { log: RaceLog; step: number } } | null>(null);
-  const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary; moments: Moment[] } | null>(null);
+  const [run, setRun] = useState<{
+    settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number; resume?: { log: RaceLog; step: number };
+    challenge?: Challenge; ghost?: { log: RaceLog; settings: RaceSettings; label: string };
+  } | null>(null);
+  const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary; moments: Moment[]; challenge?: Challenge } | null>(null);
+  // Challenges you can see, the one open, and how your last go at one went.
+  const [challenges, setChallenges] = useState<Challenge[] | null>(null);
+  const [openCh, setOpenCh] = useState<Challenge | null>(null);
+  const [chNote, setChNote] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [training, setTraining] = useState<TrainingProgress>(loadTraining);
   const [academyAt, setAcademyAt] = useState<string | null>(null);
@@ -128,6 +143,11 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     void syncTraining(a, loadTraining()).then(t => { if (live && t) setTraining(saveTraining(t)); });
     return () => { live = false; };
   }, [userId, clubId]);
+  const refreshChallenges = useCallback(() => {
+    if (!userId) return;
+    void listChallenges().then(cs => setChallenges(cs));
+  }, [userId]);
+  useEffect(() => { refreshChallenges(); }, [refreshChallenges]);
   const trainingChanged = useCallback((t: TrainingProgress) => {
     setTraining(t);
     if (userId) void syncTraining({ userId, clubId }, t);
@@ -164,25 +184,65 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     setWhere('race');
   }, [training, setup]);
 
+  const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
+    setProfile(saveRace(sum));
+    const ch = run?.challenge;
+    if (userId) {
+      const a = { userId, clubId };
+      void pushRace(a, sum, race.settings);
+      // A challenge: your best goes on the leaderboard, with your race log for your ghost.
+      // (Not when you took over part way through: that's practice.)
+      if (ch && !run?.resume) {
+        setChNote('Putting your result on the leaderboard…');
+        void submitEntry(a, ch, { name: me?.short ?? 'AlfiePRO sailor', sail: race.player?.sail ?? null }, sum, race.log, race.settings).then(r => {
+          if (!r) setChNote("Couldn't save to the leaderboard just now.");
+          else if (r.rank === null) setChNote(r.saved ? 'Saved to the leaderboard.' : 'Your best result stays on the leaderboard.');
+          else setChNote(`${r.saved ? 'On the leaderboard' : 'Your best stays'}: ${r.rank === 1 ? 'top' : ordinal(r.rank)} of ${r.of}.`);
+        });
+      } else setChNote(ch ? 'Taken over part way through, so this one is practice: it doesn\'t go on the leaderboard.' : null);
+    }
+    setDebrief({ race, sum, moments, challenge: ch });
+    setWhere('debrief');
+  }, [userId, clubId, run, me]);
+
+  // Sail a challenge, against nobody or against an entry's ghost.
+  const sailChallenge = useCallback(async (c: Challenge, ghostOf: ChallengeEntry | null) => {
+    let ghost: { log: RaceLog; settings: RaceSettings; label: string } | undefined;
+    if (ghostOf) {
+      const g = await entryLog(ghostOf.id);
+      if (g) ghost = { log: g, settings: g.settings, label: `Ghost · ${ghostOf.display_name}` };
+    }
+    setRun({ settings: challengeSettings(c, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: c, ghost });
+    setRunView(setup.view);
+    setWhere('race');
+  }, [me, setup.autoTrim, setup.view]);
+
   const again = useCallback(() => {
     if (!run) return;
     if (run.scene) playScene(run.scene.spec, run.scene.group, false);
+    else if (run.challenge) void sailChallenge(run.challenge, null);
     else start(run.mode === 'start' ? 'start' : 'race', setup);
-  }, [run, setup, start, playScene]);
+  }, [run, setup, start, playScene, sailChallenge]);
 
-  const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
-    setProfile(saveRace(sum));
-    if (userId) void pushRace({ userId, clubId }, sum, race.settings);
-    setDebrief({ race, sum, moments });
-    setWhere('debrief');
-  }, [userId, clubId]);
+  const setChallenge = useCallback(async (c: { title: string; description: string; days: number | null; everyone: boolean }): Promise<string | null> => {
+    if (!userId) return 'Sign in to set a challenge.';
+    const settings = toSettings(setup, 'race', todayWind, null);
+    const r = await createChallenge({ userId, clubId }, {
+      clubId: c.everyone ? null : clubId, title: c.title, description: c.description, settings,
+      closesAt: c.days ? new Date(Date.now() + c.days * 864e5) : null,
+    });
+    if (typeof r === 'string') return /row-level security/i.test(r) ? "Only the club's admins can set its challenges." : r;
+    refreshChallenges();
+    setOpenCh(r); setWhere('challenge');
+    return null;
+  }, [userId, clubId, setup, todayWind, refreshChallenges]);
 
   // Sail a finished race again from a moment: the same settings (and seed) and your log up to
   // there, then you have the helm.
   const takeOver = useCallback((t: number) => {
     if (!debrief) return;
     const r = debrief.race;
-    setRun({ settings: r.settings, mode: debrief.sum.mode, key: Date.now(), resume: { log: r.log, step: Math.max(0, Math.round(t / DT)) } });
+    setRun({ settings: r.settings, mode: debrief.sum.mode, key: Date.now(), resume: { log: r.log, step: Math.max(0, Math.round(t / DT)) }, challenge: debrief.challenge });
     setRunView(setup.view);
     setWhere('race');
   }, [debrief, setup.view]);
@@ -200,7 +260,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   const leaveRace = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-    setWhere(run?.scene ? GROUP_PAGE[run.scene.group] : 'home');
+    setWhere(run?.scene ? GROUP_PAGE[run.scene.group] : run?.challenge ? 'challenge' : 'home');
   }, [run]);
 
   // Racing fills the window: no page scrolling underneath it.
@@ -231,6 +291,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
           onSceneWatch={scene?.spec.solution ? () => playScene(scene.spec, scene.group, true) : undefined}
           onSceneNext={scene ? () => { const n = nextAfter(scene.spec); if (n) playScene(n.spec, scene.group, false); else leaveRace(); } : undefined}
           resume={run.resume}
+          ghost={run.ghost}
         />
       </div>,
       document.body,
@@ -240,7 +301,16 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'debrief' && debrief) {
     return (
       <div className="h-full overflow-y-auto">
-        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={takeOver} />
+        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={takeOver}
+          challenge={debrief.challenge ? { title: debrief.challenge.title, note: chNote, onOpen: () => { setOpenCh(debrief.challenge!); setWhere('challenge'); } } : null} />
+      </div>
+    );
+  }
+
+  if (where === 'challenge' && openCh) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <SimChallenge challenge={openCh} me={userId} onSail={e => void sailChallenge(openCh, e)} onBack={() => { refreshChallenges(); setWhere('home'); }} />
       </div>
     );
   }
@@ -276,7 +346,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     <div className="h-full overflow-y-auto">
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced} />
+        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced}
+        challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
+        canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge} />
     </div>
   );
 }

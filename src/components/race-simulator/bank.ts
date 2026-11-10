@@ -178,6 +178,8 @@ export interface BankOptions {
   names?: boolean;
   /** Draw boats this many steps back in their history (instant replay). */
   back: number;
+  /** A ghost to race: another member's boat from their own race (her race, for her pose), drawn faint. */
+  ghost?: { race: Race; b: Boat; label: string } | null;
 }
 
 export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptions) {
@@ -457,6 +459,17 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
     } });
   }
   for (const q of posed) items.push({ z: q.d, draw: () => drawBankBoat(ctx, V, race, q.b, q.pose, o, v) });
+  // The ghost: pale and see-through, with her name.
+  if (v.ghost && v.back === 0) {
+    const g = v.ghost.b, d = V.depth(g.x, g.y);
+    if (d > 0.7) {
+      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd), color: '#E8F1FF', tape: '#B9C7DA', deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
+      items.push({ z: d, draw: () => {
+        const { top } = drawBoat3d(ctx, pose, o);
+        label(ctx, v.ghost!.label, top.x, top.y - 10, 'rgba(232,241,255,0.75)', 11.5, 600);
+      } });
+    }
+  }
   items.sort((a, b) => b.z - a.z);
   for (const it of items) it.draw();
 

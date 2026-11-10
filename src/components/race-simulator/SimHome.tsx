@@ -15,6 +15,8 @@ import { AlfieOrb, Btn, C, Cap, Chip, CoachGlyph, Seg, Tile, compassName, cx, or
 import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
 import type { VenueWind } from './venueWind';
 import type { SimIdentity } from './identity';
+import { Challenge, closesText, isOpen } from './challenges';
+import { challengeLine } from './SimChallenge';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -104,7 +106,40 @@ function TrainCard({ title, text, icon, action, actionLabel, soon, badge }: { ti
   );
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false }: {
+/** Set a challenge: a title, a line about it, when it closes, and (super admins) who it's for. Uses the setup above. */
+function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean; onCreate: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>; onDone: () => void }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [days, setDays] = useState<number>(7);
+  const [everyone, setEveryone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const field = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[14px] text-[#F1F4FA] placeholder:text-[rgba(235,240,255,0.4)] focus:border-[rgba(77,163,255,0.6)] focus:outline-none';
+  return (
+    <form className="flex flex-col gap-3 rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-4" onSubmit={async e => {
+      e.preventDefault();
+      if (title.trim().length < 3) { setErr('Give it a title of at least three letters.'); return; }
+      setBusy(true); setErr(null);
+      const r = await onCreate({ title, description, days: days || null, everyone });
+      setBusy(false);
+      if (r) setErr(r); else onDone();
+    }}>
+      <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>The challenge is the race set up above (class, fleet, skippers, venue and wind), with its own shifts that everyone gets the same.</p>
+      <label className="flex flex-col gap-1.5"><Cap>Title</Cap><input className={field} value={title} onChange={e => setTitle(e.target.value)} maxLength={120} placeholder="Sunday sea breeze, IOM" /></label>
+      <label className="flex flex-col gap-1.5"><Cap>About it (optional)</Cap><textarea className={cx(field, 'min-h-[64px]')} value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} placeholder="Practise the start before Sunday's racing." /></label>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-col gap-1.5"><Cap>Open for</Cap><Seg size="sm" label="Open for" value={days} onChange={setDays} options={[{ value: 3, label: '3 days' }, { value: 7, label: 'A week' }, { value: 14, label: 'Two weeks' }, { value: 0, label: 'No end' }]} /></div>
+        {canEveryone && <div className="flex flex-col gap-1.5"><Cap>For</Cap><Seg size="sm" label="Who it's for" value={everyone ? 'all' : 'club'} onChange={v => setEveryone(v === 'all')} options={[{ value: 'club', label: 'This club' }, { value: 'all', label: 'Every club' }]} /></div>}
+        <span className="ml-auto" />
+        <Btn type="button" quiet onClick={onDone}>Cancel</Btn>
+        <Btn type="submit" primary disabled={busy}>{busy ? 'Setting it…' : 'Set the challenge'}</Btn>
+      </div>
+      {err && <p className="m-0 text-[13px] text-[#FCA5A5]">{err}</p>}
+    </form>
+  );
+}
+
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -113,7 +148,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   me?: SimIdentity | null;
   /** Races and training are being kept in the member's account. */
   synced?: boolean;
+  /** Challenges you can see (null when you're not signed in, or they couldn't be loaded). */
+  challenges?: Challenge[] | null;
+  onChallenge?: (c: Challenge) => void;
+  /** Can you set challenges, and for every club? */
+  canSet?: { everyone: boolean } | null;
+  onCreateChallenge?: (c: { title: string; description: string; days: number | null; everyone: boolean }) => Promise<string | null>;
 }) {
+  const [setting, setSetting] = useState(false);
   const stars = drillStars(training);
   const lic = licence(training);
   const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
@@ -264,6 +306,32 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </section>
           </aside>
         </div>
+
+        {challenges && (challenges.length > 0 || canSet) && (
+          <section className="flex flex-col gap-3.5" aria-labelledby="ch-title">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <h2 id="ch-title" className="m-0 font-display text-[22px] font-bold">Challenges</h2>
+                <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>The same race for everyone, with a leaderboard. Race the leader's ghost to find the time.</p>
+              </div>
+              {canSet && !setting && <Btn onClick={() => setSetting(true)}>Set a challenge</Btn>}
+            </div>
+            {setting && canSet && onCreateChallenge && <SetChallenge canEveryone={canSet.everyone} onCreate={onCreateChallenge} onDone={() => setSetting(false)} />}
+            {challenges.length === 0 && !setting && <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>No challenges yet. Set the first one from the race you've set up above.</p>}
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
+              {challenges.slice(0, 6).map(c => (
+                <button key={c.id} type="button" onClick={() => onChallenge?.(c)} className="flex cursor-pointer flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 text-left hover:bg-white/[0.05]">
+                  <div className="flex items-center gap-2">
+                    <Cap>{c.club_id ? 'Club challenge' : 'Open challenge'}</Cap>
+                    <Chip tone={isOpen(c) ? 'blue' : 'plain'} className="ml-auto">{closesText(c)}</Chip>
+                  </div>
+                  <p className="m-0 text-[16px] font-semibold text-[#F1F4FA]">{c.title}</p>
+                  <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{challengeLine(c)}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="flex flex-col gap-3.5" aria-labelledby="train-title">
           <div>

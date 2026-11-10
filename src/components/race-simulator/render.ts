@@ -31,6 +31,8 @@ export interface ViewOptions {
   overlays?: WorldOverlay[];
   /** Label other boats by name ("Orange") as well as sail number, as in a lesson. */
   names?: boolean;
+  /** A ghost to race: another member's boat from their own race, drawn faint (no one hits her). */
+  ghost?: { b: Boat; label: string } | null;
 }
 
 const TONE = { blue: ['rgba(77,163,255,0.85)', 'rgba(77,163,255,0.10)', '#9CCBFF'], orange: ['rgba(255,159,67,0.85)', 'rgba(255,159,67,0.10)', '#FFCB96'], green: ['rgba(52,211,153,0.85)', 'rgba(52,211,153,0.10)', '#A7F3D0'] } as const;
@@ -327,6 +329,14 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
 
   // ── Boats ──
   const Lpx = Math.max(18, L * s);
+  // The ghost first, under everyone.
+  if (v.ghost && !back) {
+    const g = v.ghost.b, gx = X(g.x), gy = Y(g.y);
+    if (gx > -60 && gx < w + 60 && gy > -60 && gy < h + 60) {
+      drawBoat(ctx, gx, gy, g.hdg, n180(g.twd - g.hdg), g.sheet, Lpx, '#E8F1FF', false, false, 0.38);
+      label(ctx, v.ghost.label, gx + Lpx * 0.75 + 8, gy - Lpx * 0.4, 'rgba(232,241,255,0.7)', 11.5, 'left', 600);
+    }
+  }
   const order = race.boats.map((_, i) => i).sort((a, bb) => (race.boats[a].isPlayer ? 1 : 0) - (race.boats[bb].isPlayer ? 1 : 0));
   for (const i of order) {
     const b = race.boats[i];

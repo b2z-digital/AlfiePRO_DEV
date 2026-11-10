@@ -31,4 +31,16 @@ describe('Sailing as yourself', () => {
     expect(a.boats.map(x => x.sail)).toEqual(b.boats.map(x => x.sail));
     expect(a.player!.sail).toBe('01');
   });
+
+  it("sails the same race whatever your number, so a challenge is fair", () => {
+    const plain = new Race(base);
+    const taken = plain.boats[3].sail; // a number an AI boat draws
+    const mine = new Race({ ...base, player: { name: 'Sam Skipper', sail: taken } });
+    expect(mine.player!.sail).toBe(taken);
+    expect(mine.boats[3].sail).toBe('01');
+    // Everything else is the same: where every boat starts, and how.
+    expect(mine.boats.map(b => `${b.x},${b.y},${b.hdg},${b.persona?.key ?? ''}`)).toEqual(plain.boats.map(b => `${b.x},${b.y},${b.hdg},${b.persona?.key ?? ''}`));
+    for (let k = 0; k < 400; k++) { plain.step(); mine.step(); }
+    expect(mine.boats.map(b => b.x.toFixed(6)).join()).toBe(plain.boats.map(b => b.x.toFixed(6)).join());
+  });
 });

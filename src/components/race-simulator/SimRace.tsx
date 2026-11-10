@@ -58,6 +58,8 @@ export interface SimRaceProps {
   onDebrief?: (race: Race, sum: RaceSummary, moments: Moment[]) => void;
   /** Sail a race again from its log up to a step, then take over from there. */
   resume?: { log: RaceLog; step: number };
+  /** Race another member's ghost: their race sails again alongside yours, and their boat is drawn faint in yours. */
+  ghost?: { log: RaceLog; settings: RaceSettings; label: string };
   onAgain: () => void;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
@@ -107,7 +109,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -122,6 +124,13 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (resume) r.followLog(resume.log, resume.step);
     return r;
   }, [built, settings, resume]);
+  // The ghost's own race, a step behind nobody: it steps with yours.
+  const ghostRace = useMemo(() => {
+    if (!ghost) return null;
+    const g = new Race(ghost.settings);
+    g.followLog(ghost.log);
+    return g;
+  }, [ghost]);
   // While it catches up, how far it has to go; then a word before you take the helm.
   const [catchUp, setCatchUp] = useState<{ to: number; at: number } | null>(() => (resume ? { to: resume.step, at: 0 } : null));
   const [tookOver, setTookOver] = useState<number | null>(null);
@@ -325,6 +334,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         const until = performance.now() + 22;
         while (race.replaying && performance.now() < until) {
           race.step();
+          if (ghostRace && !ghostRace.ended) ghostRace.step();
           if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
         }
         st.evIdx = race.events.length;
@@ -337,6 +347,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         while (acc >= DT && n < 10) {
           race.input = { rudder: ctl.rudder, sheet: ctl.sheet, autoTrim: race.settings.autoTrim, penaltyAssist: st.penaltyAssist };
           race.step();
+          if (ghostRace && !ghostRace.ended) ghostRace.step();
           handleEvents();
           if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
           acc -= DT; n++;
@@ -421,6 +432,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             next: nx ? { x: nx.x, y: nx.y, name: nx.name } : null,
             showZones: T <= 0 && !!nx?.isMark, preStart: T > 0, flashes, overlays, names: !!scene,
             back: st.replay ? Math.round(st.replay.back) : 0,
+            ghost: ghostRace?.player ? { race: ghostRace, b: ghostRace.player, label: ghost!.label } : null,
           });
         } else {
           drawRace(ctx, race, {
@@ -431,6 +443,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             flashes, preStart: T > 0,
             next: nx ? { x: nx.x, y: nx.y, name: nx.name, upwind: nx.upwind } : null,
             overlays, names: !!scene,
+            ghost: ghostRace?.player ? { b: ghostRace.player, label: ghost!.label } : null,
           });
         }
       }
@@ -460,7 +473,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume]);
 
   // ── Canvas size ──
   useEffect(() => {
