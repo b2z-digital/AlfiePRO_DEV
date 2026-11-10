@@ -47,6 +47,7 @@ import { handicapForRace } from '../utils/raceProgress';
 import { StartBoxModal } from './start-box/StartBoxModal';
 import { AAvatar } from './alfie/Kit';
 import { ScoringTopBar } from './scoring/ScoringTopBar';
+import ScoringLink from './tracking/ScoringLink';
 import { LiveStatusControl } from './LiveStatusControl';
 import { ScoringOnAir } from './livestream/ScoringOnAir';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -1814,6 +1815,39 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
     }
   };
 
+  // Finish order from Live Tracking: the same edit as entering each finish by hand, folded over
+  // the order in one go (so the race completes and saves exactly as it would from the screen).
+  const applyTrackedResults = (race: number, entries: { skipperIndex: number; position: number | null; letterScore?: LetterScore }[]) => {
+    if (!entries.length) return;
+    let ctx = { skippers, raceResults, raceType, isManualHandicaps, hasDeterminedInitialHcaps, lastCompletedRace, currentNumRaces, scoringMode };
+    let completed: { highestConsecutiveRace: number } | undefined;
+    let memberRace: number | undefined;
+    for (const e of entries) {
+      const edit = editRaceResultIn(ctx, race, e.skipperIndex, e.position, e.letterScore);
+      ctx = {
+        ...ctx, raceResults: edit.raceResults,
+        ...(edit.skippers ? { skippers: edit.skippers } : {}),
+        ...(edit.isManualHandicaps !== undefined ? { isManualHandicaps: edit.isManualHandicaps } : {}),
+        ...(edit.hasDeterminedInitialHcaps !== undefined ? { hasDeterminedInitialHcaps: edit.hasDeterminedInitialHcaps } : {}),
+        ...(edit.lastCompletedRace !== undefined ? { lastCompletedRace: edit.lastCompletedRace } : {}),
+      };
+      if (edit.raceCompleted) completed = edit.raceCompleted;
+      if (edit.memberHandicapRace !== undefined) memberRace = edit.memberHandicapRace;
+      if (e.position !== null) collaborativeScoring.recordScoringChange(race, e.skipperIndex, 'position', e.position);
+      if (e.letterScore) collaborativeScoring.recordScoringChange(race, e.skipperIndex, 'letterScore', e.letterScore);
+    }
+    if (ctx.skippers !== skippers) setSkippers(ctx.skippers);
+    if (ctx.isManualHandicaps !== isManualHandicaps) setIsManualHandicaps(ctx.isManualHandicaps);
+    if (ctx.hasDeterminedInitialHcaps !== hasDeterminedInitialHcaps) setHasDeterminedInitialHcaps(ctx.hasDeterminedInitialHcaps);
+    if (ctx.lastCompletedRace !== lastCompletedRace) setLastCompletedRace(ctx.lastCompletedRace);
+    setRaceResults(ctx.raceResults);
+    if (completed) {
+      setEditingRace(null);
+      if (memberRace !== undefined) updateMemberHandicaps(memberRace, ctx.raceResults);
+      autoSaveRaceResults(ctx.raceResults, completed.highestConsecutiveRace);
+    }
+  };
+
   // Auto-save race results to database for live tracking
   const autoSaveRaceResults = async (results: any[], lastCompletedRaceOverride?: number) => {
     try {
@@ -3346,6 +3380,19 @@ export const YachtRaceManager: React.FC<YachtRaceManagerProps> = ({
                   ? (getCurrentEvent()?.multiDay && getCurrentEvent()?.numberOfDays && currentDay < (getCurrentEvent()?.numberOfDays || 0) ? `Complete day ${currentDay}` : 'Complete scoring')
                   : null}
                 onComplete={() => setShowCompleteConfirm(true)}
+                trailing={
+                  <ScoringLink
+                    clubId={getCurrentEvent()?.clubId}
+                    eventId={getCurrentEvent()?.id}
+                    eventName={getCurrentEvent()?.eventName ?? 'Race'}
+                    raceNo={stepperRace}
+                    skippers={skippers}
+                    scored={raceResults.filter(r => r.race === stepperRace && (r.position !== null || r.letterScore)).map(r => r.skipperIndex)}
+                    onApply={applyTrackedResults}
+                    startBoxKey={showStartBoxModal ? 1 : 0}
+                    darkMode={darkMode}
+                  />
+                }
               />
               {!isFullscreenScoring && (
                 <div className="a-dim flex flex-wrap items-center gap-3.5 text-[12.5px] mt-4 px-1.5">

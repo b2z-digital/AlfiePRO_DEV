@@ -100,6 +100,8 @@ const EmailStudio = React.lazy(() => import('./email-studio/EmailStudio'));
 const SiteBuilder = React.lazy(() => import('./site-builder/SiteBuilder'));
 import LivestreamPage from '../pages/LivestreamPage';
 import RaceSimulatorPage from './race-simulator/RaceSimulatorPage';
+import TrackingPage from './tracking/TrackingPage';
+import { useClubTracking } from './tracking/data';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
 import AskAlfieManagementPage from '../pages/AskAlfieManagementPage';
 import HelpSupportPage from './help-support/HelpSupportPage';
@@ -228,6 +230,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   // The Race Simulator: for super admins, and for clubs it's been switched on for in Feature Access.
   // (An unknown feature counts as on, so it needs its flag to exist before anyone else sees it.)
   const simulatorOn = isSuperAdmin || !!featureFlags.find(f => f.feature_key === 'race_simulator')?.is_enabled;
+  // Live Tracking: only at a club whose tracking system is set up and switched on (super admins can
+  // open the demo anywhere). Nothing about tracking shows otherwise.
+  const clubTracking = useClubTracking(currentClub?.clubId);
+  const trackingOn = clubTracking.on;
   const { canView: canViewFeature } = useCapabilities();
   const { isImpersonating, session: impersonationSession } = useImpersonation();
   const effectiveUserId = isImpersonating ? impersonationSession?.targetUserId : user?.id;
@@ -1095,6 +1101,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
           icon: Rocket,
           description: 'Race AI skippers on your club\'s water, with Alfie coaching',
           path: '/race-simulator'
+        }] : []),
+        ...(trackingOn || isSuperAdmin ? [{
+          id: 'live-tracking',
+          label: 'Live Tracking',
+          icon: Radio,
+          description: 'Every boat on the water: live races, replays and scoring from tracking',
+          path: '/live-tracking'
         }] : []),
         ...(isSuperAdmin ? [{
           id: 'uwb-tracking',
@@ -2181,6 +2194,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
               {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
+              {(trackingOn || isSuperAdmin) && <Route path="/live-tracking" element={<TrackingPage account={{ userId: user?.id ?? null, clubId: currentClub?.clubId ?? null, superAdmin: isSuperAdmin }} tracking={clubTracking.tracking} onTrackingChanged={clubTracking.reload} />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
               <Route path="/settings" element={<SettingsPage darkMode={darkMode} />} />
               <Route path="/settings/race-documents/form-builder" element={
