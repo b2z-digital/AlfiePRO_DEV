@@ -103,6 +103,8 @@ export interface Pose {
   boom: number; jib: number;
   /** How much the sails are luffing, 0 (full) to 1 (flogging). */
   luff: number;
+  /** Running pressed: 0 level, 1 the bow buried (white water over it). */
+  dive?: number;
   color: string; tape: string; ink: string; deck: string;
   sail: string; country: string;
   spd: number; hullSpeed: number;
@@ -159,7 +161,8 @@ export function sailSet(twa: number, sheet: number, tws: number, disabled: boole
 export function onWaves(p: Pose, sea: Sea | null, t: number): Pose {
   if (!sea) return p;
   const m = hullMotion(sea, p.x, p.y, t, p.hdg, p.spd, (MODELS[p.cls] ?? MODELS.IOM).L);
-  return { ...p, heave: m.heave, pitch: m.pitch, heel: p.heel + m.roll };
+  // (On top of any trim she already has: bow down in a dive.)
+  return { ...p, heave: p.heave + m.heave, pitch: p.pitch + m.pitch, heel: p.heel + m.roll };
 }
 
 class Geo {

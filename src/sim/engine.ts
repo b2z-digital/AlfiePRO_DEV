@@ -663,7 +663,17 @@ export class Race implements AiHost {
       const leg = c.legs[b.legIndex];
       if (!leg) return;
       if (leg.kind === 'finish') {
+        // Back wholly on the course side after crossing with a penalty owed: she may finish again.
+        if (b.reFinish && Math.max(lineSide(c, nowBow), lineSide(c, stern(b))) < 0) b.reFinish = false;
         if (segIntersect(prevBow, nowBow, c.finish.pin, c.finish.stbd) >= 0 && lineSide(c, nowBow) > 0 && lineSide(c, prevBow) <= 0) {
+          // A boat can't finish with a penalty hanging over her: she takes her turn, gets her hull
+          // wholly back on the course side of the line, and then finishes (RRS 44.2). (A skipper
+          // who has forgotten her penalty sails on through, to be disqualified if she's protested.)
+          if ((b.penalty.owed > 0 && !this.forgot.has(b.id)) || b.reFinish) {
+            if (!b.reFinish) this.events.push({ type: 'no-finish', t, boat: b.id });
+            b.reFinish = true;
+            return;
+          }
           b.finished = true;
           b.finishTime = t - this.gunT;
           const place = this.boats.filter(o => o.finished).length;

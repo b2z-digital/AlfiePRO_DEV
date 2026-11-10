@@ -193,6 +193,9 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
   if (p.finished) return cue('Finish', 'Finished. Your boat sails clear of the line, out of the way of boats still racing. Watch the rest come in.');
 
   // ── Penalty owed ──
+  const finishing = c.legs[p.legIndex]?.kind === 'finish';
+  if (p.penalty.owed > 0 && finishing) return cue('Rules', `You can't finish with a penalty outstanding. Take your One-Turn Penalty now (one tack and one gybe), ${p.reFinish ? 'get your hull right back behind the line' : 'clear of other boats'}, then finish (Rule 44.2).`, 'warn');
+  if (p.reFinish) return cue('Finish', 'Penalty done. Get your whole hull back behind the finishing line, then cross it to finish (Rule 44.2).', 'warn');
   if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn');
 
   const leg = c.legs[p.legIndex];

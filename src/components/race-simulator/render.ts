@@ -11,7 +11,7 @@ import { hullGap } from '@/sim/physics';
 import { drawVenueLand, waterPath } from './venueMap';
 import { drawCredit } from './bankVenue';
 import { ALFIE, YOU_INTRO, alfieCallout } from './bank';
-import { mapAt, tex } from './bankWater';
+import { mapAt, tex, rippleDrift } from './bankWater';
 import { puffLife } from '@/sim/wind';
 
 export interface Camera { x: number; y: number; scale: number } // world metres at screen centre, px per metre
@@ -77,9 +77,11 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   const tm = Math.max(0.02, Math.min(0.25, 0.8 / s));
   const kn = tws / 0.514444;
   const detail = v.detail ?? 2;
+  // Where the ripples have drifted to (added up frame by frame, so they only ever drift downwind).
+  const drift = rippleDrift(race, { x: cam.x, y: cam.y });
   const wind = detail >= 1 ? tex(ctx, 'wind') : null;
   if (wind) {
-    mapAt(wind, flat, { x: cam.x, y: cam.y }, acrossW, wd, tm, (t * (0.12 + 0.02 * kn)) / tm);
+    mapAt(wind, flat, { x: cam.x, y: cam.y }, acrossW, wd, tm, 0, drift.O);
     ctx.globalAlpha = 0.25 + 0.45 * Math.min(1, kn / 13);
     ctx.fillStyle = wind; ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
@@ -103,7 +105,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.beginPath(); ctx.arc(0, 0, r * 1.08, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     if (p.strength > 0 && gust && r > 6) {
-      mapAt(gust, flat, { x: p.x, y: p.y }, acrossW, wd, tm, (t * (0.15 + 0.025 * kn)) / tm);
+      mapAt(gust, flat, { x: p.x, y: p.y }, acrossW, wd, tm, 0, drift.O);
       ctx.fillStyle = gust;
       for (const [k, al] of [[0.95, 0.35], [0.7, 0.4]] as const) {
         ctx.globalAlpha = al * a;
@@ -120,7 +122,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   const seg = Math.min(14, 0.55 * L * s);
   const rv = Math.hypot(w, h) / 2 / s + G;
   const ca = cam.x * wd.x + cam.y * wd.y, cc = cam.x * across.x + cam.y * across.y;
-  const flow = t * Math.max(0.25, tws * 0.12) / G;
+  const flow = drift.dist / G;
   ctx.lineWidth = 1.2;
   ctx.lineCap = 'round';
   for (const pass of [0, 1]) {

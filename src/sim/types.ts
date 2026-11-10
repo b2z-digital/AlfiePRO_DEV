@@ -130,6 +130,8 @@ export interface Boat {
   lastBearing2: number;
   finished: boolean;
   finishTime: number;
+  /** Crossed the finishing line owing a penalty: she must get her hull wholly back on the course side before she can finish (RRS 44.2). */
+  reFinish?: boolean;
   dsq: boolean;
   retired: boolean;
   /** Lost control and drifting (Appendix E: unable to continue in the heat). Others must avoid her (Rule 22). */
@@ -171,6 +173,7 @@ export type SimEvent =
   | { type: 'penalty-done'; t: number; boat: string }
   | { type: 'rounded'; t: number; boat: string; leg: number; place: number }
   | { type: 'finish'; t: number; boat: string; place: number }
+  | { type: 'no-finish'; t: number; boat: string }   // crossed the finishing line owing a penalty: not finished
   | { type: 'hail'; t: number; boat: string; text: string }
   | { type: 'started'; t: number; boat: string; late: number }
   | { type: 'bank'; t: number; boat: string }

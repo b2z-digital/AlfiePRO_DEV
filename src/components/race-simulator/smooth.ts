@@ -8,7 +8,7 @@ import type { Race } from '@/sim/engine';
 import { DT } from '@/sim/physics';
 import type { Boat } from '@/sim/types';
 
-const LINEAR = ['x', 'y', 'spd', 'heel', 'sheet', 'tws', 'pitch', 'luffUp'] as const;
+const LINEAR = ['x', 'y', 'spd', 'heel', 'sheet', 'tws', 'pitch', 'dive', 'luffUp'] as const;
 const ANGLES = ['hdg', 'twd'] as const;
 type Key = (typeof LINEAR)[number] | (typeof ANGLES)[number];
 type Snap = Record<Key, number>;

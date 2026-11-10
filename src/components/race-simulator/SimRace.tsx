@@ -298,6 +298,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         case 'incident': onIncident(e.incident); break;
         case 'penalty-done': if (p && e.boat === p.id) toast('Penalty done. Back to racing.', 'good'); break;
         case 'rounded': if (p && e.boat === p.id) toast(`${legLabel(race, e.leg)} done · ${ordinal(e.place)}`); break;
+        case 'no-finish': if (p && e.boat === p.id) { toast("Not finished: you owe a penalty. Take your turn, get right back behind the line, then finish.", 'warn'); audio.say("Not finished. Take your penalty turn first.", true); } break;
         case 'finish': if (p && e.boat === p.id) { toast(`Finished ${ordinal(e.place)}`, 'good'); audio.beep(1200, 300); R.current.playerDoneAt = race.t; } break;
         case 'started': if (p && e.boat === p.id) toast(e.late < 0.3 ? 'Started right on the gun' : `Started ${e.late.toFixed(1)} s after the gun`, e.late < 2 ? 'good' : 'plain'); break;
         default: break;
