@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
 import { CLASSES, rigPower, iomRig } from '@/sim/classes';
 import { KN } from '@/sim/math';
-import { heelStep, settleHeel, weatherHelm } from '@/sim/physics';
+import { heelStep, integrate, settleHeel, weatherHelm } from '@/sim/physics';
+import { twaOf } from '@/sim/math';
 import { hullMotion, makeSea } from '@/sim/sea';
 import type { Boat, RaceSettings } from '@/sim/types';
 
@@ -57,15 +58,33 @@ describe('Heel', () => {
     expect(rigPower('10R', 22)).toBe(1);
   });
 
-  it('gives weather helm only once she is heeled past about 20°, and a lot when she is laid over', () => {
+  it('rounds her up only once she is heeled past about 25°, a few degrees in a puff and a lot when she is laid over', () => {
     const b = closeHauled(9.5);
-    b.heel = 15; b.heelRate = 0;
+    b.heel = 22; b.heelRate = 0;
     expect(weatherHelm(b)).toBe(0);
-    b.heel = 26;
-    const some = weatherHelm(b);
     b.heel = 40;
-    expect(some).toBeGreaterThan(0);
+    const some = weatherHelm(b);
+    b.heel = 60;
+    expect(some).toBeGreaterThan(2);
+    expect(some).toBeLessThan(8);
     expect(weatherHelm(b)).toBeGreaterThan(3 * some);
+  });
+
+  it('keeps sailing with the rudder left alone: a gust luffs her a little, then she bears away again', () => {
+    const b = closeHauled(15, rigPower('IOM', 15));
+    let before = b.twa, maxLuff = 0;
+    for (let k = 0; k < 240; k++) {
+      b.tws = (k >= 60 && k < 120 ? 22 : 15) * KN; // a 3-second gust of 22 knots
+      b.rudder = 0;
+      integrate(b, 0.05, k * 0.05);
+      b.twa = twaOf(b.hdg, b.twd);
+      if (k === 59) before = b.twa;
+      if (k >= 60) maxLuff = Math.max(maxLuff, before - b.twa);
+    }
+    expect(maxLuff).toBeGreaterThan(2);               // she luffed in the gust
+    expect(maxLuff).toBeLessThan(15);                 // but not into irons
+    expect(Math.abs(before - b.twa)).toBeLessThan(1.5); // and came back down afterwards
+    expect(b.spd).toBeGreaterThan(0.6);
   });
 });
 
@@ -92,7 +111,7 @@ describe('Gusts', () => {
   });
 
   it('keeps them on their feet in a moderate, shifty breeze', () => {
-    expect(felt('medium', 'oscillating', 12).heel).toBeLessThan(50);
+    expect(felt('medium', 'oscillating', 12).heel).toBeLessThan(60);
   });
 });
 

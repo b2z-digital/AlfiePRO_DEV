@@ -164,7 +164,7 @@ export class Race implements AiHost {
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
         id: `b${i}`, sail, name: isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
-        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN),
+        x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN),
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
         started: false, ocs: false, returning: false, legIndex: 0, progress: 0, progress2: 0, lastBearing: 0, lastBearing2: 0,

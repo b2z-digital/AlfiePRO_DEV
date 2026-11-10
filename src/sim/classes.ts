@@ -61,9 +61,11 @@ export function heelForce(absTwa: number, sheet: number, tws: number): number {
   if (a < ng - 4) return 0.05;
   const point = a <= 45 ? 1 : a <= 80 ? 1 + 0.15 * ((a - 45) / 35) : a <= 110 ? 1.15 - 0.25 * ((a - 80) / 30) : 0.12 + 0.78 * Math.cos(((a - 110) / 70) * (Math.PI / 2));
   const fill = clamp((a - (ng - 4)) / 10, 0, 1);
+  // Pinching above her best close-hauled angle the sails start to lift and lose their power.
+  const luff = 1 - 0.6 * clamp((upAngle(tws) - a) / 18, 0, 1);
   const e = sheet - bestSheet(a);
   const trim = e < 0 ? Math.max(0.08, 1 + 2.6 * e) : 1 + Math.min(0.35, e * (a > 70 ? 1.6 : 0.5));
-  return Math.max(0.05, point * fill * trim);
+  return Math.max(0.05, point * fill * luff * trim);
 }
 
 /**
@@ -90,7 +92,8 @@ function angleFactor(a: number, tws: number): number {
   const kn = tws / KN;
   const up = upAngle(tws), ng = up - 18;
   if (a < ng) return 0;
-  if (a < up) return 0.78 * Math.pow((a - ng) / (up - ng), 1.4);
+  // Pinching: she slows steadily as she points above her best angle, to nothing head to wind.
+  if (a < up) return 0.78 * ((a - ng) / (up - ng));
   if (a < 95) return 0.78 + 0.22 * Math.sin(((a - up) / (95 - up)) * Math.PI / 2);
   if (a < 140) return 1 - 0.12 * Math.pow((a - 95) / 45, 1.5);
   const drop = 0.16 - 0.1 * clamp((kn - 4) / 10, 0, 1);

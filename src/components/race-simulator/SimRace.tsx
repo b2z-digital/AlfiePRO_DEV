@@ -438,14 +438,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         }
         const k1 = Math.min(1, dtReal * 2.6), k2 = Math.min(1, dtReal * 4);
         cam.x += (tgt.x - cam.x) * k1; cam.y += (tgt.y - cam.y) * k1; cam.scale += (tgt.scale - cam.scale) * k2;
-        // From the bank: walk the control area with her and turn to keep her in view, glancing
-        // towards the next mark (or the line before the start). Holding M looks straight at the mark.
+        // From the bank: stand in the control area and watch her sail across your view, turning to
+        // keep her in it. Holding M looks straight at the next mark (or the line before the start).
         if (st.view === 'bank') {
           const c = race.course;
           const nx = nextTarget(race, p);
           const look = !p.started ? { x: (c.start.pin.x + c.start.stbd.x) / 2, y: (c.start.pin.y + c.start.stbd.y) / 2 } : nx ? { x: nx.x, y: nx.y } : null;
-          const aim = st.glance && look ? look : { x: px, y: py };
-          followCam(bcam, race, aim, dtReal, st.zoom, st.glance ? null : look, size.w);
+          const glance = !!(st.glance && look);
+          followCam(bcam, race, glance && look ? look : { x: px, y: py }, dtReal, st.zoom, glance);
         }
       }
       // Draw.

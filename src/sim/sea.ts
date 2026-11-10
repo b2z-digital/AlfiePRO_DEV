@@ -126,10 +126,11 @@ export function hullMotion(sea: Sea, x: number, y: number, t: number, hdg: numbe
     const au = Math.abs(u);
     const sinc = au < 1e-4 ? 1 : Math.sin(u) / u;
     const tilt = au < 1e-4 ? (2 * u) / L : (6 / L) * ((Math.sin(u) - u * Math.cos(u)) / (u * u));
-    // A heavy bulb deep under her and a fine hull: slow to pitch and heave, and well damped.
-    const h = respond(enc, 0.6, 0.75), p = respond(enc, 0.9, 0.75), rl = respond(enc, 1.1, 0.35);
+    // A light, fine hull on a heavy bulb: she answers each wave quickly and well damped, so her bow
+    // lifts as a wave's face reaches her (only a little behind it) and the motion stays gentle.
+    const h = respond(enc, 0.45, 0.6), p = respond(enc, 0.55, 0.5), rl = respond(enc, 1.1, 0.35);
     heave += h.g * w.amp * sinc * Math.sin(ph + dirn * h.lag);
-    pitch += p.g * w.amp * tilt * Math.cos(ph + dirn * p.lag);
+    pitch += 0.72 * p.g * w.amp * tilt * Math.cos(ph + dirn * p.lag);
     // Across her the waves tip her; the heavy bulb answers slowly.
     roll -= 0.5 * rl.g * w.amp * w.k * s * Math.cos(ph + dirn * rl.lag);
   }
@@ -143,17 +144,25 @@ export interface WaveEffect {
   yaw: number;
 }
 
-/** What the waves do to a boat at this moment, for her heading relative to where the waves come from. */
-export function waveEffect(sea: Sea, x: number, y: number, t: number, hdg: number): WaveEffect {
+/**
+ * What the waves do to a boat at this moment, for her heading relative to where the waves come from
+ * (`L` is her length: her bow meets each wave first).
+ */
+export function waveEffect(sea: Sea, x: number, y: number, t: number, hdg: number, L = 1): WaveEffect {
   const main = sea.trains[0], second = sea.trains[1];
   const ph = phaseOf(main, x, y, t);
   const ph2 = second ? phaseOf(second, x, y, t) : ph * 0.61;
   const k = sea.height / 0.1;                        // about 1 in rough water
   const into = Math.cos((hdg - sea.from) * DEG);     // 1 = heading straight into the waves
   const beam = Math.abs(Math.sin((hdg - sea.from) * DEG));
-  const lift = (1 + Math.sin(ph)) / 2;               // 0 in a trough, 1 on a crest
-  // Punching into waves: speed lost slamming, more as the bow climbs each crest.
-  const slam = into > 0 ? 0.13 * k * Math.pow(into, 1.5) * (0.55 + 0.45 * lift) : 0;
+  // Punching into waves: the bow climbing each wave's face (its downwind side, the dark band) knocks
+  // her speed back, far more pointing straight into it than footing across it, and she picks up
+  // again sliding down its back. So in a seaway it pays to bear away a touch as each face reaches
+  // the bow and come up again over the top: that's finding the groove.
+  const f = dir(hdg);
+  const phBow = phaseOf(main, x + f.x * L * 0.5, y + f.y * L * 0.5, t);
+  const face = Math.max(0, -Math.cos(phBow)), back = Math.max(0, Math.cos(phBow));
+  const slam = into > 0 ? k * (0.045 * into * into + 0.8 * Math.pow(into, 4) * face - 0.06 * into * back) : 0;
   // Running in a breeze: a lift on the face of each wave, surfing.
   const surf = into < -0.3 ? 0.12 * k * (-into) * Math.max(0, Math.sin(ph + 0.6)) : 0;
   // The bow is knocked about, most in a beam sea.
