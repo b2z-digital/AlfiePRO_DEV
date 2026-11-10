@@ -169,7 +169,12 @@ export class Skipper implements Helm {
     const canTurn = h.t >= h.gunT - 0.001 || h.gunT - h.t > 14;
     const L0 = b.cls.loa;
     const clearOfMarks = h.course.marks.every(m => dist(m.p, b) > 2.2 * L0);
-    const ok = owes && canTurn && clearOfMarks && (b.penalty.active ? !this.trafficNear(h, 2 * L0, 3) : this.clearOfOthers(h, 4) && !this.trafficNear(h, 2.5 * L0, 5));
+    // At a real venue she sails clear of the bank before she starts turning: a turn begun against
+    // it gets stuck between turning and keeping off.
+    const clearOfBank = () => !h.course.shore || [0, 60, 120, 180, 240, 300].every(a => bankAhead(b, h.course, b.hdg + a) > 2.2 * L0);
+    // Well into her turn she carries on unless someone is about to hit her.
+    const turning = b.penalty.active && Math.abs(b.penalty.rot) > 60;
+    const ok = owes && canTurn && clearOfMarks && (turning ? !this.trafficNear(h, 2 * L0, 3) : this.clearOfOthers(h, 4) && !this.trafficNear(h, 2.5 * L0, 5) && clearOfBank());
     if (ok) { plan = this.penaltyPlan(h); this.maneuver = null; }
     else if (man) plan = man;
     else if (r2t) plan = r2t;

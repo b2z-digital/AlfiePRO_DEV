@@ -81,6 +81,7 @@ export interface Boat {
   sheet: number;         // 0..1, 1 = fully sheeted in
   heel: number;          // deg, + = heeled to port (the starboard-tack lean)
   heelRate: number;      // deg/s
+  luffUp: number;        // deg a gust has rounded her up (weather helm), easing back as she comes upright
   rigPower: number;      // the rig's heeling power, 1 = the class's A rig
 
   // wind at the boat this step (after shadows)

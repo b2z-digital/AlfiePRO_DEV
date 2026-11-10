@@ -322,27 +322,66 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     return w === 'low' ? g.w(s.fx * L, side * s.lowHw, s.lowZ) : w === 'mb' ? g.w(s.fx * L, side * s.mbHw, s.mbZ) : g.w(s.fx * L, side * s.deHw, s.deZ);
   });
   const crown = idx.map(i => g.w(st[i].fx * L, 0, st[i].crownZ));
+  // Her canoe body under the waterline: deepest a little forward of amidships, rising to the stem and
+  // the transom. When she heels or pitches, the part that lifts out of the water shows (her windward
+  // bilge, her forefoot as she rides a wave); the water hides whatever is below its surface.
+  const D = 0.056 * L;
+  const drop = (fx: number) => D * Math.pow(Math.max(0, Math.sin(Math.PI * Math.min(1, (0.5 - fx) / 0.95))), 0.75);
+  const under = (side: number, w: 'bilge' | 'keel') => idx.map(i => {
+    const s = st[i], dz = drop(s.fx);
+    return w === 'bilge' ? g.w(s.fx * L, side * s.lowHw * 0.8, s.lowZ - dz * 0.55) : g.w(s.fx * L, side * s.lowHw * 0.16, s.lowZ - dz);
+  });
+  // The water's surface round her: she rides up and down with it, and along her length it slopes
+  // with the wave she's riding (so pitching doesn't bury her stern), but it stays level across her,
+  // so heeling lifts her windward side out.
+  const tp = Math.tan(p.pitch * DEG), fw = { x: Math.sin(p.hdg * DEG), y: Math.cos(p.hdg * DEG) };
+  const above = (q: V3) => q[2] - p.heave - ((q[0] - p.x) * fw.x + (q[1] - p.y) * fw.y) * tp;
+  const wet = (pts: V3[]): V3[] => {
+    const out: V3[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length], sa = above(a), sb = above(b);
+      if (sa >= 0) out.push(a);
+      if ((sa >= 0) !== (sb >= 0)) { const k = sa / (sa - sb); out.push([a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]); }
+    }
+    return out;
+  };
   const ctr = g.w(0, 0, st[ns >> 1].deZ * 0.5);
   const faces: { d: number; pts: V3[]; color: string }[] = [];
   const face = (pts: V3[], color: string, isDeck: boolean) => {
-    let nrm = norm(cross(sub(pts[1], pts[0]), sub(pts[pts.length - 1], pts[0])));
+    // Newell's normal: right for twisted quads too (the flared topsides by the transom are).
+    let nx = 0, ny = 0, nz = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      nx += (a[1] - b[1]) * (a[2] + b[2]); ny += (a[2] - b[2]) * (a[0] + b[0]); nz += (a[0] - b[0]) * (a[1] + b[1]);
+    }
+    let nrm = norm([nx, ny, nz]);
     const cen: V3 = [0, 0, 0];
     for (const q of pts) { cen[0] += q[0] / pts.length; cen[1] += q[1] / pts.length; cen[2] += q[2] / pts.length; }
     if (dot(nrm, sub(cen, ctr)) < 0) nrm = [-nrm[0], -nrm[1], -nrm[2]];
     // The hull is convex: a face turned away from you is hidden, so it's never drawn (sorting the
     // far side against the near one by depth can flicker as she pitches).
     if (dot(nrm, sub(o.cam, cen)) < 0) return;
+    // Only what's above the water.
+    const vis = wet(pts);
+    if (vis.length < 3) return;
     const lit = (isDeck ? 0.78 : 0.6) + (isDeck ? 0.22 : 0.4) * Math.max(0, dot(nrm, SUN));
     const d = o.P(cen[0], cen[1], cen[2]).z;
-    faces.push({ d, pts, color: shade(color, lit) });
+    faces.push({ d, pts: vis, color: shade(color, lit) });
   };
   for (const side of [1, -1]) {
     const lo = ring(side, 'low'), mb = ring(side, 'mb'), de = ring(side, 'de');
+    const bi = under(side, 'bilge'), ke = under(side, 'keel');
     for (let k = 0; k < idx.length - 1; k++) {
+      face([ke[k], ke[k + 1], bi[k + 1], bi[k]], p.color, false);
+      face([bi[k], bi[k + 1], lo[k + 1], lo[k]], p.color, false);
       face([lo[k], lo[k + 1], mb[k + 1], mb[k]], p.color, false);
       face([mb[k], mb[k + 1], de[k + 1], de[k]], p.color, false);
       face([de[k], de[k + 1], crown[k + 1], crown[k]], p.deck, true);
     }
+  }
+  {
+    const kp = under(1, 'keel'), km = under(-1, 'keel');
+    for (let k = 0; k < idx.length - 1; k++) face([km[k], km[k + 1], kp[k + 1], kp[k]], p.color, false);
   }
   {
     const t = idx.length - 1;
@@ -355,10 +394,13 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     ctx.fillStyle = fc.color; ctx.strokeStyle = fc.color; ctx.lineWidth = 0.6;
     poly(ctx, pts); ctx.fill(); ctx.stroke();
   }
+  // Hatch covers (only when you can see her deck) and the bow bumper (only from ahead of her stem).
+  const o0 = g.w(0, 0, 0), upV = sub(g.w(0, 0, 1), o0), fwdV = sub(g.w(1, 0, 0), o0);
   if (size > 30) {
-    // Hatch covers and the bow bumper.
     ctx.fillStyle = 'rgba(38,44,54,0.88)';
     for (const [hx, hl, hw] of m.hatches) {
+      const hc = g.w(hx * L, 0, deckAt(m, hx));
+      if (dot(upV, sub(o.cam, hc)) <= 0 || above(hc) < 0) continue;
       let zc = deckAt(m, hx), hb = half;
       for (let k = 0; k < ns - 1; k++) if (st[k].fx >= hx && hx >= st[k + 1].fx) { const u = (st[k].fx - hx) / (st[k].fx - st[k + 1].fx); hb = st[k].deHw + (st[k + 1].deHw - st[k].deHw) * u; break; }
       const sag = 0.25 * (st[ns >> 1].crownZ - st[ns >> 1].deZ);
@@ -373,9 +415,12 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       zc = 0;
     }
     const s0 = st[0], s1 = st[1];
-    const bump = [g.w(s0.fx * L, 0, s0.crownZ), g.w((s0.fx - 0.02) * L, s1.deHw * 0.4, s1.deZ), g.w((s0.fx - 0.02) * L, s1.lowHw * 0.4, s1.lowZ), g.w(s0.fx * L, 0, s0.lowZ), g.w((s0.fx - 0.02) * L, -s1.lowHw * 0.4, s1.lowZ), g.w((s0.fx - 0.02) * L, -s1.deHw * 0.4, s1.deZ)].map(q => o.P(...q));
-    ctx.fillStyle = '#121519';
-    poly(ctx, bump); ctx.fill();
+    const stem = g.w(s0.fx * L, 0, s0.crownZ * 0.5);
+    if (dot(fwdV, sub(o.cam, stem)) > 0 && above(stem) >= 0) {
+      const bump = [g.w(s0.fx * L, 0, s0.crownZ), g.w((s0.fx - 0.02) * L, s1.deHw * 0.4, s1.deZ), g.w((s0.fx - 0.02) * L, s1.lowHw * 0.4, s1.lowZ), g.w(s0.fx * L, 0, s0.lowZ), g.w((s0.fx - 0.02) * L, -s1.lowHw * 0.4, s1.lowZ), g.w((s0.fx - 0.02) * L, -s1.deHw * 0.4, s1.deZ)].map(q => o.P(...q));
+      ctx.fillStyle = '#121519';
+      poly(ctx, bump); ctx.fill();
+    }
   }
   // Sails: shaded panels, seams, leech tape, battens, numbers, tell-tales.
   const sails = (['main', 'jib'] as const).map(kind => {

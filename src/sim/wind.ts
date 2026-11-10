@@ -109,7 +109,7 @@ export class WindField {
     const fresh = kn >= 13;
     this.puffRate = settings.character === 'puffy' ? (fresh ? 0.13 : 0.09) : settings.character === 'steady' ? 0.02 : 0.045;
     this.bigGusts = settings.character === 'puffy' && fresh;
-    this.puffStrength = settings.character === 'puffy' ? (fresh ? [0.3, 1.0] : [0.15, 0.34]) : fresh ? [0.13, 0.38] : [0.085, 0.21];
+    this.puffStrength = settings.character === 'puffy' ? (fresh ? [0.3, 1.0] : [0.2, 0.5]) : fresh ? [0.15, 0.45] : [0.12, 0.3];
     // Seed the course with puffs already on the water.
     for (let i = 0; i < 6; i++) this.spawn(r.range(-1, 1));
     this.shifts = settings.shifts ?? [];
@@ -145,7 +145,9 @@ export class WindField {
     const isLull = r.chance(0.28);
     // On a gusty fresh day the strength is skewed: mostly middling puffs, the odd big one.
     const u = r.next(), lo = this.puffStrength[0], hi = this.puffStrength[1];
-    const s = (lo + (hi - lo) * (this.bigGusts ? u * u : u)) * (isLull ? -0.7 : 1);
+    const base = lo + (hi - lo) * (this.bigGusts ? u * u : u);
+    // Lulls never take more than 40% of the breeze away: she slows in them, she doesn't park.
+    const s = isLull ? -Math.min(0.4, 0.7 * base) : base;
     this.puffs.push({
       id: this.nextPuffId++,
       x: a.cx + up.x * along + right.x * across,

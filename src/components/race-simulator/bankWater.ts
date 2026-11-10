@@ -58,11 +58,12 @@ function makeTile(kind: Tex): HTMLCanvasElement | null {
       const stand = 0.15 + 0.85 * Math.pow(along, 1.6);
       const wob = 10 * Math.sin((x / TILE) * 2 * Math.PI * 2 + 0.4) + 5 * Math.sin((x / TILE) * 2 * Math.PI * 5 + 1.7);
       for (let y = 0; y < TILE; y++) {
-        const ph = (2 * Math.PI * (y + wob)) / TILE; // crest at y = 64
-        // Soft all through: a gentle sheen over the crest and a broad shadow on the face below it,
-        // no hard lines, so the waves read as a slow swell of light and shade.
-        const lit = Math.pow(0.5 + 0.5 * Math.sin(ph), 3) * 0.1 * stand;
-        const shade = Math.pow(0.5 - 0.5 * Math.sin(ph + 0.45), 1.5) * 0.23 * stand;
+        const ph = (2 * Math.PI * (y + wob)) / TILE; // crest at y = 64 (the waves travel down the tile)
+        // Soft all through: a gentle sheen on the back of each wave as it rises to the crest, and the
+        // dark band on its face just past the crest (the side it's travelling towards). A boat punching
+        // upwind meets the dark band first, and that's when her bow lifts.
+        const lit = Math.pow(0.5 + 0.5 * Math.cos(ph - 0.95), 3) * 0.09 * stand;
+        const shade = Math.pow(0.5 + 0.5 * Math.cos(ph - 2.45), 2.2) * 0.26 * stand;
         // Light over dark, premultiplied.
         const a = lit + shade * (1 - lit);
         const k = (y * TILE + x) * 4;

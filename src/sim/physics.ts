@@ -102,13 +102,14 @@ export function heelStep(b: Boat, dt: number, twa: number) {
 }
 
 /**
- * Weather helm, deg/s towards the wind: a balanced boat sits happily up to about 20° of heel; past
- * that her bow wants to come up, a little in a puff and hard when a strong gust lays her over.
+ * Weather helm: how far (degrees) a gust rounds her up into the wind. A balanced boat holds her course
+ * up to about 25° of heel; past that her bow comes up, a few degrees in a puff and hard when a gust
+ * lays her over. As she comes upright again she bears away back onto her course, so with the rudder
+ * left alone she luffs in the gusts but never sails herself into irons.
  */
 export function weatherHelm(b: Boat): number {
-  const h = Math.abs(b.heel), ex = Math.max(0, h - 20);
-  const kick = Math.max(0, b.heelRate * Math.sign(b.heel)) * 0.06; // being pushed over
-  return Math.min(45, 0.3 * ex + 0.012 * ex * ex + kick);
+  const ex = Math.max(0, Math.abs(b.heel) - 25);
+  return Math.min(25, 0.32 * ex + 0.012 * ex * ex);
 }
 
 /** Integrate one boat for one step. Returns 'tack' or 'gybe' when the boat passed through the wind. */
@@ -137,7 +138,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   // Laid over too far she slows: more drag, less drive, and nearly stopped when she's knocked flat.
   const over = Math.max(0, Math.abs(b.heel) - 28);
   if (over > 0) target *= Math.max(0.3, 1 - 0.004 * over - 0.00022 * over * over);
-  const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg) : null;
+  const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg, c.loa) : null;
   if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;
   b.spd += (target - b.spd) * (1 - Math.exp(-dt / tau));
@@ -147,17 +148,23 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   const grip = 1 - clamp((Math.abs(b.heel) - 32) / 36, 0, 0.55);
   const steer = clamp(b.spd / (0.35 * c.hullSpeed), a < ng + 4 ? 0.32 : 0.16, 1) * grip;
   let rotTarget = b.rudder * c.maxRot * steer;
-  // Weather helm turns her up towards the wind (less when she's slow and the hull has little grip).
-  if (a >= ng) rotTarget += (twa >= 0 ? 1 : -1) * weatherHelm(b) * clamp(b.spd / (0.5 * c.hullSpeed), 0.3, 1);
   // A slow boat near head to wind has her bow blown off the wind, so holding her there takes work.
   const slow = 1 - clamp(b.spd / (0.45 * c.hullSpeed), 0, 1);
   if (a < ng + 10 && slow > 0) {
     const away = a < 2 ? (b.tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
     rotTarget += away * 16 * slow * (1 - a / (ng + 10));
   }
-  if (wave) rotTarget += wave.yaw * clamp(0.4 + b.spd / c.hullSpeed, 0, 1);
+  // (Scaled by how fast she'd sail here, not her speed this instant, which the waves themselves
+  // change: that would turn their to-and-fro into a steady pull one way.)
+  if (wave) rotTarget += wave.yaw * clamp(0.4 + b.targetSpd / c.hullSpeed, 0, 1);
   b.rot += (rotTarget - b.rot) * (1 - Math.exp(-dt / 0.12));
   b.hdg = n360(b.hdg + b.rot * dt);
+  // Weather helm rounds her up quickly as a gust heels her (less when she's slow), and lets her bear
+  // away again more slowly as it passes.
+  const upBy = a >= ng ? weatherHelm(b) * clamp(b.spd / (0.5 * c.hullSpeed), 0.3, 1) : 0;
+  const luffWas = b.luffUp;
+  b.luffUp += (upBy - b.luffUp) * (1 - Math.exp(-dt / (upBy > b.luffUp ? 0.45 : 1.5)));
+  b.hdg = n360(b.hdg + (twa >= 0 ? 1 : -1) * (b.luffUp - luffWas));
 
   const v = dir(b.hdg);
   let vx = v.x * b.spd, vy = v.y * b.spd;
@@ -190,6 +197,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   }
   if (passed === 'gybe') b.lastGybeT = t;
   b.tack = newTack;
+  if (passed) b.luffUp = 0;
   // Rule 13 ends when she is on a close-hauled course (or further off the wind).
   if (b.tackingSince !== null && Math.abs(newTwa) >= upAngle(b.tws) - 3) b.tackingSince = null;
   if (b.tackingSince !== null && t - b.tackingSince > 6) b.tackingSince = null; // stuck in irons: not "tacking" for ever

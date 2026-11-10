@@ -30,11 +30,14 @@ const NEAR = 0.35;
 export function newBankCam(): BankCam { return { x: 0, y: 0, z: EYE, yaw: 0, pitch: 3, fov: 50, ready: false }; }
 
 
-/** Walk along the control area towards your boat and turn to keep her in view, glancing towards
- *  where she's going. Zoom narrows the view; it also narrows on its own when she's far off. */
-export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, look: V2 | null, w: number) {
+/**
+ * Stand in the control area and watch her, as a skipper does: you stay put (wandering only slowly
+ * along the control area towards where she is), she sails across your view, and you turn your head
+ * only when she nears the edge of it. As she gets far away the view closes in a little, the way you
+ * peer at a distant boat, but never much. Glancing (holding M) turns straight to the mark.
+ */
+export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, glance: boolean) {
   const L = race.course.L;
-  // Stand where the control area comes closest to her.
   const ca = race.controlArea();
   const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
   const u = Math.max(0, Math.min(1, ((target.x - ca.a.x) * ex + (target.y - ca.a.y) * ey) / el2));
@@ -44,28 +47,22 @@ export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom
   const stepBack = Math.max(0, 7 * L - od);
   if (stepBack > 0 && od > 0.01) { want.x += (ox / od) * stepBack; want.y += (oy / od) * stepBack; }
   const snap = !cam.ready;
-  const kWalk = snap ? 1 : Math.min(1, dt * 0.7);
+  const kWalk = snap ? 1 : Math.min(1, dt * 0.15);
   cam.x += (want.x - cam.x) * kWalk; cam.y += (want.y - cam.y) * kWalk;
   cam.z = EYE;
-  const yawBoat = Math.atan2(target.x - cam.x, target.y - cam.y) / DEG;
-  let yaw = yawBoat;
-  if (look) {
-    const yawLook = Math.atan2(look.x - cam.x, look.y - cam.y) / DEG;
-    const lim = cam.fov * 0.22;
-    yaw = yawBoat + Math.max(-lim, Math.min(lim, n180(yawLook - yawBoat) * 0.35));
-  }
+  const yawTo = Math.atan2(target.x - cam.x, target.y - cam.y) / DEG;
   const d = Math.hypot(target.x - cam.x, target.y - cam.y);
-  // Zoom in with her as she sails away, the way you'd follow your boat with your eyes: keep her
-  // about 4½% of the screen wide, so you can still judge her distances off the marks and the boats
-  // round her. Close in it's a natural lens; you can zoom in or out from there yourself.
-  const sizePx = Math.max(28, Math.min(64, w * 0.045));
-  const fovBoat = (2 * Math.atan((w * L) / (2 * sizePx * Math.max(1, d)))) / DEG;
-  const fov = Math.max(6, Math.min(75, Math.max(11, Math.min(50, fovBoat)) / zoom));
+  const fovAuto = Math.max(30, Math.min(50, 50 * Math.sqrt((20 * L) / Math.max(1, d))));
+  const fov = Math.max(6, Math.min(75, fovAuto / zoom));
   const pitch = (Math.atan2(cam.z, Math.max(1.5, d)) / DEG) * 0.82 + 0.4;
-  if (snap) { cam.yaw = yaw; cam.pitch = pitch; cam.fov = fov; cam.ready = true; return; }
-  cam.yaw += n180(yaw - cam.yaw) * Math.min(1, dt * 2.4);
-  cam.pitch += (pitch - cam.pitch) * Math.min(1, dt * 2);
-  cam.fov += (fov - cam.fov) * Math.min(1, dt * 2.5);
+  if (snap) { cam.yaw = yawTo; cam.pitch = pitch; cam.fov = fov; cam.ready = true; return; }
+  // She roams the middle third of the view; past that you turn with her, smoothly.
+  const off = n180(yawTo - cam.yaw);
+  const dz = glance ? 0 : cam.fov * 0.16;
+  const excess = Math.abs(off) > dz ? off - Math.sign(off) * dz : 0;
+  cam.yaw += excess * Math.min(1, dt * (glance ? 3 : 1.4));
+  cam.pitch += (pitch - cam.pitch) * Math.min(1, dt * 1.2);
+  cam.fov += (fov - cam.fov) * Math.min(1, dt * 0.8);
 }
 
 export interface BankView {

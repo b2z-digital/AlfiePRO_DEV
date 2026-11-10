@@ -55,6 +55,7 @@ export function pointOfSail(b: Boat): string {
   const a = Math.abs(b.twa);
   const up = vmgAngles(b.cls, b.tws).up;
   if (a < noGoAngle(b.tws)) return 'In irons';
+  if (a < up - 4) return 'Pinching';
   if (a < up + 7) return 'Close-hauled';
   if (a < 70) return 'Close reach';
   if (a < 110) return 'Beam reach';
@@ -65,6 +66,7 @@ export function pointOfSail(b: Boat): string {
 export function trimAdvice(b: Boat): string {
   const e = b.sheet - bestSheet(Math.abs(b.twa));
   if (Math.abs(b.twa) < noGoAngle(b.tws)) return 'Bear away to fill the sail';
+  if (Math.abs(b.twa) < vmgAngles(b.cls, b.tws).up - 4) return 'Bear away a touch: she’s slowing';
   if (e > 0.09) return 'Trim: ease the sail a touch';
   if (e < -0.09) return 'Trim: sheet in a touch';
   return 'Trim: good';
