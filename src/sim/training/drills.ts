@@ -89,6 +89,7 @@ export const DRILLS: Drill[] = [
     },
     scoreText: v => `${Math.round(v)} s held`, higherIsBetter: true,
     solution: timedStart({ hover: race => linePoint(race, 0.5, 1.6), margin: 0.5 }),
+    demoSeeds: [1, 3, 4],
     mistake: hold(CH_S - 10),
     mistakeRule: '',
   },
@@ -231,7 +232,7 @@ export const DRILLS: Drill[] = [
     scoreText: v => `${v.toFixed(1)} s late`,
     // Set up to the right and let a luffing boat's drift bring the crossing point down to the pin.
     solution: timedStart({ before: holdForLine(0.18, 2.6), margin: 0.7 }),
-    demoSeeds: [3, 4, 6],
+    demoSeeds: [2, 5, 8],
     mistakeRule: '',
   },
   {
@@ -279,7 +280,7 @@ export const DRILLS: Drill[] = [
     }, 4),
     scoreText: v => `${v.toFixed(1)} s late`,
     solution: timedStart({ tack: 'port', margin: 0.4, before: holdForLine(0.1, 2.0, 'port'), duck: true }),
-    demoSeeds: [1, 6, 8],
+    demoSeeds: [6, 8, 9],
     mistakeRule: '',
   },
   {

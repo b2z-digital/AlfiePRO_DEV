@@ -1,12 +1,13 @@
-// The water in the bank view, the way it looks from the bank: the wind's ripples (a texture that
-// shrinks into the distance and drifts downwind), gusts as darker patches of rougher water and lulls
-// as glassy ones, wave crests rolling downwind (lit along their tops, shaded in front, with
-// whitecaps in rough water), and each boat's wake: her bow wave, the foam she leaves along her track
-// and the V of her wash spreading behind. Everything is drawn on the water's plane, in perspective.
+// The water in the bank view, the way it looks from the bank: the wind's ripples and the waves (two
+// textures that shrink into the distance, the ripples drifting downwind and the waves rolling with
+// them), gusts as darker patches of rougher water and lulls as glassy ones, whitecaps in a breeze,
+// and each boat's wake: her bow wave, the foam she leaves along her track and the V of her wash.
+// Everything is drawn on the water's plane, in perspective, and mostly as textured strips of the
+// screen, which a graphics card draws far faster than big shapes. Nothing jumps from frame to frame.
 import type { Race } from '@/sim/engine';
 import { DEG, dir } from '@/sim/math';
 import type { Puff } from '@/sim/wind';
-import { PUFF_LENGTH } from '@/sim/wind';
+import { PUFF_LENGTH, puffLife } from '@/sim/wind';
 import type { Pose } from './boat3d';
 import type { BankCam, BankView } from './bank';
 
@@ -22,7 +23,7 @@ const smooth = (a: number, b: number, x: number) => { const u = Math.max(0, Math
 // ───────────────────────── Textures ─────────────────────────
 // Tiles of ripple marks: across the wind is x, downwind is y. Drawn once, then mapped onto the water.
 const TILE = 256;
-type Tex = 'wind' | 'gust' | 'foam';
+type Tex = 'wind' | 'gust' | 'foam' | 'wave';
 const tiles = new Map<Tex, CanvasPattern | null>();
 
 /** Smooth noise on the tile, 0..1, that wraps at its edges (so the clumps tile too). */
@@ -47,7 +48,33 @@ function makeTile(kind: Tex): HTMLCanvasElement | null {
       draw(x + ox, y + oy);
     }
   };
-  if (kind === 'foam') {
+  if (kind === 'wave') {
+    // One wavelength down the tile (the way the waves travel), three along a crest: each crest a soft
+    // band that catches the sky on top and darkens on the face below, standing up more in some
+    // places along its length than others, the way wind waves do.
+    const img = g.createImageData(TILE, TILE), d = img.data;
+    for (let x = 0; x < TILE; x++) {
+      const along = 0.5 + 0.5 * Math.sin((x / TILE) * 2 * Math.PI * 3 + 0.7) * (0.6 + 0.4 * Math.sin((x / TILE) * 2 * Math.PI + 2.1));
+      const stand = 0.15 + 0.85 * Math.pow(along, 1.6);
+      const wob = 10 * Math.sin((x / TILE) * 2 * Math.PI * 2 + 0.4) + 5 * Math.sin((x / TILE) * 2 * Math.PI * 5 + 1.7);
+      for (let y = 0; y < TILE; y++) {
+        const ph = (2 * Math.PI * (y + wob)) / TILE; // crest at y = 64
+        // Soft all through: a gentle sheen over the crest and a broad shadow on the face below it,
+        // no hard lines, so the waves read as a slow swell of light and shade.
+        const lit = Math.pow(0.5 + 0.5 * Math.sin(ph), 3) * 0.1 * stand;
+        const shade = Math.pow(0.5 - 0.5 * Math.sin(ph + 0.45), 1.5) * 0.23 * stand;
+        // Light over dark, premultiplied.
+        const a = lit + shade * (1 - lit);
+        const k = (y * TILE + x) * 4;
+        if (a <= 0.002) { d[k + 3] = 0; continue; }
+        d[k] = Math.round((206 * lit + 4 * shade * (1 - lit)) / a);
+        d[k + 1] = Math.round((226 * lit + 18 * shade * (1 - lit)) / a);
+        d[k + 2] = Math.round((246 * lit + 40 * shade * (1 - lit)) / a);
+        d[k + 3] = Math.round(255 * a);
+      }
+    }
+    g.putImageData(img, 0, 0);
+  } else if (kind === 'foam') {
     // Churned water: soft white flecks and streaks.
     for (let k = 0; k < 520; k++) {
       const x = hash(k, 11) * TILE, y = hash(k, 23) * TILE, r = 1 + hash(k, 37) * 3.5;
@@ -106,17 +133,35 @@ export function mapAt(pat: CanvasPattern, V: Pick<BankView, 'P'>, Q: V2, across:
   return Math.min(Math.hypot(A.x, A.y), Math.hypot(B.x, B.y)); // how big a tile pixel is on screen, at its smallest
 }
 
+/** As mapAt, with its own scale along each axis and a scroll on each: returns the screen size of a
+ *  tile pixel down the tile (the way the waves travel), the axis that shrinks most with distance. */
+function mapAt2(pat: CanvasPattern, V: Pick<BankView, 'P'>, Q: V2, across: V2, down: V2, mx: number, my: number, flowV: number) {
+  const e = 0.25;
+  const p0 = V.P(Q.x, Q.y, 0), px = V.P(Q.x + e, Q.y, 0), py = V.P(Q.x, Q.y + e, 0);
+  const jxx = (px.x - p0.x) / e, jxy = (py.x - p0.x) / e, jyx = (px.y - p0.y) / e, jyy = (py.y - p0.y) / e;
+  const A = { x: (jxx * across.x + jxy * across.y) * mx, y: (jyx * across.x + jyy * across.y) * mx };
+  const B = { x: (jxx * down.x + jxy * down.y) * my, y: (jyx * down.x + jyy * down.y) * my };
+  const uQ = ((Q.x * across.x + Q.y * across.y) / mx) % TILE, vQ = ((Q.x * down.x + Q.y * down.y) / my - flowV) % TILE;
+  pat.setTransform(new DOMMatrix([A.x, A.y, B.x, B.y, p0.x - A.x * uQ - B.x * vQ, p0.y - A.y * uQ - B.y * vQ]));
+  return Math.hypot(B.x, B.y);
+}
+
 // ───────────────────────── The wind's ripples ─────────────────────────
 /**
- * Ripples over all the water: the wind's texture, mapped onto the water a few screen rows at a time.
- * Each row of the screen is a line of equal distance on the water, so thin bands map it all but
- * exactly, and it shrinks properly into the distance. You read the wind from it: its little crests
- * lie across the wind and it all drifts downwind. Two scales, fine and coarse, like a texture's mip
- * levels, so it never gets too fine to draw (which would shimmer).
+ * The water's surface: the wind's ripples and the waves, mapped onto the water a few screen rows at a
+ * time. Each row of the screen is a line of equal distance on the water, so thin strips map a texture
+ * all but exactly, with no seams, and it shrinks properly into the distance.
+ * - Ripples: their little crests lie across the wind and drift downwind, so you can read the wind.
+ *   Two scales, fine and coarse (like a texture's mip levels), so they never get too fine to draw,
+ *   which would shimmer.
+ * - Waves: the main set and, at full detail, the second set a little off the wind, rolling at the
+ *   same pace the boats feel them, and fading out before the crests crowd together in the distance.
  */
 export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Race, cam: BankCam, hz: number, detail = 2) {
-  const pat = tex(ctx, 'wind');
-  if (!pat) return;
+  const ripple = tex(ctx, 'wind');
+  const sea = race.sea;
+  const wave = sea ? tex(ctx, 'wave') : null;
+  if (!ripple && !wave) return;
   const t = race.t;
   const down = dir(race.wind.meanTwd(t) + 180), across = { x: down.y, y: -down.x };
   const kn = race.wind.meanTws(t) / 0.514444;
@@ -129,27 +174,61 @@ export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Ra
     const dz = f.z - u.z * k;
     if (dz >= -1e-4) return null;
     const tt = -cam.z / dz;
-    const x = cam.x + (f.x - u.x * k) * tt, y = cam.y + (f.y - u.y * k) * tt;
-    return { x, y, d: tt };
+    return { x: cam.x + (f.x - u.x * k) * tt, y: cam.y + (f.y - u.y * k) * tt, d: tt };
   };
+  const FINE = 0.01, COARSE = 0.044;
+  const rflow = (t * (0.12 + 0.02 * kn));
+  const w0 = sea && wave ? sea.trains[0] : null;
+  const cols = detail >= 2 ? 4 : 2;
+  const rgt = { x: cy, y: -sy };
+  // The water under a screen point: its row and column.
+  const groundXY = (row: number, col: number): (V2 & { d: number }) | null => {
+    const k = (row - V.h / 2) / V.F, c = (col - V.w / 2) / V.F;
+    const dz = f.z - u.z * k;
+    if (dz >= -1e-4) return null;
+    const tt = -cam.z / dz;
+    return { x: cam.x + (f.x + rgt.x * c - u.x * k) * tt, y: cam.y + (f.y + rgt.y * c - u.y * k) * tt, d: tt };
+  };
+  // Strips get thinner towards the horizon, where the distance changes fastest from row to row.
+  const band = detail >= 2 ? 8 : 14;
   const top = Math.max(0, Math.ceil(hz + 1));
-  const band = detail >= 2 ? 6 : 12;
-  for (const [m, a0, coarse] of [[0.01, 1, false], [0.044, 0.85, true]] as const) {
-    if (coarse && detail < 2) continue;
-    const flow = (t * (0.16 + 0.025 * kn)) / m;
-    ctx.fillStyle = pat;
-    for (let y1 = V.h; y1 > top; y1 -= band) {
-      const y0 = Math.max(top, y1 - band);
-      const Q = groundAt((y0 + y1) / 2);
-      if (!Q) break;
-      const px = mapAt(pat, V, Q, across, down, m, flow);
-      // The coarse texture takes over just where the fine one gets too small to draw.
-      const fade = coarse ? smooth(0.2, 0.5, px) * (1 - smooth(0.2, 0.5, (px * 0.01) / 0.044)) : smooth(0.2, 0.5, px);
-      const alpha = a0 * strength * fade * (1 - smooth(500, 2200, Q.d));
-      if (alpha < 0.012) continue;
-      ctx.globalAlpha = alpha;
-      ctx.fillRect(0, y0, V.w, y1 - y0 + 0.5);
+  for (let y1 = V.h; y1 > top;) {
+    const y0 = Math.max(top, y1 - Math.max(2, Math.min(band, (y1 - hz) * 0.07)));
+    const Q = groundAt((y0 + y1) / 2);
+    if (!Q) break;
+    const far = 1 - smooth(500, 2200, Q.d);
+    const h = y1 - y0 + 0.5;
+    if (ripple) {
+      ctx.fillStyle = ripple;
+      // Fine near the bank; the coarse one takes over just where the fine one gets too small.
+      const pf = mapAt(ripple, V, Q, across, down, FINE, rflow / FINE);
+      const af = smooth(0.2, 0.5, pf);
+      if (af * strength > 0.012) { ctx.globalAlpha = af * strength * far; ctx.fillRect(0, y0, V.w, h); }
+      if (af < 0.99 && detail >= 2) {
+        const pc = mapAt(ripple, V, Q, across, down, COARSE, rflow / COARSE);
+        const ac = smooth(0.2, 0.5, pc) * (1 - af) * 0.85;
+        if (ac * strength > 0.012) { ctx.globalAlpha = ac * strength * far; ctx.fillRect(0, y0, V.w, h); }
+      }
     }
+    if (wave && w0) {
+      // The main waves, mapped column by column (a strip's mapping is only exact down its middle,
+      // and long wave crests would show the joins), faded in from just off the bank and out before
+      // the crests crowd together in the distance.
+      ctx.fillStyle = wave;
+      const d = { x: w0.dx, y: w0.dy }, q = { x: d.y, y: -d.x };
+      const my = w0.length / TILE, mx = (3 * w0.length) / TILE;
+      // The tile's crest (y = 64) sits on the waves' crest: k s - ω t + φ = π/2.
+      const s0 = (Math.PI / 2 + w0.omega * t - w0.phase) / w0.k;
+      const cw = V.w / cols;
+      for (let ci = 0; ci < cols; ci++) {
+        const Qc = groundXY((y0 + y1) / 2, (ci + 0.5) * cw);
+        if (!Qc) continue;
+        const py = mapAt2(wave, V, Qc, q, d, mx, my, s0 / my - 64);
+        const a = smooth(8, 26, py * TILE) * smooth(3, 10, Qc.d) * far * Math.min(1, (w0.amp / 0.02) * 0.8 + 0.2);
+        if (a > 0.012) { ctx.globalAlpha = a; ctx.fillRect(ci * cw, y0, cw + 0.5, h); }
+      }
+    }
+    y1 = y0;
   }
   ctx.globalAlpha = 1;
 }
@@ -177,140 +256,96 @@ export function drawGusts(ctx: CanvasRenderingContext2D, V: BankView, race: Race
   const kn = race.wind.meanTws(t) / 0.514444;
   const pat = detail >= 2 ? tex(ctx, 'gust') : null;
   for (const p of race.wind.puffs) {
-    const life = Math.sin(Math.PI * Math.min(1, Math.max(0, p.age / p.life)));
-    const a = Math.min(1, Math.abs(p.strength) * 3.2 + 0.15) * life;
+    // Darker the stronger it is: a big gust stands out, a little puff is just a shade.
+    const a = Math.min(1, Math.abs(p.strength) * 1.5 + 0.25) * puffLife(p);
     if (a < 0.04 || V.depth(p.x, p.y) < -p.r * 2) continue;
-    const outer = V.ground(puffRing(p, down, across, 1.08));
+    const outer = V.ground(puffRing(p, down, across, 1.1));
     if (outer.length < 3) continue;
-    let minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity;
-    for (const q of outer) { minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y); minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); }
-    if (maxY < hz - 2 || minY > V.h + 4 || maxX < -20 || minX > V.w + 20) continue;
-    const path = (pts: { x: number; y: number }[]) => { ctx.beginPath(); pts.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath(); };
-    if (p.strength > 0) {
-      // The dark of the gust, deepest in its middle.
-      const layers: [number, number][] = [[1.08, 0.3], [0.74, 0.42]];
-      for (const [sc, k] of layers) {
-        const q = sc === 1.08 ? outer : V.ground(puffRing(p, down, across, sc));
-        if (q.length < 3) continue;
-        ctx.fillStyle = `rgba(3,14,30,${(k * a).toFixed(3)})`;
-        path(q); ctx.fill();
-      }
-      // Its rougher water: the gust texture, mapped at its middle and scrolling a little faster
-      // than the gust itself moves.
-      if (pat) {
-        const px = mapAt(pat, V, { x: p.x, y: p.y }, across, down, 0.024, (t * (0.5 + 0.05 * kn)) / 0.024);
-        const vis = smooth(0.16, 0.4, px);
-        if (vis > 0.02) {
-          ctx.fillStyle = pat;
-          const q = V.ground(puffRing(p, down, across, 0.9));
-          if (q.length >= 3) { ctx.globalAlpha = 0.55 * a * vis; path(q); ctx.fill(); }
-          ctx.globalAlpha = 1;
-        }
-      }
-    } else {
-      // A lull: glassier, so paler with the sky, and softer at its edge.
-      for (const [sc, k] of [[1.08, 0.07], [0.8, 0.08]] as const) {
-        const q = sc === 1.08 ? outer : V.ground(puffRing(p, down, across, sc));
-        if (q.length < 3) continue;
-        ctx.fillStyle = `rgba(178,205,232,${(k * a).toFixed(3)})`;
-        path(q); ctx.fill();
+    // Centre and principal axes of its outline on the screen: the ellipse it makes there.
+    let mx = 0, my = 0;
+    for (const q of outer) { mx += q.x; my += q.y; }
+    mx /= outer.length; my /= outer.length;
+    let sxx = 0, syy = 0, sxy = 0, minY = Infinity, maxY = -Infinity;
+    for (const q of outer) { const dx = q.x - mx, dy = q.y - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y); }
+    sxx /= outer.length; syy /= outer.length; sxy /= outer.length;
+    const tr = sxx + syy, disc = Math.sqrt(Math.max(0, (tr * tr) / 4 - (sxx * syy - sxy * sxy)));
+    const ra = Math.sqrt(2 * (tr / 2 + disc)), rb = Math.sqrt(2 * Math.max(1e-6, tr / 2 - disc));
+    if (ra < 1.5 || maxY < hz - 2 || minY > V.h + 4 || mx + ra < -40 || mx - ra > V.w + 40) continue;
+    // The tone: a soft-edged ellipse (no hard outline anywhere, however close the gust is).
+    const dark = p.strength > 0;
+    const rgb = dark ? '3,14,30' : '178,205,232', k = dark ? 0.4 : 0.09;
+    ctx.save();
+    ctx.translate(mx, my); ctx.rotate(0.5 * Math.atan2(2 * sxy, sxx - syy)); ctx.scale(1, Math.max(0.02, rb / ra));
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, ra);
+    g.addColorStop(0, `rgba(${rgb},${(k * a).toFixed(3)})`); g.addColorStop(0.6, `rgba(${rgb},${(k * a * 0.8).toFixed(3)})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, ra, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // A gust's rougher water: its texture over its ragged middle. Its ripples drift with the rest of
+    // the water; the gust itself sweeps across them.
+    if (dark && pat) {
+      const px = mapAt(pat, V, { x: p.x, y: p.y }, across, down, 0.024, (t * (0.15 + 0.025 * kn)) / 0.024);
+      // Gone where it would be too fine to draw, and close in, where it would be blown up into blobs.
+      const vis = smooth(0.16, 0.4, px) * (1 - smooth(2.5, 6, px));
+      const q = vis > 0.02 ? V.ground(puffRing(p, down, across, 0.85)) : [];
+      if (q.length >= 3) {
+        ctx.fillStyle = pat; ctx.globalAlpha = 0.5 * a * vis;
+        ctx.beginPath(); q.forEach((pt, i) => (i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y))); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1;
       }
     }
   }
 }
 
-// ───────────────────────── Waves ─────────────────────────
+// ───────────────────────── Whitecaps ─────────────────────────
 /**
- * Wave crests: each crest of the main waves is a soft, broken band across the water, moving
- * downwind at the waves' speed: shaded on its face towards you, with a faint lit edge on top. Where
- * the second set of waves meets it in step the crest stands up more, and in rough water those
- * places break into little patches of white.
+ * Whitecaps: in rough water, and on choppy water once it blows fresh, little flecks of white break
+ * off the crests where the two sets of waves pile up. They ride the crests, and come and go as the
+ * sets move through each other, so they never pop.
  */
 export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race, cam: BankCam) {
   const sea = race.sea;
   if (!sea) return;
   const t = race.t;
-  const fw = dir(cam.yaw);
-  const halfTan = Math.tan((cam.fov / 2) * DEG) * 1.15;
-  // Whitecaps in rough water, and on choppy water too once it blows fresh.
   const kn = race.wind.meanTws(t) / 0.514444;
   const capsK = sea.kind === 'rough' ? 1 : smooth(12, 18, kn) * 0.8;
-  const LEVELS = 5;
-  const lightP = Array.from({ length: LEVELS }, () => new Path2D()), darkP = Array.from({ length: LEVELS }, () => new Path2D());
-  const caps: { x: number; y: number; r: number; a: number; along: V2 }[] = [];
-  const quad = (pth: Path2D, a: V2, b: V2, c: V2, d: V2) => {
-    const pa = V.P(a.x, a.y, 0), pb = V.P(b.x, b.y, 0), pc = V.P(c.x, c.y, 0), pd = V.P(d.x, d.y, 0);
-    pth.moveTo(pa.x, pa.y); pth.lineTo(pb.x, pb.y); pth.lineTo(pc.x, pc.y); pth.lineTo(pd.x, pd.y); pth.closePath();
-  };
+  if (capsK < 0.02) return;
+  const fw = dir(cam.yaw);
+  const halfTan = Math.tan((cam.fov / 2) * DEG) * 1.15;
   const w = sea.trains[0], other = sea.trains[1] ?? sea.trains[0];
   const d = { x: w.dx, y: w.dy }, q = { x: d.y, y: -d.x };
-  const lam = w.length;
-  const reach = Math.min(110, lam * 32);
+  const lam = w.length, reach = Math.min(70, lam * 20), step = Math.max(0.6, lam * 0.8);
   const sCam = cam.x * d.x + cam.y * d.y, qCam = cam.x * q.x + cam.y * q.y;
-  // Crest n sits where k s - ω t + φ = π/2 + 2πn.
   const n0 = Math.ceil(((sCam - reach) * w.k - w.omega * t + w.phase - Math.PI / 2) / (2 * Math.PI));
   const n1 = Math.floor(((sCam + reach) * w.k - w.omega * t + w.phase - Math.PI / 2) / (2 * Math.PI));
-  const step = Math.max(0.6, lam * 0.8);
+  const foam = tex(ctx, 'foam');
   for (let n = n0; n <= n1; n++) {
     const s = (Math.PI / 2 + 2 * Math.PI * n + w.omega * t - w.phase) / w.k;
-    const toward = sCam > s ? 1 : -1; // which side of the crest you're on
     for (let qq = Math.floor((qCam - reach) / step) * step; qq < qCam + reach; qq += step) {
       const mid = { x: d.x * s + q.x * (qq + step / 2), y: d.y * s + q.y * (qq + step / 2) };
-      const rx = mid.x - cam.x, ry = mid.y - cam.y;
-      const depth = rx * fw.x + ry * fw.y;
-      if (depth < 1.5 || depth > reach) continue;
-      if (Math.abs(rx * fw.y - ry * fw.x) > depth * halfTan + step) continue;
-      // How far apart the crests look here: fade them out before they crowd into stripes.
-      const gap = (lam * V.F * cam.z) / (depth * depth);
-      const vis = smooth(4, 14, gap) * (1 - smooth(reach * 0.5, reach, depth)) * smooth(1.5, 4, depth);
-      if (vis < 0.08) continue;
-      // Short-crested: each crest runs a few wavelengths, then dies away, and the second set of
-      // waves decides where it stands up.
+      const rx = mid.x - cam.x, ry = mid.y - cam.y, depth = rx * fw.x + ry * fw.y;
+      if (depth < 1.5 || depth > reach || Math.abs(rx * fw.y - ry * fw.x) > depth * halfTan + step) continue;
       const phO = other.k * (mid.x * other.dx + mid.y * other.dy) - other.omega * t + other.phase;
-      const join = 0.5 + 0.5 * Math.cos(phO);
-      const run = 0.5 + 0.5 * Math.sin((qq / lam) * 1.3 + n * 2.3 + 0.7 * Math.sin((qq / lam) * 0.45 + n * 0.8));
-      const k = vis * smooth(0.25, 0.9, run) * (0.25 + 0.75 * join);
-      const lv = Math.min(LEVELS - 1, Math.floor(k * LEVELS));
-      if (lv > 0) {
-        const at = (ds: number, dq: number): V2 => ({ x: d.x * (s + ds) + q.x * (qq + dq), y: d.y * (s + ds) + q.y * (qq + dq) });
-        quad(darkP[lv], at(toward * lam * 0.04, 0), at(toward * lam * 0.04, step), at(toward * lam * 0.32, step), at(toward * lam * 0.32, 0));
-        quad(lightP[lv], at(-toward * lam * 0.02, 0), at(-toward * lam * 0.02, step), at(toward * lam * 0.03, step), at(toward * lam * 0.03, 0));
-      }
-      // Whitecaps: where the two sets pile up in rough water, a little white breaks off the crest.
-      if (capsK > 0.02) {
-        const cap = smooth(0.82, 0.98, join) * smooth(0.6, 0.9, hash(n, Math.round(qq / step))) * vis * capsK;
-        if (cap > 0.08) {
-          // A few small flecks of white, not one slab.
-          const id = Math.round(qq / step);
-          for (let j = 0; j < 3; j++) {
-            const off = (hash(n + 7 * j, id) - 0.5) * step, back = (hash(n, id + 11 * j) - 0.5) * lam * 0.06;
-            caps.push({ x: mid.x + q.x * off + d.x * back, y: mid.y + q.y * off + d.y * back, r: 0.05 + 0.06 * hash(n + j, id + 3), a: cap * (1 - 0.25 * j), along: q });
-          }
+      const id = Math.round(qq / step);
+      const cap = smooth(0.82, 0.98, 0.5 + 0.5 * Math.cos(phO)) * smooth(0.6, 0.9, hash(n, id)) * capsK * (1 - smooth(reach * 0.6, reach, depth));
+      if (cap < 0.06) continue;
+      for (let j = 0; j < 3; j++) {
+        const off = (hash(n + 7 * j, id) - 0.5) * step, back = (hash(n, id + 11 * j) - 0.5) * lam * 0.06;
+        const c = { x: mid.x + q.x * off + d.x * back, y: mid.y + q.y * off + d.y * back };
+        const r = 0.05 + 0.06 * hash(n + j, id + 3), a = cap * (1 - 0.25 * j);
+        const ring: V2[] = [];
+        for (let k = 0; k < 9; k++) {
+          const ang = (k / 9) * Math.PI * 2, rr = r * (0.75 + 0.5 * hash(n * 13 + j + k, id));
+          ring.push({ x: c.x + q.x * Math.cos(ang) * rr * 2.2 + q.y * Math.sin(ang) * rr * 0.8, y: c.y + q.y * Math.cos(ang) * rr * 2.2 - q.x * Math.sin(ang) * rr * 0.8 });
         }
-      }
-    }
-  }
-  for (let lv = 1; lv < LEVELS; lv++) {
-    const f = lv / (LEVELS - 1);
-    ctx.fillStyle = `rgba(4,18,38,${(0.11 * f).toFixed(3)})`; ctx.fill(darkP[lv]);
-    ctx.fillStyle = `rgba(206,226,246,${(0.03 * f).toFixed(3)})`; ctx.fill(lightP[lv]);
-  }
-  if (caps.length) {
-    const foam = tex(ctx, 'foam');
-    for (const c of caps) {
-      // A ragged little patch of foam, longer along the crest than across it.
-      const ring: V2[] = [];
-      for (let k = 0; k < 9; k++) {
-        const ang = (k / 9) * Math.PI * 2, rr = c.r * (0.75 + 0.5 * hash(Math.round(c.x * 31) + k, Math.round(c.y * 17)));
-        ring.push({ x: c.x + c.along.x * Math.cos(ang) * rr * 2.2 + c.along.y * Math.sin(ang) * rr * 0.8, y: c.y + c.along.y * Math.cos(ang) * rr * 2.2 - c.along.x * Math.sin(ang) * rr * 0.8 });
-      }
-      const pts = V.ground(ring);
-      if (pts.length < 3) continue;
-      ctx.beginPath(); pts.forEach((pt, k) => (k ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y))); ctx.closePath();
-      ctx.fillStyle = `rgba(240,247,255,${(0.22 * c.a).toFixed(3)})`; ctx.fill();
-      if (foam) {
-        mapAt(foam, V, c, c.along, { x: -c.along.y, y: c.along.x }, 0.004, 0);
-        ctx.globalAlpha = Math.min(1, c.a * 1.1); ctx.fillStyle = foam; ctx.fill(); ctx.globalAlpha = 1;
+        const pts = V.ground(ring);
+        if (pts.length < 3) continue;
+        ctx.beginPath(); pts.forEach((pt, k) => (k ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y))); ctx.closePath();
+        ctx.fillStyle = `rgba(240,247,255,${(0.22 * a).toFixed(3)})`; ctx.fill();
+        if (foam) {
+          mapAt(foam, V, c, q, { x: -q.y, y: q.x }, 0.004, 0);
+          ctx.globalAlpha = Math.min(1, a * 1.1); ctx.fillStyle = foam; ctx.fill(); ctx.globalAlpha = 1;
+        }
       }
     }
   }
@@ -329,15 +364,12 @@ export interface WakeBoat { i: number; pose: Pose; L: number; beam: number; hull
 export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race, boats: WakeBoat[], back: number, detail = 2) {
   const foam = detail >= 2 ? tex(ctx, 'foam') : null;
   const KELVIN = Math.tan(19.47 * DEG);
-  const lane = [new Path2D(), new Path2D(), new Path2D()];
-  const churns: { pth: Path2D; at: { x: number; y: number; nx: number; ny: number } }[] = [];
-  const featherLit = new Path2D(), featherDark = new Path2D();
-  const bowSoft = new Path2D(), bowWhite = new Path2D();
   const quadTo = (pth: Path2D, a: V2, b: V2, c: V2, d: V2, z = 0) => {
     const pa = V.P(a.x, a.y, z), pb = V.P(b.x, b.y, z), pc = V.P(c.x, c.y, z), pd = V.P(d.x, d.y, z);
     if (Math.min(pa.z, pb.z, pc.z, pd.z) < 0.4) return;
     pth.moveTo(pa.x, pa.y); pth.lineTo(pb.x, pb.y); pth.lineTo(pc.x, pc.y); pth.lineTo(pd.x, pd.y); pth.closePath();
   };
+  const LANE = [0.12, 0.095, 0.07, 0.048, 0.026];
   for (const wb of boats) {
     const H = race.hist[wb.i];
     const n = H.x.length - 1 - Math.max(0, back);
@@ -345,83 +377,83 @@ export function drawWakes(ctx: CanvasRenderingContext2D, V: BankView, race: Race
     const { pose: p, L, beam } = wb;
     const fast = Math.min(1.3, p.spd / Math.max(0.05, wb.hullSpeed));
     if (fast < 0.06 || V.depth(p.x, p.y) < 0.7) continue;
-    // Her track back from the stern.
+    // Her track back from the stern, every step of it: each point stays put on the water, so the
+    // wake grows smoothly behind her instead of being re-sampled every frame.
     const T = 1.6 + 3.6 * Math.min(1, fast);
     const steps = Math.min(n, Math.round(T / 0.05));
     const pts: { x: number; y: number; nx: number; ny: number; age: number; s: number }[] = [];
     let s0 = 0;
-    for (let k = n; k >= n - steps; k -= 2) {
+    for (let k = n; k >= n - steps; k--) {
       const f = dir(H.hdg[k]);
       const q = { x: H.x[k] - f.x * L * 0.47, y: H.y[k] - f.y * L * 0.47 };
       if (pts.length) s0 += Math.hypot(q.x - pts[pts.length - 1].x, q.y - pts[pts.length - 1].y);
       pts.push({ ...q, nx: f.y, ny: -f.x, age: (n - k) * 0.05, s: s0 });
     }
     if (pts.length < 3) continue;
-    // ── The lane, and the white water just behind her ──
+    // ── The lane, smoother and paler than the ripples round it, and white water just behind her ──
     const width = (age: number) => beam * (0.32 + 1.5 * (age / T)) * (0.7 + 0.4 * fast);
-    const churn = new Path2D();
-    churns.push({ pth: churn, at: { x: pts[0].x, y: pts[0].y, nx: pts[0].nx, ny: pts[0].ny } });
+    const lane = LANE.map(() => new Path2D()), churn = new Path2D();
     for (let k = 0; k + 1 < pts.length; k++) {
       const a = pts[k], b = pts[k + 1], wa = width(a.age), wbb = width(b.age);
       const A = { x: a.x + a.nx * wa, y: a.y + a.ny * wa }, B = { x: b.x + b.nx * wbb, y: b.y + b.ny * wbb };
       const C = { x: b.x - b.nx * wbb, y: b.y - b.ny * wbb }, D = { x: a.x - a.nx * wa, y: a.y - a.ny * wa };
-      quadTo(lane[Math.min(2, Math.floor((a.age / T) * 3))], A, B, C, D);
+      quadTo(lane[Math.min(LANE.length - 1, Math.floor((a.age / T) * LANE.length))], A, B, C, D);
       if (a.age < 0.25 + 0.5 * fast) quadTo(churn, A, B, C, D);
     }
-    // ── Her wash: a feather of little waves along each arm of the V ──
+    lane.forEach((pth, k) => { ctx.fillStyle = `rgba(176,204,232,${LANE[k] * Math.min(1, 0.4 + fast)})`; ctx.fill(pth); });
+    ctx.fillStyle = 'rgba(232,242,252,0.22)'; ctx.fill(churn);
+    if (foam) {
+      mapAt(foam, V, pts[0], { x: pts[0].nx, y: pts[0].ny }, { x: -pts[0].ny, y: pts[0].nx }, 0.008, 0);
+      ctx.fillStyle = foam; ctx.globalAlpha = 0.8; ctx.fill(churn); ctx.globalAlpha = 1;
+    }
+    // ── Her wash: a feather of little waves along each arm of the V, at fixed distances behind her ──
     if (fast > 0.2 && detail > 0) {
       const reach = L * (1.2 + 2.6 * fast), gap = 0.12 + 0.2 * fast;
-      let next = gap * 0.6, k = 1;
-      while (next < reach && k < pts.length) {
+      const lit = new Path2D(), dark = new Path2D();
+      let k = 1;
+      for (let next = gap * 0.6; next < reach; next += gap) {
         while (k < pts.length && pts[k].s < next) k++;
         if (k >= pts.length) break;
-        const a = pts[k], fade = 1 - next / reach;
+        // Exactly that far back along her track, between the two points either side.
+        const a0 = pts[k - 1], a1 = pts[k], u = (next - a0.s) / Math.max(1e-6, a1.s - a0.s);
+        const a = { x: a0.x + (a1.x - a0.x) * u, y: a0.y + (a1.y - a0.y) * u, nx: a0.nx + (a1.nx - a0.nx) * u, ny: a0.ny + (a1.ny - a0.ny) * u };
+        const fade = 1 - next / reach;
+        if (fade < 0.15) continue;
         const len = (0.05 + 0.1 * fast) * (0.5 + 0.8 * fade), th = 0.012 + 0.012 * fast * fade;
-        // The little crests lie at about 55° to her track, sloping back from the arm.
         for (const side of [1, -1]) {
+          // The little crests lie at about 55° to her track, sloping back from the arm.
           const off = beam * 0.45 + next * KELVIN;
           const c = { x: a.x + a.nx * off * side, y: a.y + a.ny * off * side };
-          const tx = -a.ny, ty = a.nx; // along her track, forwards
-          const ang = 55 * DEG;
+          const tx = -a.ny, ty = a.nx, ang = 55 * DEG;
           const ex = (tx * Math.cos(ang) + a.nx * side * Math.sin(ang)) * len, ey = (ty * Math.cos(ang) + a.ny * side * Math.sin(ang)) * len;
-          const ox = -ey / len * th, oy = ex / len * th;
+          const ox = (-ey / len) * th, oy = (ex / len) * th;
           const e0 = { x: c.x - ex * 0.5, y: c.y - ey * 0.5 }, e1 = { x: c.x + ex * 0.5, y: c.y + ey * 0.5 };
-          if (fade > 0.15) {
-            quadTo(featherLit, { x: e0.x + ox, y: e0.y + oy }, { x: e1.x + ox, y: e1.y + oy }, e1, e0);
-            quadTo(featherDark, e0, e1, { x: e1.x - ox * 1.6, y: e1.y - oy * 1.6 }, { x: e0.x - ox * 1.6, y: e0.y - oy * 1.6 });
-          }
+          quadTo(lit, { x: e0.x + ox, y: e0.y + oy }, { x: e1.x + ox, y: e1.y + oy }, e1, e0);
+          quadTo(dark, e0, e1, { x: e1.x - ox * 1.6, y: e1.y - oy * 1.6 }, { x: e0.x - ox * 1.6, y: e0.y - oy * 1.6 });
         }
-        next += gap;
       }
+      ctx.fillStyle = 'rgba(3,15,32,0.13)'; ctx.fill(dark);
+      ctx.fillStyle = 'rgba(214,232,250,0.32)'; ctx.fill(lit);
     }
     // ── Bow wave: white water peeling off both sides of the bow ──
     if (fast > 0.12) {
       const f = dir(p.hdg), sd = { x: f.y, y: -f.x };
       const at = (fx: number, side: number, off: number) => ({ x: p.x + f.x * fx * L + sd.x * side * off, y: p.y + f.y * fx * L + sd.y * side * off });
       const hw = beam / 2, flare = hw * (0.5 + 1.3 * fast), aft = 0.16 + 0.34 * fast;
+      const soft = new Path2D(), white = new Path2D();
       for (const side of [1, -1]) {
         // A soft sheet of white, then the bright curl along the hull.
-        const soft = [at(0.49, side, 0.01), at(0.38, side, hw * 0.85), at(0.5 - aft * 0.6, side, hw + flare * 0.55), at(0.5 - aft, side, hw + flare), at(0.5 - aft * 1.05, side, hw + flare * 0.4), at(0.5 - aft * 0.7, side, hw * 0.9)];
-        const white = [at(0.49, side, 0.005), at(0.4, side, hw * 0.8), at(0.5 - aft * 0.55, side, hw + flare * 0.35), at(0.5 - aft * 0.6, side, hw * 0.95)];
-        for (const [pth, ring] of [[bowSoft, soft], [bowWhite, white]] as const) {
+        const sheet = [at(0.49, side, 0.01), at(0.38, side, hw * 0.85), at(0.5 - aft * 0.6, side, hw + flare * 0.55), at(0.5 - aft, side, hw + flare), at(0.5 - aft * 1.05, side, hw + flare * 0.4), at(0.5 - aft * 0.7, side, hw * 0.9)];
+        const curl = [at(0.49, side, 0.005), at(0.4, side, hw * 0.8), at(0.5 - aft * 0.55, side, hw + flare * 0.35), at(0.5 - aft * 0.6, side, hw * 0.95)];
+        for (const [pth, ring] of [[soft, sheet], [white, curl]] as const) {
           const q = ring.map(pt => V.P(pt.x, pt.y, p.heave));
           if (q.some(qq => qq.z < 0.4)) continue;
           q.forEach((qq, k2) => (k2 ? pth.lineTo(qq.x, qq.y) : pth.moveTo(qq.x, qq.y)));
           pth.closePath();
         }
       }
+      ctx.fillStyle = 'rgba(236,245,255,0.32)'; ctx.fill(soft);
+      ctx.fillStyle = 'rgba(248,252,255,0.75)'; ctx.fill(white);
     }
   }
-  // The lane: paler and smoother than the rippled water round it, fading as it widens.
-  [0.11, 0.075, 0.04].forEach((a, k) => { ctx.fillStyle = `rgba(176,204,232,${a})`; ctx.fill(lane[k]); });
-  ctx.fillStyle = 'rgba(3,15,32,0.13)'; ctx.fill(featherDark);
-  ctx.fillStyle = 'rgba(214,232,250,0.32)'; ctx.fill(featherLit);
-  for (const c of churns) {
-    ctx.fillStyle = 'rgba(232,242,252,0.22)'; ctx.fill(c.pth);
-    if (!foam) continue;
-    mapAt(foam, V, c.at, { x: c.at.nx, y: c.at.ny }, { x: -c.at.ny, y: c.at.nx }, 0.008, 0);
-    ctx.fillStyle = foam; ctx.globalAlpha = 0.8; ctx.fill(c.pth); ctx.globalAlpha = 1;
-  }
-  ctx.fillStyle = 'rgba(236,245,255,0.32)'; ctx.fill(bowSoft);
-  ctx.fillStyle = 'rgba(248,252,255,0.75)'; ctx.fill(bowWhite);
 }

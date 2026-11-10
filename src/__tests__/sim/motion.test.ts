@@ -19,10 +19,27 @@ function closeHauled(kn: number, rig = 1): Boat {
 }
 
 describe('Heel', () => {
-  it('heels an IOM about 16° close-hauled in 9 to 10 knots, and to port on starboard tack', () => {
+  it('heels an IOM about 20° close-hauled in 9 to 10 knots, and to port on starboard tack', () => {
     const h = closeHauled(9.5).heel;
-    expect(h).toBeGreaterThan(12);
-    expect(h).toBeLessThan(20);
+    expect(h).toBeGreaterThan(15);
+    expect(h).toBeLessThan(25);
+  });
+
+  it('lays her nearly flat in a gust twice the breeze', () => {
+    const b = closeHauled(15, rigPower('IOM', 15));
+    b.tws = 30 * KN;
+    let peak = 0;
+    for (let k = 0; k < 40; k++) { heelStep(b, 0.05, 42); peak = Math.max(peak, Math.abs(b.heel)); }
+    expect(peak).toBeGreaterThan(70);
+  });
+
+  it('never lays her past flat, however hard it blows', () => {
+    const b = closeHauled(15);
+    b.tws = 45 * KN;
+    let peak = 0;
+    for (let k = 0; k < 80; k++) { heelStep(b, 0.05, 42); peak = Math.max(peak, Math.abs(b.heel)); }
+    expect(peak).toBeGreaterThan(75);
+    expect(peak).toBeLessThanOrEqual(86);
   });
 
   it('heels her further in a gust, with a small overshoot as it hits, and less with the B rig', () => {
@@ -49,6 +66,33 @@ describe('Heel', () => {
     b.heel = 40;
     expect(some).toBeGreaterThan(0);
     expect(weatherHelm(b)).toBeGreaterThan(3 * some);
+  });
+});
+
+describe('Gusts', () => {
+  /** The strongest wind any boat feels on the beat (as a share of the breeze), and the most heel. */
+  const felt = (windStrength: RaceSettings['windStrength'], windCharacter: RaceSettings['windCharacter'], seed: number) => {
+    const r = new Race({ classId: 'IOM', fleetSize: 8, level: 'state', windStrength, windCharacter, laps: 1, length: 'medium', sequenceSeconds: 30, coach: 'off', autoTrim: true, seed, noPlayer: true } as RaceSettings);
+    let gust = 0, heel = 0;
+    while (!r.ended && r.t < r.gunT + 200) {
+      r.step();
+      if (r.t < r.gunT) continue;
+      for (const b of r.boats) {
+        if (b.finished || Math.abs(b.twa) > 55) continue;
+        gust = Math.max(gust, b.tws / r.wind.baseTws); heel = Math.max(heel, Math.abs(b.heel));
+      }
+    }
+    return { gust, heel };
+  };
+
+  it('brings big gusts through the fleet on a fresh, puffy day, and they lay boats nearly flat', () => {
+    const f = felt('fresh', 'puffy', 12);
+    expect(f.gust).toBeGreaterThan(1.7);
+    expect(f.heel).toBeGreaterThan(65);
+  });
+
+  it('keeps them on their feet in a moderate, shifty breeze', () => {
+    expect(felt('medium', 'oscillating', 12).heel).toBeLessThan(50);
   });
 });
 

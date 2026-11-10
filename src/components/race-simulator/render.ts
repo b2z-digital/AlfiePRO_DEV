@@ -12,6 +12,7 @@ import { drawVenueLand, waterPath } from './venueMap';
 import { drawCredit } from './bankVenue';
 import { ALFIE, YOU_INTRO, alfieCallout } from './bank';
 import { mapAt, tex } from './bankWater';
+import { puffLife } from '@/sim/wind';
 
 export interface Camera { x: number; y: number; scale: number } // world metres at screen centre, px per metre
 
@@ -76,7 +77,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   const detail = v.detail ?? 2;
   const wind = detail >= 1 ? tex(ctx, 'wind') : null;
   if (wind) {
-    mapAt(wind, flat, { x: cam.x, y: cam.y }, acrossW, wd, tm, (t * (0.16 + 0.025 * kn)) / tm);
+    mapAt(wind, flat, { x: cam.x, y: cam.y }, acrossW, wd, tm, (t * (0.12 + 0.02 * kn)) / tm);
     ctx.globalAlpha = 0.25 + 0.45 * Math.min(1, kn / 13);
     ctx.fillStyle = wind; ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = 1;
@@ -85,8 +86,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   // them. Lulls: smoother, paler patches.
   const gust = detail >= 2 ? tex(ctx, 'gust') : null;
   for (const p of race.wind.puffs) {
-    const life = Math.sin(Math.PI * Math.min(1, Math.max(0, p.age / p.life)));
-    const a = Math.min(1, Math.abs(p.strength) * 3.2 + 0.15) * life;
+    const a = Math.min(1, Math.abs(p.strength) * 1.5 + 0.25) * puffLife(p);
     if (a < 0.03) continue;
     const px = X(p.x), py = Y(p.y), r = p.r * s;
     if (px < -r * 2 || px > w + r * 2 || py < -r * 2 || py > h + r * 2) continue;
@@ -95,13 +95,13 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.rotate((twd * Math.PI) / 180);
     ctx.scale(1, 1.5);
     const rg = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r * 1.08);
-    if (p.strength > 0) { rg.addColorStop(0, `rgba(2,9,22,${0.78 * a})`); rg.addColorStop(0.7, `rgba(2,9,22,${0.6 * a})`); rg.addColorStop(1, 'rgba(2,9,22,0)'); }
-    else { rg.addColorStop(0, `rgba(190,215,255,${0.13 * a})`); rg.addColorStop(1, 'rgba(190,215,255,0)'); }
+    if (p.strength > 0) { rg.addColorStop(0, `rgba(2,9,22,${0.52 * a})`); rg.addColorStop(0.7, `rgba(2,9,22,${0.4 * a})`); rg.addColorStop(1, 'rgba(2,9,22,0)'); }
+    else { rg.addColorStop(0, `rgba(190,215,255,${0.1 * a})`); rg.addColorStop(1, 'rgba(190,215,255,0)'); }
     ctx.fillStyle = rg;
     ctx.beginPath(); ctx.arc(0, 0, r * 1.08, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     if (p.strength > 0 && gust && r > 6) {
-      mapAt(gust, flat, { x: p.x, y: p.y }, acrossW, wd, tm, (t * (0.5 + 0.05 * kn)) / tm);
+      mapAt(gust, flat, { x: p.x, y: p.y }, acrossW, wd, tm, (t * (0.15 + 0.025 * kn)) / tm);
       ctx.fillStyle = gust;
       for (const [k, al] of [[0.95, 0.35], [0.7, 0.4]] as const) {
         ctx.globalAlpha = al * a;
@@ -419,7 +419,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
         }
       }
     }
-    drawBoat(ctx, sx, sy, bh, twa, b.disabled ? 0 : b.sheet, Lpx, b.color, b.isPlayer, b.disabled || Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1);
+    drawBoat(ctx, sx, sy, bh, twa, b.disabled ? 0 : b.sheet, Lpx, b.color, b.isPlayer, b.disabled || Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1, back > 0 ? undefined : b.tack);
     // Label.
     if (intro) {
       const pulse = 0.5 + 0.5 * Math.sin(race.t * 7);
@@ -480,7 +480,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
 /** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on
  *  screen. Both sails come off the one sheet, as on a radio yacht; running deep, the jib swings out
  *  on the other side (goose-winged). */
-export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, hdg: number, twa: number, sheet: number, Lpx: number, color: string, isPlayer: boolean, luffing: boolean, alpha = 1) {
+export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, hdg: number, twa: number, sheet: number, Lpx: number, color: string, isPlayer: boolean, luffing: boolean, alpha = 1, tack?: 'stbd' | 'port') {
   const k = Lpx / 24;
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -512,7 +512,9 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   const natural = Math.min(88, Math.max(0, a - 4));
   const boom = Math.min(maxBoom, natural);
   const flapping = luffing || maxBoom > natural + 6;
-  const side = twa >= 0 ? -1 : 1; // starboard tack: sails to port
+  // Starboard tack: sails to port. Her tack (when we know it) waits until she's well by the lee before
+  // it changes, so sails on a boat running dead downwind don't flick from side to side.
+  const side = tack ? (tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
   const sail = (mx: number, my: number, len: number, ang: number, sd: number, flap: boolean, width: number) => {
     const r = (ang * Math.PI) / 180;
     const ex = mx + sd * Math.sin(r) * len, ey = my + Math.cos(r) * len;
@@ -529,11 +531,13 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   };
   ctx.strokeStyle = '#FFFFFF';
   ctx.lineCap = 'round';
-  // Jib: forward of the mast. Running deep with the sheet eased it goose-wings to the other side.
-  const goose = a > 156 && ease > 0.6 && !luffing;
-  const jibAng = goose ? Math.min(85, maxBoom) : Math.min(maxBoom * 1.08 + 2, natural + 2);
+  // Jib: forward of the mast. Running deep with the sheet eased it swings across to goose-wing on
+  // the other side, gradually, so it never flicks back and forth.
+  const ramp = (lo: number, hi: number, x: number) => { const u = Math.max(0, Math.min(1, (x - lo) / (hi - lo))); return u * u * (3 - 2 * u); };
+  const goose = luffing ? 0 : ramp(150, 162, a) * ramp(0.5, 0.68, ease);
+  const jibSigned = (1 - goose) * Math.min(maxBoom * 1.08 + 2, natural + 2) - goose * Math.min(85, maxBoom);
   ctx.globalAlpha = alpha * 0.95;
-  sail(0, -11.6 * k, 7 * k, jibAng, goose ? -side : side, flapping && !goose, Math.max(1.2, 1.5 * k * 0.55));
+  sail(0, -11.6 * k, 7 * k, Math.abs(jibSigned), jibSigned < 0 ? -side : side, flapping && goose < 0.5, Math.max(1.2, 1.5 * k * 0.55));
   ctx.globalAlpha = alpha;
   // Mainsail.
   sail(0, -3.9 * k, 11.5 * k, boom, side, flapping, Math.max(1.4, 1.8 * k * 0.55));

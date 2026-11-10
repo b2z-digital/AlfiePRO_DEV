@@ -38,14 +38,24 @@ export const PUFF_LENGTH = 1.5;
 
 /**
  * How much of a puff is felt at a point, 0 to 1: the same all through its middle, falling away over
- * its last few metres, so you feel it arrive. `down` is the way the wind is blowing.
+ * its last metre or two, so it hits you when it arrives. `down` is the way the wind is blowing.
  */
 export function puffWeight(p: Puff, x: number, y: number, down: V2): number {
   const dx = x - p.x, dy = y - p.y;
   const al = (dx * down.x + dy * down.y) / (PUFF_LENGTH * p.r), ac = (dx * down.y - dy * down.x) / p.r;
   const d2 = al * al + ac * ac;
-  if (d2 > 2.2) return 0;
-  return Math.exp(-d2 * d2 * d2) * Math.sin(Math.PI * clamp(p.age / p.life, 0, 1));
+  if (d2 > 1.7) return 0;
+  const d4 = d2 * d2;
+  return Math.exp(-d4 * d4) * puffLife(p);
+}
+
+/**
+ * How grown a puff is, 0 to 1: it builds over its first 8 s (before it reaches the course), blows at
+ * full strength through the rest of its life and dies away over its last 15 s.
+ */
+export function puffLife(p: Puff): number {
+  const s = (v: number) => { const u = clamp(v, 0, 1); return u * u * (3 - 2 * u); };
+  return s(p.age / 8) * s((p.life - p.age) / 15);
 }
 
 export class WindField {
@@ -59,6 +69,7 @@ export class WindField {
   puffs: Puff[] = [];
   private puffRate: number;        // puffs per second
   private puffStrength: [number, number];
+  private bigGusts = false;
   private nextPuffId = 1;
   private rng: Rng;
   /** Centre and size of the area puffs cover, set by the course. */
@@ -93,8 +104,12 @@ export class WindField {
     const across = Math.max(10, area.halfAcross);
     this.sidePressure = sideSign * (settings.character === 'steady' ? 0.04 : 0.1) / across;
     this.sideShift = r.range(-1, 1) * 3 / across;
-    this.puffRate = settings.character === 'puffy' ? 0.09 : settings.character === 'steady' ? 0.02 : 0.045;
-    this.puffStrength = settings.character === 'puffy' ? [0.18, 0.4] : [0.1, 0.25];
+    // A fresh breeze is gustier: on a puffy day the puffs come through more often, most of them 30 to
+    // 60% up, and every minute or two a big one at up to twice the breeze lays the fleet over.
+    const fresh = kn >= 13;
+    this.puffRate = settings.character === 'puffy' ? (fresh ? 0.13 : 0.09) : settings.character === 'steady' ? 0.02 : 0.045;
+    this.bigGusts = settings.character === 'puffy' && fresh;
+    this.puffStrength = settings.character === 'puffy' ? (fresh ? [0.3, 1.0] : [0.15, 0.34]) : fresh ? [0.13, 0.38] : [0.085, 0.21];
     // Seed the course with puffs already on the water.
     for (let i = 0; i < 6; i++) this.spawn(r.range(-1, 1));
     this.shifts = settings.shifts ?? [];
@@ -125,9 +140,12 @@ export class WindField {
     const a = this.area;
     // New puffs appear upwind of the course; the initial ones are spread along it.
     const along = alongFrac === undefined ? a.halfAlong * 1.3 : alongFrac * a.halfAlong;
-    const across = r.range(-1, 1) * a.halfAcross * 1.1;
+    // Across the middle of the course, where the fleet sails, so the boats meet most of them.
+    const across = r.range(-1, 1) * a.halfAcross * 0.7;
     const isLull = r.chance(0.28);
-    const s = r.range(this.puffStrength[0], this.puffStrength[1]) * (isLull ? -0.7 : 1);
+    // On a gusty fresh day the strength is skewed: mostly middling puffs, the odd big one.
+    const u = r.next(), lo = this.puffStrength[0], hi = this.puffStrength[1];
+    const s = (lo + (hi - lo) * (this.bigGusts ? u * u : u)) * (isLull ? -0.7 : 1);
     this.puffs.push({
       id: this.nextPuffId++,
       x: a.cx + up.x * along + right.x * across,
@@ -145,7 +163,8 @@ export class WindField {
     const tws = this.meanTws(t);
     const down = dir(this.meanTwd(t) + 180);
     this.down = down;
-    const v = tws * 0.55;
+    // Puffs and lulls ride down the course at about a third of the wind's speed.
+    const v = tws * 0.36;
     for (const p of this.puffs) {
       p.x += down.x * v * dt;
       p.y += down.y * v * dt;
@@ -172,7 +191,7 @@ export class WindField {
       k += p.strength * w;
       shift += p.shift * w;
     }
-    tws *= clamp(k, 0.4, 1.6);
+    tws *= clamp(k, 0.4, 2.1);
     twd += shift;
     return { twd: n360(twd), tws };
   }
