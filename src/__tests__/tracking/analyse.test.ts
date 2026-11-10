@@ -51,4 +51,14 @@ describe('tracking analysis against the simulator', () => {
     expect(w).not.toBeNull();
     expect(Math.abs(((w! - twd + 540) % 360) - 180)).toBeLessThan(10);
   });
+
+  it('only calls finishes too close when the boats crossed together', () => {
+    // The finish is mid-course: boats still on their way to the last mark pass near it from the far
+    // side, and must not be counted as close to a boat finishing.
+    for (const f of a.finishes) for (const id of f.tooClose) {
+      const o = a.finishes.find(x => x.boatId === id)!;
+      expect(Math.abs(o.t - f.t)).toBeLessThan(3);
+    }
+    for (const f of a.finishes) if (f.margin != null) expect(f.margin).toBeGreaterThanOrEqual(0);
+  });
 });

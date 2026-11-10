@@ -367,8 +367,10 @@ export function analyseRace(boats: TrackedBoat[], c: TrackedCourse, gun: number 
       const hb = hullAt(boats.find(b => b.id === nx.boatId)!, f.t);
       if (!hb) continue;
       const gap = -hullAcross(finishGate, hb).d;
-      f.margin = gap;
-      if (gap < set.accuracy) { f.tooClose.push(nx.boatId); nx.tooClose.push(f.boatId); }
+      // Only a boat coming up to the line counts: one on the far side of it (still on her way to the
+      // last mark, where the finish is mid-course) isn't close, however near the line she is.
+      f.margin = gap >= 0 && gap < 10 ? gap : null;
+      if (gap > -set.accuracy && gap < set.accuracy && nx.t - f.t < 3) { f.tooClose.push(nx.boatId); nx.tooClose.push(f.boatId); }
     }
   }
 
