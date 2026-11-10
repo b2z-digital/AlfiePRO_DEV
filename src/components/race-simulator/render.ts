@@ -38,6 +38,8 @@ export interface ViewOptions {
   ghost?: { b: Boat; label: string } | null;
   /** How much detail the water gets: 2 full, 1 less, 0 the least (for slower devices). */
   detail?: number;
+  /** The map credit in the corner (off on a phone, which shows it under your boat's line). */
+  credit?: boolean;
 }
 
 const TONE = { blue: ['rgba(77,163,255,0.85)', 'rgba(77,163,255,0.10)', '#9CCBFF'], orange: ['rgba(255,159,67,0.85)', 'rgba(255,159,67,0.10)', '#FFCB96'], green: ['rgba(52,211,153,0.85)', 'rgba(52,211,153,0.10)', '#A7F3D0'] } as const;
@@ -474,7 +476,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), r, 0, Math.PI * 2); ctx.stroke();
   }
-  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
+  if (race.venue && v.credit !== false) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
 /** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on

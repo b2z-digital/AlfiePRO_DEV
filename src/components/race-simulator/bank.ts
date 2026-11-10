@@ -164,6 +164,8 @@ export interface BankOptions {
   ghost?: { race: Race; b: Boat; label: string } | null;
   /** How much detail the water gets: 2 full, 1 less, 0 the least (for slower devices). */
   detail?: number;
+  /** The map credit in the corner (off on a phone, which shows it under your boat's line). */
+  credit?: boolean;
 }
 
 export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptions) {
@@ -388,7 +390,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
       label(ctx, nextAt.name.replace(/^the /, ''), Math.max(60, Math.min(w - 60, ax)), ay + (ay > h / 2 ? -28 : 28), '#CFE5FF', 12);
     }
   }
-  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
+  if (race.venue && v.credit !== false) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
 /** Hull tape and deck colours that go with a hull colour. */

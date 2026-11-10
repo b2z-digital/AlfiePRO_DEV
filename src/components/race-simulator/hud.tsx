@@ -6,6 +6,20 @@ import type { Cue, CoachMode, LineInfo } from './coach';
 import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
 
+/** What the race screen shows, refreshed ten times a second from the race. */
+export interface HudState {
+  T: number; raceT: number; preStart: boolean;
+  wind: { kn: number; from: number; spark: number[]; swing: number };
+  line: LineInfo | null;
+  course: { leg: string; legNo: number; legs: number; next: string; distL: number | null; place: number; of: number; status: string | null };
+  fleet: FleetRow[];
+  boat: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string };
+  rudder: number; sheet: number; twa: number;
+  /** The penalty turn you owe, and how far round you are (null when you owe none). */
+  penalty: PenaltyProgress | null; finished: boolean;
+  goal: { progress: string | null; timeLeft: number | null } | null;
+}
+
 // ───────────────────────── Wind ─────────────────────────
 export function WindCard({ kn, from, spark, swing, compact }: { kn: number; from: number; spark: number[]; swing: number; compact?: boolean }) {
   const w = 240, h = 46;
@@ -272,21 +286,23 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
 }
 
 // ───────────────────────── Rules moment ─────────────────────────
-export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, onLearn }: {
+export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, onLearn, compact }: {
   inc: Incident; mine: boolean; otherSail: string | null; onContinue: () => void; onReplay?: () => void; onLearn: () => void;
+  /** On a phone: smaller, and as tall as the screen allows. */
+  compact?: boolean;
 }) {
   const rt = ruleText(inc.rule);
   const head = inc.kind === 'ocs' ? 'You were over the line at the gun'
     : mine ? `You broke Rule ${inc.rule}: ${inc.title.toLowerCase()}`
       : `${otherSail ?? 'A boat'} broke Rule ${inc.rule} against you`;
-  return (
-    <Hud className="flex flex-col gap-4 overflow-auto px-6 py-[22px]" style={{ width: 'min(464px, calc(100vw - 32px))', maxHeight: 'calc(100% - 44px)' }}>
+  const body = (
+    <>
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone="warn">Rules moment</Chip>
         <Chip>Rule {inc.rule} · {inc.title.toLowerCase()}</Chip>
       </div>
-      <h2 className="m-0 font-display text-[25px] font-bold leading-[1.2] tracking-[-0.02em]">{head}</h2>
-      <p className="m-0 text-[14.5px] leading-[1.55]">{inc.explanation}</p>
+      <h2 className={cx('m-0 font-display font-bold leading-[1.2] tracking-[-0.02em]', compact ? 'text-[19px]' : 'text-[25px]')}>{head}</h2>
+      <p className={cx('m-0 leading-[1.55]', compact ? 'text-[14px]' : 'text-[14.5px]')}>{inc.explanation}</p>
       {rt?.rc && (
         <div className="flex items-start gap-2.5 rounded-[14px] bg-white/[0.04] px-3.5 py-3">
           <InfoGlyph />
@@ -307,16 +323,30 @@ export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, o
           <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>{inc.nextTime}</p>
         </div>
       )}
-      <div className="mt-auto flex flex-wrap gap-2.5">
-        <Btn primary onClick={onContinue}>Carry on racing</Btn>
-        {onReplay && (
-          <Btn onClick={onReplay}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-            Watch replay
-          </Btn>
-        )}
-        {rt && <Btn quiet onClick={onLearn}>Rule {rt.rule} in brief</Btn>}
-      </div>
+    </>
+  );
+  const buttons = (
+    <div className="mt-auto flex flex-wrap gap-2.5">
+      <Btn primary onClick={onContinue}>Carry on racing</Btn>
+      {onReplay && (
+        <Btn onClick={onReplay}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+          Watch replay
+        </Btn>
+      )}
+      {rt && <Btn quiet onClick={onLearn}>Rule {rt.rule} in brief</Btn>}
+    </div>
+  );
+  // On a phone the words scroll and the buttons stay in view below them.
+  return compact ? (
+    <Hud className="flex flex-col gap-3 overflow-hidden px-4 py-4" style={{ width: 'min(520px, 100%)', maxHeight: '100%' }}>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">{body}</div>
+      {buttons}
+    </Hud>
+  ) : (
+    <Hud className="flex flex-col gap-4 overflow-auto px-6 py-[22px]" style={{ width: 'min(464px, calc(100vw - 32px))', maxHeight: 'calc(100% - 44px)' }}>
+      {body}
+      {buttons}
     </Hud>
   );
 }
@@ -328,7 +358,7 @@ export function RuleSheet({ rule, onClose }: { rule: string; onClose: () => void
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center p-4">
       <button type="button" aria-label="Close" className="absolute inset-0 cursor-default border-0 bg-black/45" onClick={onClose} />
-      <Hud className="relative flex w-full max-w-[460px] flex-col gap-3.5 px-6 py-5" role="dialog" aria-label={`Rule ${rt.rule}`}>
+      <Hud className="relative flex max-h-full w-full max-w-[460px] flex-col gap-3.5 overflow-y-auto px-6 py-5" role="dialog" aria-label={`Rule ${rt.rule}`}>
         <Cap>Rule {rt.rule}</Cap>
         <h3 className="m-0 font-display text-[22px] font-bold">{rt.title}</h3>
         <p className="m-0 text-[14.5px] leading-[1.55]">{rt.text}</p>
@@ -383,11 +413,11 @@ export function ReplayBar({ back, max, playing, onStep, onToggle, onScrub, onExi
 // ───────────────────────── Toasts & banners ─────────────────────────
 export interface Toast { id: number; text: string; tone: 'plain' | 'warn' | 'good' }
 
-export function Toasts({ items }: { items: Toast[] }) {
+export function Toasts({ items, compact }: { items: Toast[]; compact?: boolean }) {
   return (
-    <div className="pointer-events-none flex flex-col items-center gap-2" aria-live="polite">
+    <div className={cx('pointer-events-none flex flex-col items-center', compact ? 'gap-1.5' : 'gap-2')} aria-live="polite">
       {items.map(t => (
-        <div key={t.id} className={cx('rounded-full border px-4 py-2 text-[13.5px] font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[10px]',
+        <div key={t.id} className={cx('rounded-full border font-semibold shadow-[0_8px_24px_rgba(0,0,0,0.35)] backdrop-blur-[10px]', compact ? 'px-3 py-1.5 text-center text-[12.5px]' : 'px-4 py-2 text-[13.5px]',
           t.tone === 'warn' ? 'border-[rgba(255,159,67,0.45)] bg-[rgba(60,32,8,0.88)] text-[#FFD7B0]'
             : t.tone === 'good' ? 'border-[rgba(52,211,153,0.4)] bg-[rgba(6,40,30,0.88)] text-[#A7F3D0]'
               : 'border-white/[0.12] bg-[rgba(7,13,27,0.88)] text-[#F1F4FA]')}>
@@ -398,16 +428,19 @@ export function Toasts({ items }: { items: Toast[] }) {
   );
 }
 
-export function HintBanner({ inc, mine, onOpen, onClose }: { inc: Incident; mine: boolean; onOpen: () => void; onClose: () => void }) {
+export function HintBanner({ inc, mine, onOpen, onClose, compact }: { inc: Incident; mine: boolean; onOpen: () => void; onClose: () => void; compact?: boolean }) {
   return (
-    <Hud className="flex items-start gap-3 px-4 py-3" style={{ width: 'min(560px, calc(100vw - 32px))' }}>
+    <Hud className={cx('pointer-events-auto flex items-start', compact ? 'w-full max-w-[520px] gap-2.5 !rounded-[14px] px-3 py-2.5' : 'gap-3 px-4 py-3')} style={compact ? undefined : { width: 'min(560px, calc(100vw - 32px))' }}>
       <WarnGlyph />
       <div className="min-w-0 flex-1">
-        <p className="m-0 text-[14px] font-semibold">Rule {inc.rule}: {inc.title}</p>
-        <p className="m-0 mt-0.5 text-[13px] leading-[1.45]" style={{ color: C.mute }}>{inc.kind === 'ocs' ? (mine ? 'Recall: sail back below the line and start again. ' : '') : mine ? 'You owe a One-Turn Penalty: when you\'re clear, turn right round through a tack and a gybe. ' : 'The other boat owes a penalty. '}{inc.nextTime ?? ''}</p>
+        <p className={cx('m-0 font-semibold', compact ? 'text-[13px]' : 'text-[14px]')}>Rule {inc.rule}: {inc.title}</p>
+        <p className={cx('m-0 mt-0.5 leading-[1.45]', compact ? 'line-clamp-2 text-[12px]' : 'text-[13px]')} style={{ color: C.mute }}>{inc.kind === 'ocs' ? (mine ? 'Recall: sail back below the line and start again. ' : '') : mine ? 'You owe a One-Turn Penalty: when you\'re clear, turn right round through a tack and a gybe. ' : 'The other boat owes a penalty. '}{inc.nextTime ?? ''}</p>
       </div>
-      <Btn small onClick={onOpen}>Explain</Btn>
-      <Btn small icon aria-label="Dismiss" onClick={onClose}>✕</Btn>
+      {/* On a phone held upright the buttons stack, leaving the words room. */}
+      <div className={cx('flex shrink-0', compact ? 'flex-col items-end gap-1.5 min-[480px]:flex-row min-[480px]:items-center' : 'items-center gap-3')}>
+        <Btn small onClick={onOpen}>Explain</Btn>
+        <Btn small icon aria-label="Dismiss" onClick={onClose}>✕</Btn>
+      </div>
     </Hud>
   );
 }
@@ -475,13 +508,15 @@ function Stars({ n }: { n: number }) {
   );
 }
 
-export function SceneResult({ pass, title, text, stars, best, watching, onAgain, onWatch, onNext, nextLabel, onBack, backLabel, onRule, rule }: {
+export function SceneResult({ pass, title, text, stars, best, watching, onAgain, onWatch, onNext, nextLabel, onBack, backLabel, onRule, rule, onReplay }: {
   pass: boolean; title: string; text: string; stars?: number; best?: string | null; watching: boolean;
   onAgain: () => void; onWatch?: () => void; onNext?: () => void; nextLabel?: string; onBack: () => void; backLabel: string;
   onRule?: () => void; rule?: string;
+  /** Replay the last 10 s, from a button here (on a phone, where there's no room for one underneath). */
+  onReplay?: () => void;
 }) {
   return (
-    <Hud className="flex flex-col gap-4 px-6 py-5" style={{ width: 'min(480px, calc(100vw - 32px))', maxHeight: 'calc(100% - 48px)' }} role="dialog" aria-label={title}>
+    <Hud className="flex flex-col gap-4 overflow-y-auto px-6 py-5" style={{ width: 'min(480px, calc(100vw - 32px))', maxHeight: 'calc(100% - 48px)' }} role="dialog" aria-label={title}>
       <div className="flex items-center gap-3">
         <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-full', pass ? 'bg-[rgba(52,211,153,0.16)] text-[#6EE7B7]' : 'bg-[rgba(255,159,67,0.16)] text-[#FFCB96]')}>
           {pass
@@ -500,6 +535,7 @@ export function SceneResult({ pass, title, text, stars, best, watching, onAgain,
         {onWatch && !watching && <Btn onClick={onWatch}>Watch the right way</Btn>}
         {onNext && <Btn onClick={onNext}>{nextLabel ?? 'Next'}</Btn>}
         {onRule && rule && <Btn quiet onClick={onRule}>Rule {rule} in brief</Btn>}
+        {onReplay && <Btn quiet onClick={onReplay}>Replay the last 10 s</Btn>}
         <Btn quiet onClick={onBack}>{backLabel}</Btn>
       </div>
     </Hud>
