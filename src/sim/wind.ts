@@ -4,6 +4,7 @@
 // the engine on top of this field. Everything is seeded, so the same race replays exactly.
 
 import { KN, Rng, V2, clamp, dir, n360 } from './math';
+import { dexp, dsin } from './dmath';
 
 export type WindStrength = 'light' | 'medium' | 'fresh';
 export type WindCharacter = 'steady' | 'oscillating' | 'puffy' | 'persistent';
@@ -46,7 +47,7 @@ export function puffWeight(p: Puff, x: number, y: number, down: V2): number {
   const d2 = al * al + ac * ac;
   if (d2 > 1.7) return 0;
   const d4 = d2 * d2;
-  return Math.exp(-d4 * d4) * puffLife(p);
+  return dexp(-d4 * d4) * puffLife(p);
 }
 
 /**
@@ -123,13 +124,13 @@ export class WindField {
   /** Mean direction at time t, before local effects. */
   meanTwd(t: number): number {
     let d = this.baseTwd + this.drift * t;
-    for (const o of this.osc) d += o.amp * Math.sin((2 * Math.PI * t) / o.period + o.phase);
+    for (const o of this.osc) d += o.amp * dsin((2 * Math.PI * t) / o.period + o.phase);
     for (const s of this.shifts) if (t > s.t) d += s.deg * Math.min(1, (t - s.t) / Math.max(0.1, s.over));
     return n360(d);
   }
   meanTws(t: number): number {
     let k = 1;
-    for (const g of this.gust) k += g.amp * Math.sin((2 * Math.PI * t) / g.period + g.phase);
+    for (const g of this.gust) k += g.amp * dsin((2 * Math.PI * t) / g.period + g.phase);
     return this.baseTws * k;
   }
 

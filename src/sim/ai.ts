@@ -11,6 +11,7 @@ import { bankAhead, bow, capsule, closest, hullGap, lineSide, stern } from './ph
 import { keepClear, Referee } from './referee';
 import type { Boat, Persona, SkipperLevel } from './types';
 import type { WindField } from './wind';
+import { datan2, dcos, dexp, dhypot, dsin } from './dmath';
 
 export interface LevelParams {
   reaction: number; noise: number; trimNoise: number; shiftThr: number; layMargin: number;
@@ -119,7 +120,7 @@ export class Skipper implements Helm {
     }
     if (!b.started || Math.abs(b.twa) > vmgAngles(b.cls, b.tws).up + 12) return null;
     if (bankAhead(b, h.course) > 3 * L) return null;
-    const right = { x: Math.cos((b.hdg * Math.PI) / 180), y: -Math.sin((b.hdg * Math.PI) / 180) };
+    const right = { x: dcos((b.hdg * Math.PI) / 180), y: -dsin((b.hdg * Math.PI) / 180) };
     const wSide = b.tack === 'stbd' ? 1 : -1;
     let blocker: Boat | null = null, bg = 1.8 * L;
     for (const o of h.boats) {
@@ -285,19 +286,19 @@ export class Skipper implements Helm {
     for (const o of h.boats) {
       if (o === b || o.finished || o.retired) continue;
       const rx = o.x - b.x, ry = o.y - b.y;
-      if (rx * rx + ry * ry > (rad + 4 * horizon) ** 2) continue;
+      if (rx * rx + ry * ry > (rad + 4 * horizon) * (rad + 4 * horizon)) continue;
       const ov = dir(o.hdg);
       const vx = ov.x * o.spd - bv.x * b.spd * 0.3, vy = ov.y * o.spd - bv.y * b.spd * 0.3;
       const vv = vx * vx + vy * vy;
       const tc = vv > 1e-9 ? clamp(-(rx * vx + ry * vy) / vv, 0, horizon) : 0;
-      if (Math.hypot(rx + vx * tc, ry + vy * tc) < rad) return true;
+      if (dhypot(rx + vx * tc, ry + vy * tc) < rad) return true;
     }
     return false;
   }
 
   private clearOfOthers(h: AiHost, lengths: number) {
     const b = this.b;
-    return h.boats.every(o => o === b || o.finished || o.retired || Math.hypot(o.x - b.x, o.y - b.y) > lengths * b.cls.loa);
+    return h.boats.every(o => o === b || o.finished || o.retired || dhypot(o.x - b.x, o.y - b.y) > lengths * b.cls.loa);
   }
 
   private closeHauled(tack: 'port' | 'stbd', twd: number, tws: number) {
@@ -336,7 +337,7 @@ export class Skipper implements Helm {
     const T = h.gunT - h.t;
     const Tp = T + pre.clockErr;                     // the clock as this skipper reads it
     const P = c.start.pin, S = c.start.stbd;
-    const line = sub(S, P), len = Math.hypot(line.x, line.y);
+    const line = sub(S, P), len = dhypot(line.x, line.y);
     const ld = { x: line.x / len, y: line.y / len };
     const n = { x: -ld.y, y: ld.x };                 // towards the course side
     const over = Math.max(lineSide(c, bow(b)), lineSide(c, stern(b))); // most-forward point, + = over
@@ -441,7 +442,7 @@ export class Skipper implements Helm {
         return { hdg: f.hdg, sheet: easedSheet(Math.abs(n180(twd - f.hdg)), 0.8), intent: 'Moving to the start area', maneuver: f.tack ? 'tack' : null };
       }
       const al = dot(sub(b, X), ld); // + = towards the starboard end
-      const west = n360(Math.atan2(-ld.x, -ld.y) * 180 / Math.PI);
+      const west = n360(datan2(-ld.x, -ld.y) * 180 / Math.PI);
       if (onS && Math.abs(b.twa) < 125 && al < -3 * L) return { hdg: n360(twd + va.down), sheet: bestSheet(va.down), intent: 'Turning back', maneuver: 'gybe' };
       if (!onS && Math.abs(b.twa) > 55 && al > 3 * L) return { hdg: stbdCH, sheet: bestSheet(goTwa), intent: 'Turning back', maneuver: 'tack' };
       const base = onS ? west : n360(west + 180);
@@ -694,7 +695,7 @@ export class Skipper implements Helm {
     const devK = plan.rounding ? 1.5 : 1;
     for (const a of ANGLES) {
       const hd = n360(plan.hdg + a);
-      const extra = (80 * (1 - Math.cos(a * Math.PI / 180)) + 0.25 * Math.abs(a)) * devK;
+      const extra = (80 * (1 - dcos(a * Math.PI / 180)) + 0.25 * Math.abs(a)) * devK;
       cands.push({ hdg: hd, sheet: a === 0 ? plan.sheet : sheetAt(hd), extra, tag: a === 0 ? '' : a > 0 ? 'right' : 'left' });
     }
     // Slow down: ease off upwind and reaching; downwind the sail is already out, so over-sheet instead.
@@ -710,7 +711,7 @@ export class Skipper implements Helm {
     const legNow = h.course.legs[b.legIndex];
     const zoneMark = legNow && legNow.kind === 'mark' && legNow.upwind && b.started ? h.course.byId[legNow.rounding.markId] : null;
     const inZone = zoneMark ? dist(zoneMark.p, b) < 4.6 * L : false;
-    const stbdNear = inZone && b.tack === 'port' && others.some(ot => ot.o.tack === 'stbd' && Math.hypot(ot.p.x - b.x, ot.p.y - b.y) < 5.5 * L && dist(zoneMark!.p, ot.o) < 6 * L);
+    const stbdNear = inZone && b.tack === 'port' && others.some(ot => ot.o.tack === 'stbd' && dhypot(ot.p.x - b.x, ot.p.y - b.y) < 5.5 * L && dist(zoneMark!.p, ot.o) < 6 * L);
     if (plan.maneuver !== 'tack' && Math.abs(b.twa) < 90 && h.t > h.gunT) {
       const other = this.closeHauled(b.tack === 'stbd' ? 'port' : 'stbd', b.twd, b.tws);
       // Tacking gives up right of way (Rule 13), so a boat with right of way near her doesn't tack to dodge.
@@ -753,7 +754,7 @@ export class Skipper implements Helm {
         const sc = fooled ? 0.8 : 1;
         for (let k = 0; k < path.length; k++) {
           const ox = ot.p.x + (ot.px[k] - ot.p.x) * sc, oy = ot.p.y + (ot.py[k] - ot.p.y) * sc;
-          const cd = Math.hypot(path[k].x - ox, path[k].y - oy) - ot.reach;
+          const cd = dhypot(path[k].x - ox, path[k].y - oy) - ot.reach;
           const g = cd > 0.7 * L ? cd : hullGap(b, ot.o, path[k].x, path[k].y, path[k].h, ox, oy, ot.ph[k]);
           if (k === 3) g1 = g;
           if (g < min) { min = g; tMin = (k + 1) * 0.25; }
@@ -765,7 +766,7 @@ export class Skipper implements Helm {
         // Rule 14: avoid contact whatever the rights (a skipper who misjudged it only sees it late). A
         // right-of-way boat need not act until it's clear the other isn't keeping clear: against you
         // she holds her course until about 2 s out; with each other the AI skippers give way early.
-        if (min < 0.03 * L && (iKeep || (mr && mr.iOwes) ? (!fooled || tMin <= 0.75) : (!ot.o.isPlayer || tMin <= 2.0))) cost += 1100;
+        if (min < 0.03 * L && (iKeep || (mr && mr.iOwes) ? (!fooled || tMin <= 0.75) : (!ot.o.human || tMin <= 2.0))) cost += 1100;
         if (mr && mr.iOwes) {
           if (min < 0.6 * L) cost += 300 * (0.6 * L - min) / L + 60;
           continue;
@@ -776,7 +777,7 @@ export class Skipper implements Helm {
           // Right of way: hold course and let her keep clear; act only when contact is close (Rule 14),
           // and any change of course near her must leave her room (Rule 16.1).
           const dh = Math.abs(n180(c.hdg - b.hdg));
-          if (min < 0.02 * L) cost += tMin <= 1.4 ? (dh < 4 ? 1400 : 1600) : tMin <= 2.4 || !ot.o.isPlayer ? 140 : 0;
+          if (min < 0.02 * L) cost += tMin <= 1.4 ? (dh < 4 ? 1400 : 1600) : tMin <= 2.4 || !ot.o.human ? 140 : 0;
           else if (!plan.rounding && dh > 6 && ot.g0 < 2.5 * L && min < 0.6 * L) cost += 60 + 200 * (1 - min / (0.6 * L));
         }
       }
@@ -818,7 +819,7 @@ export class Skipper implements Helm {
       hh = n360(hh + step);
       const a = Math.abs(n180(b.twd - hh));
       const target = a < noGoAngle(b.tws) ? 0 : polarSpeed(b.cls, b.tws, a) * trimEfficiency(sheet, a);
-      v += (target - v) * (1 - Math.exp(-dt / 1.6));
+      v += (target - v) * (1 - dexp(-dt / 1.6));
       const d = dir(hh);
       x += d.x * v * dt; y += d.y * v * dt;
       out.push({ x, y, h: hh });
@@ -829,7 +830,7 @@ export class Skipper implements Helm {
   private maybeHail(h: AiHost, others: { j: number; p: Perceived; o: Boat }[]) {
     const b = this.b, L = b.cls.loa;
     for (const ot of others) {
-      const d = Math.hypot(ot.p.x - b.x, ot.p.y - b.y);
+      const d = dhypot(ot.p.x - b.x, ot.p.y - b.y);
       if (d > 4 * L) continue;
       const kc = keepClear(b, ot.o, h.t);
       if (kc.keeper !== 1) continue;
@@ -842,7 +843,7 @@ export class Skipper implements Helm {
       const closing = -dot(rv, relV);
       if (closing <= 0) continue;
       const tca = closing / Math.max(1e-6, dot(relV, relV));
-      const miss = Math.abs(cross(rv, relV)) / Math.max(1e-6, Math.hypot(relV.x, relV.y));
+      const miss = Math.abs(cross(rv, relV)) / Math.max(1e-6, dhypot(relV.x, relV.y));
       if (tca < 3.5 && miss < 0.7 * L) {
         this.hailed.set(key, h.t);
         h.hail(b, kc.rule === '10' ? 'Starboard!' : kc.rule === '11' ? 'Up, up!' : 'Keep clear!');
@@ -893,7 +894,7 @@ export function timeToCover(D: number, v0: number, vT: number, tau: number): num
   let lo = 0, hi = 120;
   for (let k = 0; k < 40; k++) {
     const t = (lo + hi) / 2;
-    const d = vT * t - (vT - v0) * tau * (1 - Math.exp(-t / tau));
+    const d = vT * t - (vT - v0) * tau * (1 - dexp(-t / tau));
     if (d >= D) hi = t; else lo = t;
   }
   return hi;

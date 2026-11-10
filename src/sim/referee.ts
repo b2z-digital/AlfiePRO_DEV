@@ -8,6 +8,7 @@ import { Course, Leg } from './course';
 import { V2, bearing, dir, dist, dot, n180 } from './math';
 import { ContactPair, hullGap, stern, bow } from './physics';
 import type { Boat, Incident, SimEvent } from './types';
+import { dhypot } from './dmath';
 
 export interface Relation {
   sameTack: boolean;
@@ -266,7 +267,7 @@ export class Referee {
       for (let j = i + 1; j < n; j++) {
         const B = boats[j];
         if (!isRacing(B)) continue;
-        const d = Math.hypot(A.x - B.x, A.y - B.y);
+        const d = dhypot(A.x - B.x, A.y - B.y);
         const L = Math.max(A.cls.loa, B.cls.loa);
         const m = this.memFor(i, j);
         if (d > 9 * L) { m.threat = null; continue; }
@@ -372,7 +373,7 @@ export class Referee {
       }
       z.state = 'on'; z.rule = '18.2(a)'; z.since = t;
       const ent = boats[z.entitled];
-      if (rel.overlap && !ent.isPlayer && Math.min(dA, dB) < zone) this.h.hail(ent, 'Room!');
+      if (rel.overlap && !ent.human && Math.min(dA, dB) < zone) this.h.hail(ent, 'Room!');
       return;
     }
     if (z.state === 'on') {
@@ -524,7 +525,7 @@ export class Referee {
     const { boats, t, course } = this.h;
     const Ri = m.r17, Wi = Ri === i ? j : i;
     const R = boats[Ri], W = boats[Wi];
-    const above = aboveProperCourse(R, course) && (R.isPlayer || !this.h.avoidingSince(Ri, t - 1));
+    const above = aboveProperCourse(R, course) && (R.human || !this.h.avoidingSince(Ri, t - 1));
     if (!above) { m.r17Above = null; return; }
     if (m.r17Above === null) m.r17Above = t;
     if (t - m.r17Above < 1.2 || t - m.lastIncident < 6 || hullGap(R, W) > 1.5 * W.cls.loa) return;
@@ -555,7 +556,7 @@ export class Referee {
       O.penalty.since = t;
       O.penalty.reason = rule;
     }
-    if (V && !V.isPlayer && kind !== 'mark-touch') this.h.hail(V, `${spellSail(V.sail)} protest ${spellSail(O.sail)}`);
+    if (V && !V.human && kind !== 'mark-touch') this.h.hail(V, `${spellSail(V.sail)} protest ${spellSail(O.sail)}`);
   }
 
   private trackPenalties(passed: ('tack' | 'gybe' | null)[]) {

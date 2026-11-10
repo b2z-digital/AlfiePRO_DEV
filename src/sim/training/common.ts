@@ -9,6 +9,7 @@ import { V2, bearing, dir, dist, dot, n180, n360, sub } from '../math';
 import { bankAhead, bow, hullGap, lineSide } from '../physics';
 import { keepClear, spellSail } from '../referee';
 import { Goal, GoalCtx, Outcome, PlanFn, SceneDef, Step, closeHauled, onTack } from '../scene';
+import { dhypot } from '../dmath';
 
 export type SceneKind = 'drill' | 'lesson' | 'lab';
 
@@ -173,7 +174,7 @@ export const hoverAt = (spot: V2): PlanFn => (_t, b, race) => {
   const d = sub(spot, b);
   const ahead = dot(d, c.up) / L, side = dot(d, c.right) / L;
   const ng = noGoAngle(b.tws);
-  const far = Math.hypot(ahead, side);
+  const far = dhypot(ahead, side);
   if (far > 2.5) {
     // Sail to it, eased, on whichever tack points there.
     const brg = bearing(b, spot), twa = n180(b.twd - brg);
@@ -286,7 +287,7 @@ export function closing(b: Boat, o: Boat, horizon = 3): number {
   const rel = { x: ov.x * o.spd - bv.x * b.spd, y: ov.y * o.spd - bv.y * b.spd };
   const vv = rel.x * rel.x + rel.y * rel.y;
   const tc = vv > 1e-9 ? Math.max(0, Math.min(horizon, -(rv.x * rel.x + rv.y * rel.y) / vv)) : 0;
-  return Math.hypot(rv.x + rel.x * tc, rv.y + rel.y * tc);
+  return dhypot(rv.x + rel.x * tc, rv.y + rel.y * tc);
 }
 
 export const gapTo = (race: Race, b: Boat, role: string) => hullGap(b, race.boats.find(o => o.name === role)!);

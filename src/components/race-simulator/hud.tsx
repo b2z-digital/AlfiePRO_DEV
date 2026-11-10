@@ -273,7 +273,7 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
 
 // ───────────────────────── Rules moment ─────────────────────────
 export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, onLearn }: {
-  inc: Incident; mine: boolean; otherSail: string | null; onContinue: () => void; onReplay: () => void; onLearn: () => void;
+  inc: Incident; mine: boolean; otherSail: string | null; onContinue: () => void; onReplay?: () => void; onLearn: () => void;
 }) {
   const rt = ruleText(inc.rule);
   const head = inc.kind === 'ocs' ? 'You were over the line at the gun'
@@ -309,10 +309,12 @@ export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, o
       )}
       <div className="mt-auto flex flex-wrap gap-2.5">
         <Btn primary onClick={onContinue}>Carry on racing</Btn>
-        <Btn onClick={onReplay}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-          Watch replay
-        </Btn>
+        {onReplay && (
+          <Btn onClick={onReplay}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+            Watch replay
+          </Btn>
+        )}
         {rt && <Btn quiet onClick={onLearn}>Rule {rt.rule} in brief</Btn>}
       </div>
     </Hud>

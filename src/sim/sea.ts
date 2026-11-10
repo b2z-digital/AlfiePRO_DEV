@@ -3,6 +3,7 @@
 // slow a boat punching into them, knock her bow about, and let her surf downwind in a breeze.
 // Deterministic: the waves depend only on the race's settings, the place and the time.
 import { DEG, Rng, dir } from './math';
+import { datan, datan2, dcos, dpow, dsin } from './dmath';
 
 export type SeaKind = 'flat' | 'chop' | 'rough';
 
@@ -58,7 +59,7 @@ export function makeSea(kind: SeaKind | undefined, from: number, seed = 1, knots
   const kn = Math.max(2, knots);
   const chop = kind === 'chop';
   const ref = chop ? 9.5 : 12;
-  const ka = Math.min(1.9, Math.max(0.45, Math.pow(kn / ref, 1.3))), kl = Math.min(1.5, Math.max(0.6, Math.pow(kn / ref, 0.7)));
+  const ka = Math.min(1.9, Math.max(0.45, dpow(kn / ref, 1.3))), kl = Math.min(1.5, Math.max(0.6, dpow(kn / ref, 0.7)));
   const trains = chop
     ? [train(0.024 * ka, 1.8 * kl, from, ph()), train(0.011 * ka, 1.2 * kl, from + side * 28, ph()), train(0.005 * ka, 0.5 * kl, from - side * 18, ph())]
     : [train(0.05 * ka, 4.0 * kl, from, ph()), train(0.025 * ka, 2.6 * kl, from + side * 30, ph()), train(0.01 * ka, 0.8 * kl, from - side * 20, ph())];
@@ -76,7 +77,7 @@ export function wavePhase(sea: Sea, x: number, y: number, t: number): number {
 /** Height of the water surface at a point, m. */
 export function seaLevel(sea: Sea, x: number, y: number, t: number): number {
   let z = 0;
-  for (const w of sea.trains) z += w.amp * Math.sin(phaseOf(w, x, y, t));
+  for (const w of sea.trains) z += w.amp * dsin(phaseOf(w, x, y, t));
   return z;
 }
 
@@ -84,7 +85,7 @@ export function seaLevel(sea: Sea, x: number, y: number, t: number): number {
 export function seaSlope(sea: Sea, x: number, y: number, t: number): { sx: number; sy: number } {
   let sx = 0, sy = 0;
   for (const w of sea.trains) {
-    const c = w.amp * w.k * Math.cos(phaseOf(w, x, y, t));
+    const c = w.amp * w.k * dcos(phaseOf(w, x, y, t));
     sx += c * w.dx; sy += c * w.dy;
   }
   return { sx, sy };
@@ -93,7 +94,8 @@ export function seaSlope(sea: Sea, x: number, y: number, t: number): { sx: numbe
 /** A damped oscillator's steady response to a wave met at frequency ω: gain and phase lag. */
 function respond(omega: number, period: number, zeta: number): { g: number; lag: number } {
   const r = Math.abs(omega) / ((2 * Math.PI) / period);
-  return { g: 1 / Math.sqrt((1 - r * r) ** 2 + (2 * zeta * r) ** 2), lag: Math.atan2(2 * zeta * r, 1 - r * r) };
+  const a = 1 - r * r, b = 2 * zeta * r;
+  return { g: 1 / Math.sqrt(a * a + b * b), lag: datan2(b, a) };
 }
 
 export interface HullMotion {
@@ -124,17 +126,17 @@ export function hullMotion(sea: Sea, x: number, y: number, t: number, hdg: numbe
     // Averaged over her length: u is half the phase change from stern to bow.
     const u = (w.k * L * c) / 2;
     const au = Math.abs(u);
-    const sinc = au < 1e-4 ? 1 : Math.sin(u) / u;
-    const tilt = au < 1e-4 ? (2 * u) / L : (6 / L) * ((Math.sin(u) - u * Math.cos(u)) / (u * u));
+    const sinc = au < 1e-4 ? 1 : dsin(u) / u;
+    const tilt = au < 1e-4 ? (2 * u) / L : (6 / L) * ((dsin(u) - u * dcos(u)) / (u * u));
     // A light, fine hull on a heavy bulb: she answers each wave quickly and well damped, so her bow
     // lifts as a wave's face reaches her (only a little behind it) and the motion stays gentle.
     const h = respond(enc, 0.45, 0.6), p = respond(enc, 0.55, 0.5), rl = respond(enc, 1.1, 0.35);
-    heave += h.g * w.amp * sinc * Math.sin(ph + dirn * h.lag);
-    pitch += 0.72 * p.g * w.amp * tilt * Math.cos(ph + dirn * p.lag);
+    heave += h.g * w.amp * sinc * dsin(ph + dirn * h.lag);
+    pitch += 0.72 * p.g * w.amp * tilt * dcos(ph + dirn * p.lag);
     // Across her the waves tip her; the heavy bulb answers slowly.
-    roll -= 0.5 * rl.g * w.amp * w.k * s * Math.cos(ph + dirn * rl.lag);
+    roll -= 0.5 * rl.g * w.amp * w.k * s * dcos(ph + dirn * rl.lag);
   }
-  return { heave, pitch: Math.atan(pitch) / DEG, roll: Math.atan(roll) / DEG };
+  return { heave, pitch: datan(pitch) / DEG, roll: datan(roll) / DEG };
 }
 
 export interface WaveEffect {
@@ -153,19 +155,19 @@ export function waveEffect(sea: Sea, x: number, y: number, t: number, hdg: numbe
   const ph = phaseOf(main, x, y, t);
   const ph2 = second ? phaseOf(second, x, y, t) : ph * 0.61;
   const k = sea.height / 0.1;                        // about 1 in rough water
-  const into = Math.cos((hdg - sea.from) * DEG);     // 1 = heading straight into the waves
-  const beam = Math.abs(Math.sin((hdg - sea.from) * DEG));
+  const into = dcos((hdg - sea.from) * DEG);     // 1 = heading straight into the waves
+  const beam = Math.abs(dsin((hdg - sea.from) * DEG));
   // Punching into waves: the bow climbing each wave's face (its downwind side, the dark band) knocks
   // her speed back, far more pointing straight into it than footing across it, and she picks up
   // again sliding down its back. So in a seaway it pays to bear away a touch as each face reaches
   // the bow and come up again over the top: that's finding the groove.
   const f = dir(hdg);
   const phBow = phaseOf(main, x + f.x * L * 0.5, y + f.y * L * 0.5, t);
-  const face = Math.max(0, -Math.cos(phBow)), back = Math.max(0, Math.cos(phBow));
-  const slam = into > 0 ? k * (0.045 * into * into + 0.8 * Math.pow(into, 4) * face - 0.06 * into * back) : 0;
+  const face = Math.max(0, -dcos(phBow)), back = Math.max(0, dcos(phBow));
+  const slam = into > 0 ? k * (0.045 * into * into + 0.8 * dpow(into, 4) * face - 0.06 * into * back) : 0;
   // Running in a breeze: a lift on the face of each wave, surfing.
-  const surf = into < -0.3 ? 0.12 * k * (-into) * Math.max(0, Math.sin(ph + 0.6)) : 0;
+  const surf = into < -0.3 ? 0.12 * k * (-into) * Math.max(0, dsin(ph + 0.6)) : 0;
   // The bow is knocked about, most in a beam sea.
-  const yaw = 11 * k * (0.35 + 0.65 * beam) * (Math.sin(ph) * 0.7 + Math.sin(ph2) * 0.3);
+  const yaw = 11 * k * (0.35 + 0.65 * beam) * (dsin(ph) * 0.7 + dsin(ph2) * 0.3);
   return { speed: 1 - slam + surf, yaw };
 }

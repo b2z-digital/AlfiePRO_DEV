@@ -8,6 +8,7 @@ import type { Boat } from './types';
 import type { WindField } from './wind';
 import { Sea, waveEffect } from './sea';
 import { nearestShore, shoreRay, shoreWet } from './venue';
+import { dcos, dexp, dhypot } from './dmath';
 
 export const DT = 0.05;
 
@@ -38,7 +39,7 @@ export function localWind(boats: Boat[], wind: WindField, t: number) {
         if (b.finished || b.retired || b.disabled) continue;
         const L = b.cls.loa;
         const d = { x: a.x - b.x, y: a.y - b.y };
-        const dd = Math.hypot(d.x, d.y);
+        const dd = dhypot(d.x, d.y);
         if (dd > 8 * L) continue;
         // Shadow: a cone downwind of b's sail.
         const w = dir(base[j].twd + 180);
@@ -47,7 +48,7 @@ export function localWind(boats: Boat[], wind: WindField, t: number) {
         if (along > 0.2 * L && along < 7 * L) {
           const hw = 0.45 * L + 0.22 * along;
           if (across < hw) {
-            const k = (1 - along / (7 * L)) * (1 - (across / hw) ** 2);
+            const k = (1 - along / (7 * L)) * (1 - (across / hw) * (across / hw));
             loss += 0.3 * k;
           }
         }
@@ -80,7 +81,7 @@ function heelWanted(b: Boat, twa: number): number {
   const a = Math.abs(twa);
   const side = twa > 0 || (twa === 0 && b.tack === 'stbd') ? 1 : -1;
   if (b.disabled) return 4 * side;
-  const aws2 = b.tws * b.tws + b.spd * b.spd + 2 * b.tws * b.spd * Math.cos((a * Math.PI) / 180);
+  const aws2 = b.tws * b.tws + b.spd * b.spd + 2 * b.tws * b.spd * dcos((a * Math.PI) / 180);
   return side * heelFor((aws2 * heelForce(a, b.sheet, b.tws) * b.rigPower) / b.cls.stiffness);
 }
 
@@ -119,8 +120,8 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   if (b.disabled) {
     // Out of control: the sail flaps, she stops and drifts slowly downwind.
     b.targetSpd = 0;
-    b.spd *= Math.exp(-dt / 1.5);
-    b.rot *= Math.exp(-dt / 0.3);
+    b.spd *= dexp(-dt / 1.5);
+    b.rot *= dexp(-dt / 0.3);
     b.hdg = n360(b.hdg + b.rot * dt);
     const v = dir(b.hdg), dw = dir(b.twd + 180), k = 0.018 * b.tws;
     b.x += (v.x * b.spd + dw.x * k) * dt; b.y += (v.y * b.spd + dw.y * k) * dt;
@@ -141,7 +142,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   const wave = sea ? waveEffect(sea, b.x, b.y, t, b.hdg, c.loa) : null;
   if (wave) target *= wave.speed;
   const tau = target > b.spd ? accelTau(b.tws) : a < ng ? 0.9 : 1.3;
-  b.spd += (target - b.spd) * (1 - Math.exp(-dt / tau));
+  b.spd += (target - b.spd) * (1 - dexp(-dt / tau));
   if (b.spd < 0) b.spd = 0;
 
   // Heeled hard, the rudder loses its grip on the water.
@@ -157,13 +158,13 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   // (Scaled by how fast she'd sail here, not her speed this instant, which the waves themselves
   // change: that would turn their to-and-fro into a steady pull one way.)
   if (wave) rotTarget += wave.yaw * clamp(0.4 + b.targetSpd / c.hullSpeed, 0, 1);
-  b.rot += (rotTarget - b.rot) * (1 - Math.exp(-dt / 0.12));
+  b.rot += (rotTarget - b.rot) * (1 - dexp(-dt / 0.12));
   b.hdg = n360(b.hdg + b.rot * dt);
   // Weather helm rounds her up quickly as a gust heels her (less when she's slow), and lets her bear
   // away again more slowly as it passes.
   const upBy = a >= ng ? weatherHelm(b) * clamp(b.spd / (0.5 * c.hullSpeed), 0.3, 1) : 0;
   const luffWas = b.luffUp;
-  b.luffUp += (upBy - b.luffUp) * (1 - Math.exp(-dt / (upBy > b.luffUp ? 0.45 : 1.5)));
+  b.luffUp += (upBy - b.luffUp) * (1 - dexp(-dt / (upBy > b.luffUp ? 0.45 : 1.5)));
   b.hdg = n360(b.hdg + (twa >= 0 ? 1 : -1) * (b.luffUp - luffWas));
 
   const v = dir(b.hdg);
@@ -180,7 +181,7 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
     vx += back.x * k; vy += back.y * k;
   }
   b.x += vx * dt; b.y += vy * dt;
-  b.distSailed += Math.hypot(vx, vy) * dt;
+  b.distSailed += dhypot(vx, vy) * dt;
 
   const newTwa = twaOf(b.hdg, b.twd);
   b.twa = newTwa;
@@ -228,7 +229,7 @@ export function collide(boats: Boat[]): ContactPair[] {
       if (depth > 0) {
         out.push({ a: i, b: j, depth });
         let n = sub(pa, pb);
-        const len = Math.hypot(n.x, n.y) || 1e-6;
+        const len = dhypot(n.x, n.y) || 1e-6;
         n = { x: n.x / len, y: n.y / len };
         const push = depth / 2 + 0.012 * Math.min(A.cls.loa, B.cls.loa); // bounce apart a little
         A.x += n.x * push; A.y += n.y * push;
@@ -254,7 +255,7 @@ export function markContacts(boats: Boat[], course: Course): { boat: number; mar
       if (depth > 0) {
         out.push({ boat: i, mark: m.id });
         let n = sub(p, m.p);
-        const len = Math.hypot(n.x, n.y) || 1e-6;
+        const len = dhypot(n.x, n.y) || 1e-6;
         n = { x: n.x / len, y: n.y / len };
         b.x += n.x * (depth + 0.002); b.y += n.y * (depth + 0.002);
         b.spd *= 0.8;
@@ -296,7 +297,7 @@ export function bank(b: Boat, course: Course): boolean {
       if (push <= 0) continue;
       // Into the water: away from the nearest shore point if afloat, towards (and past) it if not.
       let nx = (p.x - s.q.x) * (wet ? 1 : -1), ny = (p.y - s.q.y) * (wet ? 1 : -1);
-      const len = Math.hypot(nx, ny);
+      const len = dhypot(nx, ny);
       if (len < 1e-6) continue;
       nx /= len; ny /= len;
       b.x += nx * (push + 0.002); b.y += ny * (push + 0.002);
@@ -312,7 +313,7 @@ function closestOnSeg(p: V2, a: V2, b: V2): { d: number; p: V2 } {
   const ab = sub(b, a), ap = sub(p, a);
   const t = clamp(dot(ap, ab) / Math.max(1e-9, dot(ab, ab)), 0, 1);
   const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
-  return { d: Math.hypot(p.x - q.x, p.y - q.y), p: q };
+  return { d: dhypot(p.x - q.x, p.y - q.y), p: q };
 }
 
 /** Closest points between two segments. */
@@ -329,7 +330,7 @@ export function closest(p1: V2, q1: V2, p2: V2, q2: V2): { d: number; pa: V2; pb
   else if (e > 1e-9) { t = clamp(f / e, 0, 1); }
   const pa = { x: p1.x + d1.x * s, y: p1.y + d1.y * s };
   const pb = { x: p2.x + d2.x * t, y: p2.y + d2.y * t };
-  return { d: Math.hypot(pa.x - pb.x, pa.y - pb.y), pa, pb };
+  return { d: dhypot(pa.x - pb.x, pa.y - pb.y), pa, pb };
 }
 
 /** Minimum gap between two hulls (negative = overlapping). */
@@ -357,7 +358,7 @@ export function bankAhead(b: Boat, course: Course, hdg = b.hdg): number {
 /** Signed distance of a point from the start/finish line: positive = course side (upwind). */
 export function lineSide(course: Course, p: V2): number {
   const l = sub(course.start.stbd, course.start.pin);
-  const len = Math.hypot(l.x, l.y);
+  const len = dhypot(l.x, l.y);
   return cross(l, sub(p, course.start.pin)) / len;
 }
 

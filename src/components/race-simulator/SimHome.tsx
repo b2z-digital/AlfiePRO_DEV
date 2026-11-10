@@ -18,6 +18,7 @@ import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
 import type { SimSequence } from './startbox';
+import type { OpenRoom } from './live';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -148,6 +149,55 @@ function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean;
  * The starts to offer: the club's own sequences (or StartBox's defaults if it has none) and the one
  * chosen, then the simulator calling a 1, 2 or 3 minute start for the lengths they don't cover.
  */
+/** Race members live: open a room for the race set up above, join one with its code, or pick one of
+ *  the club's open races. */
+function LiveSection({ rooms, onOpen, onJoin }: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void }) {
+  const [code, setCode] = useState('');
+  const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  return (
+    <section className="flex flex-col gap-3.5" aria-labelledby="live-title">
+      <div>
+        <h2 id="live-title" className="m-0 font-display text-[22px] font-bold">Race members live</h2>
+        <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Race other members in real time. Each of you sails your own boat from your own device, and AI skippers fill the rest of the fleet.</p>
+      </div>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))' }}>
+        <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+          <p className="m-0 text-[16px] font-semibold">Open a live race</p>
+          <p className="m-0 flex-1 text-[13px] leading-snug" style={{ color: C.mute }}>The race you've set up above. You get a code to give the members you're racing, and you start it when everyone's ready.</p>
+          <Btn primary onClick={onOpen} className="self-start">Open a room</Btn>
+        </div>
+        <form className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5" onSubmit={e => { e.preventDefault(); if (clean.length === 6) onJoin(clean); }}>
+          <label htmlFor="live-code" className="m-0 text-[16px] font-semibold">Join with a code</label>
+          <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>The six-letter code from whoever opened the room.</p>
+          <div className="flex gap-2">
+            <input id="live-code" value={code} onChange={e => setCode(e.target.value)} placeholder="ABC234" autoComplete="off" spellCheck={false} maxLength={8}
+              className="h-10 min-w-0 flex-1 rounded-xl border border-white/10 bg-black/25 px-3 font-display text-[16px] font-bold uppercase tracking-[0.18em] text-[#F1F4FA] outline-none placeholder:text-white/25 focus:border-[#2A8BFF]" />
+            <Btn type="submit" disabled={clean.length !== 6}>Join</Btn>
+          </div>
+        </form>
+        <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+          <p className="m-0 text-[16px] font-semibold">Open races at your club</p>
+          {rooms.length === 0 ? (
+            <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>None open right now. Rooms show here while they wait to start.</p>
+          ) : (
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {rooms.slice(0, 5).map(r => (
+                <li key={r.code} className="flex items-center gap-3 rounded-[12px] bg-white/[0.035] px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="m-0 truncate text-[14px] font-semibold">{r.title}</p>
+                    <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{r.host} · {r.people} in</p>
+                  </div>
+                  <Btn small onClick={() => onJoin(r.code)}>Join</Btn>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seconds: number): { value: string; label: string }[] {
   const own = sequences.filter(q => q.club);
   let shown = own.length ? own.slice(0, 3) : sequences.slice(0, 2);
@@ -159,7 +209,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, sequences = [], startSeq = null, live = null }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -177,6 +227,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   /** The club's StartBox sequences, and the one this race will use (null: the simulator calls it). */
   sequences?: SimSequence[];
   startSeq?: SimSequence | null;
+  /** Live races with other members (signed in): the club's open rooms, open one, join one. */
+  live?: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void } | null;
 }) {
   const [setting, setSetting] = useState(false);
   const stars = drillStars(training);
@@ -341,6 +393,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </section>
           </aside>
         </div>
+
+        {live && <LiveSection {...live} />}
 
         {challenges && (challenges.length > 0 || canSet) && (
           <section className="flex flex-col gap-3.5" aria-labelledby="ch-title">

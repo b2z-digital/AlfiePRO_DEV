@@ -1,3 +1,4 @@
+import { datan2, dcos, dhypot, dsin } from './dmath';
 // Small maths helpers for the race simulator.
 // World frame: x = east (m), y = north (m). Headings and wind directions are compass
 // degrees (0 = north, 90 = east). Wind direction is where the wind blows FROM.
@@ -26,13 +27,13 @@ export function n360(d: number): number {
 
 /** Unit vector for a compass heading. */
 export function dir(hdg: number): V2 {
-  return { x: Math.sin(hdg * DEG), y: Math.cos(hdg * DEG) };
+  return { x: dsin(hdg * DEG), y: dcos(hdg * DEG) };
 }
 /** Compass bearing from a to b. */
 export function bearing(a: V2, b: V2): number {
-  return n360(Math.atan2(b.x - a.x, b.y - a.y) / DEG);
+  return n360(datan2(b.x - a.x, b.y - a.y) / DEG);
 }
-export const dist = (a: V2, b: V2) => Math.hypot(b.x - a.x, b.y - a.y);
+export const dist = (a: V2, b: V2) => dhypot(b.x - a.x, b.y - a.y);
 export const add = (a: V2, b: V2): V2 => ({ x: a.x + b.x, y: a.y + b.y });
 export const sub = (a: V2, b: V2): V2 => ({ x: a.x - b.x, y: a.y - b.y });
 export const mul = (a: V2, k: number): V2 => ({ x: a.x * k, y: a.y * k });
@@ -50,7 +51,7 @@ export function segSegDist(p1: V2, q1: V2, p2: V2, q2: V2): number {
   const d1 = sub(q1, p1), d2 = sub(q2, p2), r = sub(p1, p2);
   const a = dot(d1, d1), e = dot(d2, d2), f = dot(d2, r);
   let s: number, t: number;
-  if (a <= 1e-9 && e <= 1e-9) return Math.hypot(r.x, r.y);
+  if (a <= 1e-9 && e <= 1e-9) return dhypot(r.x, r.y);
   if (a <= 1e-9) { s = 0; t = clamp(f / e, 0, 1); }
   else {
     const c = dot(d1, r);
@@ -64,7 +65,7 @@ export function segSegDist(p1: V2, q1: V2, p2: V2, q2: V2): number {
     }
   }
   const c1 = add(p1, mul(d1, s)), c2 = add(p2, mul(d2, t));
-  return Math.hypot(c1.x - c2.x, c1.y - c2.y);
+  return dhypot(c1.x - c2.x, c1.y - c2.y);
 }
 
 /** Distance from point p to segment a-b. */

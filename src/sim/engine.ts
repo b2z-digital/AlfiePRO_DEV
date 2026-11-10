@@ -13,6 +13,7 @@ import { WindField } from './wind';
 import { Sea, makeSea } from './sea';
 import { VenueScene, frameAt, layCourse, shoreFor, venueScene } from './venue';
 import { VENUES } from './venues';
+import { dcos, dhypot, dsin } from './dmath';
 
 export const BOAT_COLORS = ['#2A93FF', '#F472B6', '#2DD4BF', '#94A3B8', '#A78BFA', '#34D399', '#FBBF24', '#FB923C', '#F87171', '#60A5FA', '#E879F9', '#4ADE80', '#FCD34D', '#38BDF8', '#C084FC', '#FDA4AF'];
 
@@ -33,6 +34,29 @@ export interface RaceLog {
 }
 export type PlayerAct = 'tack' | 'gybe' | 'hail';
 
+/**
+ * A person's boat in a live race. Everyone's device sails the whole race; each person's inputs and
+ * actions travel to the others stamped with the step they apply from, so every device applies them
+ * at the same moment and the races stay identical, boat for boat. A device can only take a step
+ * once everyone still racing has sent their inputs for it.
+ */
+export interface CrewSeat {
+  /** Her boat's index in the fleet. */
+  boat: number;
+  /** Everything they have done, step by step, as it arrives (the same shape as a player's log). */
+  log: RaceLog;
+  /** Their inputs are known for every step before this one. */
+  upTo: number;
+  /** From this step an AI skipper sails her (they left the race); Infinity while they're racing. */
+  aiFrom: number;
+  /** The input in force, and the helm assist through a tack or gybe they asked for. */
+  input: PlayerInput;
+  assist: { target: number; until: number } | null;
+  /** How far through their log the race has got. */
+  fi: number;
+  fa: number;
+}
+
 /** What a hail by the player turned out to be, for the screen to say and show. */
 export interface HailResult {
   kind: 'you-tack' | 'protest' | 'room-to-tack' | 'say' | 'none';
@@ -45,7 +69,7 @@ export interface HailResult {
 
 /** The boat on the same tack close to windward of b (the one a room-to-tack hail goes to). */
 export function windwardBoat(race: { boats: Boat[] }, b: Boat, within: number): Boat | null {
-  const right = { x: Math.cos((b.hdg * Math.PI) / 180), y: -Math.sin((b.hdg * Math.PI) / 180) };
+  const right = { x: dcos((b.hdg * Math.PI) / 180), y: -dsin((b.hdg * Math.PI) / 180) };
   const side = b.tack === 'stbd' ? 1 : -1;
   let best: Boat | null = null, bg = within;
   for (const o of race.boats) {
@@ -99,6 +123,10 @@ export class Race implements AiHost {
   private passed: ('tack' | 'gybe' | null)[] = [];
   private lastSignal = Infinity;
   private helmAssist: { target: number; until: number } | null = null;
+  /** A live race: the people racing, one seat each (see CrewSeat). Empty for a race on your own. */
+  crew: CrewSeat[] = [];
+  /** Is this a live race between people on their own devices? */
+  get live(): boolean { return this.crew.length > 0; }
 
   constructor(settings: RaceSettings) {
     this.settings = settings;
@@ -144,14 +172,35 @@ export class Race implements AiHost {
     // comes out the same whatever her real number: everyone in a challenge sails the same race.
     // Then she gets her own, and an AI boat that drew it takes 01, which no AI boat ever draws.
     const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? s.player.sail : '01';
-    const numbers = new Set<string>();
+    // A live race: the crew take the first boats, in seat order, with their own numbers (two people
+    // with the same number: the later one gets the next free one). The AI boats keep clear of them.
+    const crew = s.crew && s.crew.length ? s.crew.slice(0, n) : null;
+    const crewSails: string[] = [];
+    if (crew) {
+      const taken = new Set<string>();
+      crew.forEach((m, k) => {
+        let sail = /^\d{1,4}$/.test(m.sail) ? m.sail : String(k + 1).padStart(2, '0');
+        let num = Number(sail);
+        while (taken.has(sail)) { num = (num + 1) % 10000; sail = String(num).padStart(2, '0'); }
+        taken.add(sail);
+        crewSails.push(sail);
+      });
+    }
+    const numbers = new Set<string>(crewSails);
     for (let i = 0; i < n; i++) {
-      const isPlayer = !s.noPlayer && i === 0;
-      let sail = isPlayer ? '01' : String(this.rng.int(2, 98)).padStart(2, '0');
-      while (numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
+      const isCrew = !!crew && i < crew.length;
+      const isPlayer = crew ? isCrew && i === (s.seat ?? 0) : !s.noPlayer && i === 0;
+      let sail: string;
+      if (isCrew) sail = crewSails[i];
+      else {
+        sail = isPlayer ? '01' : String(this.rng.int(2, 98)).padStart(2, '0');
+        while (numbers.has(sail)) sail = String(this.rng.int(2, 98)).padStart(2, '0');
+      }
       numbers.add(sail);
-      if (isPlayer) sail = mySail;
-      else if (!s.noPlayer && sail === mySail) sail = '01';
+      if (!crew) {
+        if (isPlayer) sail = mySail;
+        else if (!s.noPlayer && sail === mySail) sail = '01';
+      }
       // Start sailing round below the line like a fleet does: half reaching towards the pin on
       // starboard in a nearer lane, half back on port in a farther one, spread along the line.
       const frac = (i + 0.5) / n;
@@ -160,10 +209,10 @@ export class Race implements AiHost {
       const across = (frac - 0.5) * 2 * (c.bounds.across * 0.45);
       const p = { x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across };
       const hdg = n360(c.axis + (near ? -95 : 95) + this.rng.range(-8, 8));
-      const persona = isPlayer ? undefined : { ...personas[i % personas.length] };
+      const persona = isPlayer || isCrew ? undefined : { ...personas[i % personas.length] };
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
-        id: `b${i}`, sail, name: isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, cls, persona,
+        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona,
         x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: rigPower(cls.id, this.wind.baseTws / KN),
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
@@ -175,7 +224,11 @@ export class Race implements AiHost {
       settleHeel(b);
       this.boats.push(b);
       this.hist.push({ x: [], y: [], hdg: [], spd: [], rot: [], heel: [] });
-      if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
+      if (isCrew) {
+        if (isPlayer) this.playerIndex = i;
+        this.skippers.push(null);
+        this.crew.push({ boat: i, log: { input: [], acts: [] }, upTo: 0, aiFrom: Infinity, input: { rudder: 0, sheet: 1, autoTrim: crew![i].autoTrim ?? s.autoTrim }, assist: null, fi: 0, fa: 0 });
+      } else if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
       else {
         const lv = LEVELS[s.level];
         const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
@@ -183,6 +236,8 @@ export class Race implements AiHost {
         this.skippers.push(sk);
       }
     }
+    // In a live race everyone keeps the start the fleet was laid out with: the same on every device.
+    if (this.live) { this.log = this.crew[Math.max(0, this.crew.findIndex(c => c.boat === this.playerIndex))].log; return; }
     // You start nearest the bank, in front of the fleet as you look out, so you can find your boat.
     const me = this.player;
     if (me) {
@@ -190,7 +245,7 @@ export class Race implements AiHost {
       const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
       const toBank = (b: Boat) => {
         const u = Math.max(0, Math.min(1, ((b.x - ca.a.x) * ex + (b.y - ca.a.y) * ey) / el2));
-        return Math.hypot(b.x - (ca.a.x + ex * u), b.y - (ca.a.y + ey * u));
+        return dhypot(b.x - (ca.a.x + ex * u), b.y - (ca.a.y + ey * u));
       };
       let near = me;
       for (const b of this.boats) if (toBank(b) < toBank(near)) near = b;
@@ -266,26 +321,28 @@ export class Race implements AiHost {
   /** Still following a log? */
   get replaying(): boolean { return !!this.following; }
 
-  /** The player tacks, gybes or hails. Between steps; recorded, so a replay does the same. */
+  /** The player tacks, gybes or hails. Between steps; recorded, so a replay does the same. (In a live
+   *  race her actions go out with her inputs instead, and come back in through feed().) */
   act(a: PlayerAct): HailResult | null {
-    if (this.following) return null; // the log decides what she does
+    if (this.following || this.live) return null; // the log decides what she does
     this.log.acts.push([this.step_, a]);
     return this.doAct(a);
   }
-  private doAct(a: PlayerAct): HailResult | null {
-    if (a === 'hail') return this.playerHail();
-    this.requestManeuver(a);
+  private doAct(a: PlayerAct, seat?: CrewSeat): HailResult | null {
+    const b = seat ? this.boats[seat.boat] : this.player;
+    if (!b) return null;
+    if (a === 'hail') return this.hailFor(b);
+    const assist = this.assistFor(b, a);
+    if (assist) { if (seat) seat.assist = assist; else this.helmAssist = assist; }
     return null;
   }
 
   /**
-   * The player hails. What she calls depends on what's going on, in the order a skipper thinks of
+   * A person hails. What she calls depends on what's going on, in the order a skipper thinks of
    * it: answer a room-to-tack hail ("You tack"), protest a foul, ask for room to tack at the bank,
    * claim mark-room, then right of way.
    */
-  private playerHail(): HailResult {
-    const p = this.player;
-    if (!p) return { kind: 'none' };
+  private hailFor(p: Boat): HailResult {
     const L = p.cls.loa;
     // Rule 20.2(c): reply "You tack" to a boat hailing us for room to tack.
     if (this.referee.pendingRoomToTack(this.boats.indexOf(p))) {
@@ -359,25 +416,125 @@ export class Race implements AiHost {
   requestManeuver(kind: 'tack' | 'gybe') {
     const p = this.player;
     if (!p) return;
+    const a = this.assistFor(p, kind);
+    if (a) this.helmAssist = a;
+  }
+  private assistFor(p: Boat, kind: 'tack' | 'gybe'): { target: number; until: number } | null {
     const twa = p.twa;
     if (kind === 'tack' && Math.abs(twa) < 100) {
       const up = vmgAngles(p.cls, p.tws).up + 1.5;
-      this.helmAssist = { target: n360(twa >= 0 ? p.twd + up : p.twd - up), until: this.t + 3 };
-    } else if (kind === 'gybe' && Math.abs(twa) > 80) {
+      return { target: n360(twa >= 0 ? p.twd + up : p.twd - up), until: this.t + 3 };
+    }
+    if (kind === 'gybe' && Math.abs(twa) > 80) {
       const dn = vmgAngles(p.cls, p.tws).down;
-      this.helmAssist = { target: n360(twa >= 0 ? p.twd + dn : p.twd - dn), until: this.t + 3 };
+      return { target: n360(twa >= 0 ? p.twd + dn : p.twd - dn), until: this.t + 3 };
+    }
+    return null;
+  }
+
+  /** A person's helm and sheet onto her boat: the helm assist through a tack or gybe, and auto-trim. */
+  private steer(p: Boat, input: PlayerInput, assist: { target: number; until: number } | null): { target: number; until: number } | null {
+    let rudder = input.rudder;
+    if (assist && this.t < assist.until) {
+      const err = n180(assist.target - p.hdg);
+      if (Math.abs(err) < 4) assist = null;
+      else rudder = Math.max(-0.82, Math.min(0.82, err / 22));
+      if (Math.abs(input.rudder) > 0.5) assist = null; // she took over
+    }
+    // Penalties are the skipper's own: she sails her turn herself (the referee sees it done).
+    p.rudder = rudder;
+    const best = bestSheet(Math.abs(p.twa));
+    p.sheet = input.autoTrim ? Math.min(best, input.sheet >= 0.98 ? best : input.sheet) : input.sheet;
+    return assist && this.t < assist.until ? assist : null;
+  }
+
+  // ───────────────────────── live races ─────────────────────────
+
+  /** Live race: can the race take its next step? Only once everyone still racing has sent their
+   *  inputs for it. */
+  canStep(): boolean {
+    for (const c of this.crew) if (this.holding(c)) return false;
+    return true;
+  }
+  /** Is this seat holding the race up? Not once her boat has finished (nothing she does matters
+   *  then, so she can leave), nor once an AI skipper has her. */
+  private holding(c: CrewSeat): boolean {
+    return c.aiFrom > this.step_ && c.upTo <= this.step_ && !this.boats[c.boat].finished;
+  }
+
+  /** Live race: the seats holding the race up (their inputs for the next step haven't arrived). */
+  waitingFor(): number[] {
+    const out: number[] = [];
+    this.crew.forEach((c, k) => { if (this.holding(c)) out.push(k); });
+    return out;
+  }
+
+  /**
+   * Live race: what one seat has done, now known up to (but not including) step `upTo`: her input
+   * changes and actions, each stamped with the step it applies from. Arrives from her device (or
+   * this one, for the player), and may repeat what's already known: only the new part is taken.
+   */
+  feed(seat: number, upTo: number, input: [number, number, number][], acts: [number, PlayerAct][]) {
+    const c = this.crew[seat];
+    if (!c || upTo <= c.upTo) return;
+    for (const [st, rudder, sheet] of input) if (st >= c.upTo && st < upTo) c.log.input.push([st, rudder, sheet, 0]);
+    for (const [st, a] of acts) if (st >= c.upTo && st < upTo) c.log.acts.push([st, a]);
+    c.upTo = upTo;
+  }
+
+  /**
+   * Live race: from step `at` an AI skipper sails this seat's boat (they left the race, or lost
+   * their connection). Every device must hand over at the same step: the host picks it, no earlier
+   * than any device has got to (none can pass the first step her inputs are missing for).
+   */
+  handOver(seat: number, at: number) {
+    const c = this.crew[seat];
+    if (!c || at >= c.aiFrom) return;
+    c.aiFrom = Math.max(at, this.step_);
+    if (c.upTo > c.aiFrom) c.upTo = c.aiFrom;
+  }
+
+  /** Sail a whole live race again from everyone's logs (the debrief's replay). */
+  followCrew(logs: RaceLog[]) {
+    logs.forEach((l, k) => { const c = this.crew[k]; if (!c) return; c.log = { input: l.input.slice(), acts: l.acts.slice() }; c.upTo = Infinity; });
+    const me = this.crew.find(c => c.boat === this.playerIndex);
+    if (me) this.log = me.log;
+  }
+
+  /** Before the skippers decide: an AI skipper takes over any seat whose person has left. */
+  private crewTakeovers() {
+    for (const c of this.crew) {
+      if (this.step_ < c.aiFrom || this.skippers[c.boat]) continue;
+      const b = this.boats[c.boat];
+      const persona = { ...(PERSONAS.find(p => p.key === 'steady') ?? PERSONAS[0]) };
+      b.persona = persona;
+      this.skippers[c.boat] = new Skipper(b, LEVELS[this.settings.level], persona, new Rng(this.settings.seed * 31 + c.boat * 977), c.boat);
+    }
+  }
+
+  /** Each person's actions and input for this step, onto their boat. */
+  private crewInputs() {
+    for (const c of this.crew) {
+      const b = this.boats[c.boat];
+      if (this.step_ >= c.aiFrom || b.finished) continue;
+      const L = c.log;
+      while (c.fa < L.acts.length && L.acts[c.fa][0] <= this.step_) this.doAct(L.acts[c.fa++][1], c);
+      while (c.fi < L.input.length && L.input[c.fi][0] <= this.step_) { const e = L.input[c.fi++]; c.input = { rudder: e[1], sheet: e[2], autoTrim: c.input.autoTrim }; }
+      c.assist = this.steer(b, c.input, c.assist);
     }
   }
 
   step() {
     if (this.ended) return;
+    if (this.live && !this.canStep()) return; // waiting for someone's inputs
     if (this.following) this.followStep();
-    if (this.player) this.recordInput();
+    if (this.player && !this.live) this.recordInput();
     const dt = DT;
     const t = this.t;
     this.wind.step(dt, t);
     const racing = this.boats;
     localWind(racing, this.wind, t);
+    if (this.live) this.crewTakeovers();
 
     // AI decisions at 10 Hz, staggered.
     this.skippers.forEach((s, i) => {
@@ -386,21 +543,10 @@ export class Race implements AiHost {
       s.helm(this, dt);
     });
 
-    // Player input.
+    // The people's input: everyone in a live race, or the player.
     const p = this.player;
-    if (p && !p.finished && !this.autopilot) {
-      let rudder = this.input.rudder;
-      if (this.helmAssist && t < this.helmAssist.until) {
-        const err = n180(this.helmAssist.target - p.hdg);
-        if (Math.abs(err) < 4) this.helmAssist = null;
-        else rudder = Math.max(-0.82, Math.min(0.82, err / 22));
-        if (Math.abs(this.input.rudder) > 0.5) this.helmAssist = null; // the player took over
-      }
-      // Penalties are the skipper's own: she sails her turn herself (the referee sees it done).
-      p.rudder = rudder;
-      const best = bestSheet(Math.abs(p.twa));
-      p.sheet = this.input.autoTrim ? Math.min(best, this.input.sheet >= 0.98 ? best : this.input.sheet) : this.input.sheet;
-    }
+    if (this.live) this.crewInputs();
+    else if (p && !p.finished && !this.autopilot) this.helmAssist = this.steer(p, this.input, this.helmAssist);
 
     // Physics.
     this.passed = this.boats.map(b => (b.finished || b.retired ? null : integrate(b, dt, t, this.sea)));
@@ -563,8 +709,15 @@ export class Race implements AiHost {
     const leaderDone = this.boats.some(b => b.finished);
     const firstFinish = leaderDone ? Math.min(...this.boats.filter(b => b.finished).map(b => b.finishTime + this.gunT)) : Infinity;
     const timeLimit = leaderDone && this.t > firstFinish + Math.max(90, (firstFinish - this.gunT) * 0.6);
-    const playerDoneLong = p && p.finished && this.finishedAt !== null && this.t > this.finishedAt + 45;
-    if (all || timeLimit || playerDoneLong || this.t > this.gunT + 1800) this.end();
+    // On your own: 45 s after you finish. In a live race (the same on every device, whoever's watching):
+    // 30 s after the last person still racing finishes.
+    let peopleDone = !!(p && p.finished && this.finishedAt !== null && this.t > this.finishedAt + 45);
+    if (this.live) {
+      const racing = this.crew.filter(c => c.aiFrom > this.step_).map(c => this.boats[c.boat]);
+      const last = Math.max(0, ...racing.map(b => (b.finished ? b.finishTime + this.gunT : Infinity)));
+      peopleDone = racing.length > 0 && racing.every(b => b.finished || b.retired || b.disabled) && this.t > last + 30;
+    }
+    if (all || timeLimit || peopleDone || this.t > this.gunT + 1800) this.end();
   }
 
   end() {

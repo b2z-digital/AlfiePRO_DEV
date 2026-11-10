@@ -5,6 +5,7 @@
 
 import { V2, add, bearing, dir, mul, n360, sub, dot } from './math';
 import type { Shore } from './venue';
+import { dtan } from './dmath';
 
 export type Side = 'port' | 'stbd';
 export type MarkKind = 'windward' | 'offset' | 'gate-port' | 'gate-stbd' | 'pin' | 'start-stbd';
@@ -79,8 +80,8 @@ export function buildCourse(axis: number, L: number, s: CourseSettings): Course 
   const runDown = s.length === 'short' ? 13 : s.length === 'long' ? 22 : 17;
   const half = Math.max(6, 0.82 * s.fleetSize);
   const bias = ((s.lineBias ?? 0) * Math.PI) / 180;
-  const pin = add(O, add(mul(right, -half * L), mul(up, Math.tan(bias) * half * L)));
-  const stbd = add(O, add(mul(right, half * L), mul(up, -Math.tan(bias) * half * L)));
+  const pin = add(O, add(mul(right, -half * L), mul(up, dtan(bias) * half * L)));
+  const stbd = add(O, add(mul(right, half * L), mul(up, -dtan(bias) * half * L)));
   const W = at(beatUp, 0);
   const F = at(beatUp - 1.6, -4.2);
   const G = at(-runDown, 0);
