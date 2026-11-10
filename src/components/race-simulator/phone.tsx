@@ -31,8 +31,10 @@ function RoundBtn({ label, size = 46, round, className, style, children, ...rest
     <button
       type="button"
       aria-label={label}
-      className={cx('pointer-events-auto inline-flex shrink-0 cursor-pointer select-none items-center justify-center text-[13.5px] font-semibold text-[#F1F4FA] active:bg-[rgba(42,80,140,0.9)]', glass, round ? 'rounded-full' : 'rounded-[14px]', className)}
-      style={{ width: size, height: size, ...style }}
+      className={cx('pointer-events-auto inline-flex shrink-0 cursor-pointer select-none items-center justify-center text-[13.5px] font-semibold text-[#F1F4FA] active:bg-[rgba(42,80,140,0.9)]', glass, className)}
+      // The corner radius is set here, not as a class: the app's Alfie theme turns a row of
+      // rounded-full buttons (Hail and Tack) into a segmented control.
+      style={{ width: size, height: size, borderRadius: round ? 9999 : 14, ...style }}
       {...rest}
     >
       {children}

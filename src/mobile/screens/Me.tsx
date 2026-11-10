@@ -7,6 +7,7 @@ import { Avatar, OfflineBanner } from '../ui';
 import { setMobilePreview } from '../preview';
 import { isNative } from '../../lib/native/platform';
 import { MBoat, MMembership, computeStats, isCurrent, loadBoats, loadMembership } from '../me';
+import { useSimulatorAccess } from '../simulator';
 
 const Tile: React.FC<{ icon: IconName; bg: string; fg: string; title: string; sub: string; to: string }> = ({ icon, bg, fg, title, sub, to }) => {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export const Me: React.FC = () => {
   const until = membership?.renewalDate ? new Date(membership.renewalDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const simulator = useSimulatorAccess().allowed;
   const where = currentOrganization && currentOrganization.type !== 'club' ? currentOrganization.name : currentClub?.club?.name;
 
   return (
@@ -70,6 +72,17 @@ export const Me: React.FC = () => {
         <Tile icon="timer" bg="rgba(255,159,10,.15)" fg="#FFC062" title="Race Timer" sub="Start sequences" to="/race-timer" />
         <Tile icon="wind" bg="rgba(56,189,248,.15)" fg="#6CCBF5" title="Wind & tides" sub="Your venues" to="/weather" />
       </div>
+
+      {simulator && (
+        <button className="m-card" onClick={() => navigate('/race-simulator')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
+          <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(138,77,255,.16)', color: '#B89BFF' }}><Icon name="simulator" size={20} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>Race Simulator</div>
+            <div className="m-dim" style={{ fontSize: 12.5 }}>Race AI skippers and members, with Alfie coaching</div>
+          </div>
+          <Icon name="chevron" size={17} className="m-dim" />
+        </button>
+      )}
 
       <button className="m-card" onClick={() => navigate('/shops')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
         <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(10,132,255,.14)', color: 'var(--m-blue-ink)' }}><Icon name="bag" size={20} /></span>
