@@ -43,7 +43,7 @@ export class DemoRace {
     this.race = new Race(s);
     this.compass = o.compass ?? true;
     const r = this.race;
-    const cls = CLASSES[r.cls?.id ?? 'IOM'] ?? CLASSES.IOM;
+    const cls = CLASSES[s.classId] ?? CLASSES.IOM;
     this.boats = r.boats.map((b, i) => ({
       id: b.id, sail: b.sail, name: DEMO_SKIPPERS[i % DEMO_SKIPPERS.length], color: b.color,
       bow: cls.loa / 2, length: cls.loa, fixes: [] as Fix[],
