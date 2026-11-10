@@ -13,7 +13,6 @@ import { CompareScreen } from './screens/Compare';
 import { ExternalResultScreen, RaceHistoryScreen } from './screens/History';
 import { Notifications } from './screens/Notifications';
 import { Me } from './screens/Me';
-import { Soon } from './screens/Soon';
 import { DeskEventScreen, RaceDeskScreen, SeasonScreen } from './screens/RaceDesk';
 import { HeatsScreen, RaceSettingsScreen, SignOnScreen, SkippersScreen } from './screens/RaceSetup';
 import { RaceScreen } from './screens/RaceDay';
@@ -36,6 +35,7 @@ import { BoatShedScreen, BoatScreen } from './screens/BoatShed';
 import { StatsScreen } from './screens/Stats';
 import { MeetingScreen } from './screens/Meeting';
 import { RaceTimerScreen } from './screens/RaceTimer';
+import { RaceSimulatorScreen } from './screens/RaceSimulator';
 import { WeatherScreen } from './screens/Weather';
 import { TasksScreen } from './screens/Tasks';
 import { MyDetailsScreen } from './screens/MyDetails';
@@ -54,11 +54,16 @@ import '../styles/alfie-mobile.css';
 
 /** Screens that sit outside the tab bar (pushed full screen). */
 const FIRST_RUN_PATHS = ['/choose-club', '/welcome-notifications', '/membership-due'];
-const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/(?!mine$)[^/]+/, /^\/news\/[^/]+/];
+const NO_TABS = [/^\/(choose-club|welcome-notifications|membership-due)/, /^\/notifications/, /^\/race-timer/, /^\/race-simulator/, /^\/race-desk\/event\/[^/]+\/(race|finish|confirm|sheet)$/, /^\/comms\/chat\//, /^\/classifieds\/(?!mine$)[^/]+/, /^\/news\/[^/]+/];
+
+/** Screens that are always dark, whatever the appearance setting. */
+const ALWAYS_DARK = ['/alfie-tv', '/race-timer', '/race-simulator'];
 
 const Shell: React.FC = () => {
   const { pathname } = useLocation();
-  const { light } = useMobile();
+  const { light: lightSetting } = useMobile();
+  // On an always-dark screen the app (and the status bar text over it) stays dark.
+  const light = lightSetting && !ALWAYS_DARK.some(p => pathname.startsWith(p));
   const [alfieOpen, setAlfieOpen] = useState(false);
   const [alfieMessage, setAlfieMessage] = useState<string | undefined>();
   const [alfieVoice, setAlfieVoice] = useState(false);
@@ -71,7 +76,7 @@ const Shell: React.FC = () => {
   useAlfieTheme(true, light ? 'light' : 'dark');
   // Online dots in chats and profiles
   usePresence();
-  // Upright, except the finish pad and full sheet (they allow turning the phone)
+  // Upright, except the finish pad, full sheet and Race Simulator (they allow turning the phone)
   useEffect(() => { lockPortrait(); }, []);
   // Results confirmed with no signal send themselves when it's back
   useEffect(() => startOutbox(), []);
@@ -91,7 +96,7 @@ const Shell: React.FC = () => {
   useEffect(() => { document.querySelector('.m-scroll')?.scrollTo({ top: 0 }); }, [pathname]);
 
   return (
-    <div className={`m-app ${light && !pathname.startsWith('/alfie-tv') && !pathname.startsWith('/race-timer') ? 'm-light' : ''}`}>
+    <div className={`m-app ${light ? 'm-light' : ''}`}>
       <main className={`m-scroll ${hideTabs ? 'm-no-tabs' : ''}`} style={{ position: 'relative' }}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -143,6 +148,7 @@ const Shell: React.FC = () => {
           <Route path="/calendar/meeting/:id" element={<MeetingScreen />} />
           <Route path="/find-racing" element={<FindRacingScreen />} />
           <Route path="/race-timer" element={<RaceTimerScreen />} />
+          <Route path="/race-simulator" element={<RaceSimulatorScreen />} />
           <Route path="/weather" element={<WeatherScreen />} />
           <Route path="/venue/:id" element={<VenueScreen />} />
           <Route path="/tasks" element={<TasksScreen />} />
