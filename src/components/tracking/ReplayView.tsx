@@ -55,7 +55,8 @@ export default function ReplayView({ race }: { race: TrackedRace }) {
   const gaps = useMemo(() => {
     if (!a || !race.course || race.gun == null) return null;
     const out: { t: number; g: Record<string, number> }[] = [];
-    for (let tt = race.gun + 5; tt <= race.t1; tt += 5) {
+    const end = a.finishes.length ? a.finishes[0].t : race.t1;
+    for (let tt = race.gun + 5; tt <= end; tt += 5) {
       const s = standingsAt(race.boats, race.course, a, tt);
       const lead = s[0]?.progress ?? 0;
       out.push({ t: tt, g: Object.fromEntries(s.filter(x => !x.finished).map(x => [x.boatId, lead - x.progress])) });
@@ -69,9 +70,10 @@ export default function ReplayView({ race }: { race: TrackedRace }) {
   const toggle = (id: string) => setPicked(p => (p.includes(id) ? p.filter(x => x !== id) : [...p, id].slice(-6)));
   const st = standingsAt(race.boats, race.course, a, Math.min(at, a.now));
 
-  const W = 640, H = 180;
+  const W = 1000, H = 200;
   const maxG = Math.max(5, ...(gaps ?? []).flatMap(p => show.map(id => p.g[id] ?? 0)));
-  const xs = (tt: number) => ((tt - gun) / Math.max(1, race.t1 - gun)) * W;
+  const tEnd = gaps && gaps.length ? gaps[gaps.length - 1].t : race.t1;
+  const xs = (tt: number) => ((tt - gun) / Math.max(1, tEnd - gun)) * W;
   const ys = (g: number) => (g / maxG) * (H - 10) + 5;
 
   return (
@@ -79,7 +81,7 @@ export default function ReplayView({ race }: { race: TrackedRace }) {
       <div className="flex flex-wrap items-start gap-3">
         <section aria-label="Replay map" className="relative min-w-0 flex-[3_1_520px] overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0A1A33]" style={{ aspectRatio: '1.25' }}>
           <TrackMap race={race} t={at} orient={orient} tracks={show} trails={picked.length ? 99999 : 45} label="Replay map with the picked boats' tracks" onPick={toggle} />
-          <div className="absolute right-3 top-3"><Seg size="sm" label="Map view" value={orient} onChange={setOrient} options={[{ value: 'wind', label: 'Wind up' }, { value: 'north', label: 'North up' }]} /></div>
+          <div className="absolute left-3 top-3"><Seg size="sm" label="Map view" value={orient} onChange={setOrient} options={[{ value: 'wind', label: 'Wind up' }, { value: 'north', label: 'North up' }]} /></div>
           <div className="absolute inset-x-3 bottom-3 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-[rgba(6,11,22,0.88)] px-2.5 py-2">
             <Btn small primary onClick={() => { if (!play && at >= race.t1 - 0.1) setT(race.t0); setPlay(p => !p); }}>{play ? 'Pause' : 'Play'}</Btn>
             <span className="w-[58px] font-mono text-[14px] tabular-nums">{rt(at - gun)}</span>
@@ -112,20 +114,20 @@ export default function ReplayView({ race }: { race: TrackedRace }) {
         <section aria-labelledby="gap-h" className="rounded-[20px] border border-white/[0.08] bg-[#0A0F1C] p-4">
           <div className="flex flex-wrap items-baseline gap-3">
             <h3 id="gap-h" className="m-0 text-[15px] font-bold">Behind the leader</h3>
-            <span className="text-[12.5px]" style={{ color: C.mute }}>metres to go more than the leader, through the race</span>
+            <span className="text-[12.5px]" style={{ color: C.mute }}>metres further to go than the leader, from the gun to the first finish</span>
             <span className="ml-auto flex flex-wrap gap-3 text-[12.5px]">{show.map(id => <span key={id} className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="h-[3px] w-3 rounded" style={{ background: boat(id).color }} />{boat(id).sail}</span>)}</span>
           </div>
           <svg viewBox={`0 0 ${W} ${H + 18}`} className="mt-2 block h-auto w-full" role="img" aria-label="Line chart of each picked boat's distance behind the leader through the race">
-            {[0, 0.5, 1].map(f => <g key={f}><line x1={0} x2={W} y1={ys(maxG * f)} y2={ys(maxG * f)} stroke="rgba(255,255,255,.08)" /><text x={W - 2} y={ys(maxG * f) - 3} textAnchor="end" fontSize="10" fill="rgba(235,240,255,.5)">{Math.round(maxG * f)} m</text></g>)}
+            {[0, 0.5, 1].map(f => <g key={f}><line x1={0} x2={W} y1={ys(maxG * f)} y2={ys(maxG * f)} stroke="rgba(255,255,255,.08)" /><text x={W - 2} y={ys(maxG * f) + (f === 0 ? 12 : -4)} textAnchor="end" fontSize="11" fill="rgba(235,240,255,.5)">{Math.round(maxG * f)} m</text></g>)}
             {a.roundings.length > 0 && race.course.waypoints.map((w, i) => {
               const first = Math.min(...a.roundings.filter(r => r.wp === i).map(r => r.t));
-              return Number.isFinite(first) ? <g key={i}><line x1={xs(first)} x2={xs(first)} y1={0} y2={H} stroke="rgba(255,159,67,.35)" strokeDasharray="3 3" /><text x={xs(first) + 3} y={H + 13} fontSize="10" fill="rgba(255,203,150,.8)">{w.name.replace(/^Mark /, '')}</text></g> : null;
+              return Number.isFinite(first) ? <g key={i}><line x1={xs(first)} x2={xs(first)} y1={0} y2={H} stroke="rgba(255,159,67,.35)" strokeDasharray="3 3" /><text x={xs(first) + 3} y={H + 13} fontSize="11" fill="rgba(255,203,150,.8)">{w.name.replace(/^Mark /, '')}</text></g> : null;
             })}
             {show.map(id => (
               <polyline key={id} fill="none" stroke={boat(id).color} strokeWidth={2} strokeLinejoin="round"
                 points={gaps.filter(p => p.g[id] != null).map(p => `${xs(p.t).toFixed(1)},${ys(p.g[id]).toFixed(1)}`).join(' ')} />
             ))}
-            <line x1={xs(at)} x2={xs(at)} y1={0} y2={H} stroke="#fff" strokeWidth={1} />
+            {at <= gaps[gaps.length - 1].t && <line x1={xs(at)} x2={xs(at)} y1={0} y2={H} stroke="#fff" strokeWidth={1} />}
           </svg>
         </section>
       )}

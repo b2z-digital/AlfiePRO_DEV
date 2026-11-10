@@ -122,7 +122,7 @@ export default function SettingsView({ tracking, onSaved }: Props) {
         </section>
       )}
 
-      {!ro && (
+      {!ro && (dirty || msg) && (
         <div className="sticky bottom-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-[rgba(6,11,22,0.92)] px-4 py-3">
           <span className="text-[13px]" role="status" style={{ color: C.mute }}>{msg ?? (dirty ? 'Unsaved changes' : 'All saved')}</span>
           <Btn className="ml-auto" onClick={() => { setD(tracking); setRounding(Number(tracking.rounding_m ?? 2)); }} disabled={!dirty || saving}>Undo</Btn>

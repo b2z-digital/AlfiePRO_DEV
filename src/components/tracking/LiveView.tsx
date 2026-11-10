@@ -111,7 +111,7 @@ export default function LiveView({ race, onTv, onStart, onOfficer }: { race: Tra
           <p className="m-1 text-[12px]" style={{ color: C.faint }}>Seconds behind at this leg's pace. VMG in knots. Tap a boat to follow her.</p>
         </section>
 
-        <section aria-label="Race map" className="relative min-w-0 flex-[3_1_520px] overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0A1A33]" style={{ aspectRatio: '1.12' }}>
+        <section aria-label="Race map" className="relative min-w-0 max-lg:order-first flex-[3_1_520px] overflow-hidden rounded-[22px] border border-white/[0.08] bg-[#0A1A33]" style={{ aspectRatio: '1.12' }}>
           <TrackMap race={race} t={t} orient={orient} wind={wind} follow={follow} onPick={id => setFollow(id)} label="Live map: boats, trails, the course, ladder rungs and laylines" />
           <div className="absolute left-3 top-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-[rgba(6,11,22,0.86)] py-2 pl-2 pr-3">
             <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20">

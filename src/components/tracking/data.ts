@@ -132,15 +132,16 @@ export async function loadFixes(sessionId: string, since?: string): Promise<{ ta
   try {
     const supabase = await db();
     const out: { tag_id: string; x: number; y: number; h: number | null; at: string }[] = [];
-    let after = since ?? '1970-01-01T00:00:00Z';
+    // Paged by offset, in a stable order: many tags report in the same instant, so paging on the
+    // time alone would drop fixes that share a page boundary's timestamp.
     for (let page = 0; page < 400; page++) {
-      const { data, error } = await supabase.from('uwb_position_data').select('tag_id, position_x, position_y, heading_deg, recorded_at')
-        .eq('session_id', sessionId).gt('recorded_at', after).order('recorded_at').limit(1000);
+      let q = supabase.from('uwb_position_data').select('tag_id, position_x, position_y, heading_deg, recorded_at').eq('session_id', sessionId);
+      if (since) q = q.gt('recorded_at', since);
+      const { data, error } = await q.order('recorded_at').order('id').range(page * 1000, page * 1000 + 999);
       if (error) return null;
       const rows = (data ?? []) as { tag_id: string; position_x: number; position_y: number; heading_deg: number | null; recorded_at: string }[];
       for (const r of rows) out.push({ tag_id: r.tag_id, x: Number(r.position_x), y: Number(r.position_y), h: r.heading_deg == null ? null : Number(r.heading_deg), at: r.recorded_at });
       if (rows.length < 1000) break;
-      after = rows[rows.length - 1].recorded_at;
     }
     return out;
   } catch {
@@ -170,7 +171,9 @@ const FALLBACK_COLORS = ['#FBBF24', '#E879F9', '#34D399', '#2DD4BF', '#F472B6', 
 /** Tags and their fixes as boats, with each boat's tag-to-bow distance and hull length. */
 export function boatsFrom(tags: TagRow[], fixes: { tag_id: string; x: number; y: number; h: number | null; at: string }[], geo: Record<string, ClassGeometry>): TrackedBoat[] {
   const by: Record<string, Fix[]> = {};
-  for (const f of fixes) (by[f.tag_id] ||= []).push({ t: epoch(f.at), x: f.x, y: f.y, h: f.h });
+  // A tag's compass heading is a bearing; the anchors' frame has no known bearing yet, so headings
+  // come from the track instead (good to a couple of degrees at 10 Hz).
+  for (const f of fixes) (by[f.tag_id] ||= []).push({ t: epoch(f.at), x: f.x, y: f.y, h: null });
   return tags.filter(t => by[t.id]?.length).map((t, i) => {
     const g = geo[t.boat_class ?? ''] ?? geo.IOM ?? { bow: 0.42, length: 1 };
     return {

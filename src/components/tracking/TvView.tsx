@@ -25,11 +25,11 @@ export default function TvView({ race, onClose }: { race: TrackedRace; onClose: 
         {gun != null && <span className="ml-auto font-mono text-[clamp(28px,3.4vw,56px)] font-semibold tabular-nums">{rt(race.now - gun)}</span>}
         <Btn small onClick={onClose} className={gun != null ? '' : 'ml-auto'}>Exit</Btn>
       </div>
-      <div className="relative min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4">
         {race.status === 'ready' && race.course && (
-          <TrackMap race={race} t={race.now} orient={race.venue ? 'bank' : 'wind'} trails={30} ladder={false} scale={1.5} className="absolute inset-0" label="The race, from the bank" />
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-[22px]"><TrackMap race={race} t={race.now} orient={race.venue ? 'bank' : 'wind'} trails={30} ladder={false} scale={1.5} className="absolute inset-0" label="The race, from the bank" />{last && <div className="absolute bottom-4 right-4 max-w-[min(560px,60vw)] rounded-[18px] border border-white/10 bg-[rgba(6,11,22,0.86)] px-4 py-3 text-[clamp(14px,1.4vw,24px)]">{last.text}</div>}</div>
         )}
-        <ol className="absolute bottom-4 left-4 top-4 m-0 flex w-[clamp(220px,22vw,380px)] list-none flex-col gap-1 overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(6,11,22,0.82)] p-3">
+        <ol className="order-first m-0 flex w-[clamp(220px,22vw,380px)] shrink-0 list-none flex-col gap-1 self-start overflow-hidden rounded-[22px] border border-white/10 bg-[rgba(6,11,22,0.82)] p-3">
           {standings.slice(0, 12).map(s => (
             <li key={s.boatId} className="grid grid-cols-[1.6em_6px_minmax(0,1fr)_auto] items-center gap-2.5 text-[clamp(15px,1.5vw,26px)]">
               <b className="text-center">{s.place}</b>
@@ -39,9 +39,6 @@ export default function TvView({ race, onClose }: { race: TrackedRace; onClose: 
             </li>
           ))}
         </ol>
-        {last && (
-          <div className="absolute bottom-4 right-4 max-w-[min(560px,60vw)] rounded-[18px] border border-white/10 bg-[rgba(6,11,22,0.86)] px-4 py-3 text-[clamp(14px,1.4vw,24px)]">{last.text}</div>
-        )}
       </div>
     </div>
   );

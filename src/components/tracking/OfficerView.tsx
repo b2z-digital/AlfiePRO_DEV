@@ -112,7 +112,7 @@ export default function OfficerView({ race, lowBattery = [], onEnd, ending }: Pr
               {a.finishes.map((f, i) => (
                 <Row key={f.boatId} {...R(f.boatId)} tone={f.tooClose.length ? '#FFD48A' : undefined}>
                   <span className="font-bold">{i + 1}</span> · <span className="font-mono">{gun != null ? rt1(f.t - gun) : ''}</span>
-                  {f.tooClose.length ? ` · too close to call with ${f.tooClose.map(sail).join(', ')}` : f.margin != null && i < a.finishes.length - 1 ? ` · ${Math.round(f.margin * 100)} cm clear` : ''}
+                  {f.tooClose.length ? ` · too close to call with ${f.tooClose.map(sail).join(', ')}` : f.margin != null && i < a.finishes.length - 1 ? ` · ${f.margin < 1 ? `${Math.round(f.margin * 100)} cm` : `${f.margin.toFixed(1)} m`} clear` : ''}
                 </Row>
               ))}
             </ol>

@@ -158,7 +158,7 @@ export default function CourseView({ kit, tracking, onChange }: { kit: Kit; trac
             <input type="number" min={0} max={359} className={cx(sel, 'w-[84px] text-right font-mono')} disabled={!can} value={d.wind_direction_deg ?? ''} onChange={e => setD({ ...d, wind_direction_deg: e.target.value === '' ? null : ((Number(e.target.value) % 360) + 360) % 360 })} />
             ° on the plan (up is 0°). The live screens read the real wind from the fleet.
           </label>
-          {legs.length > 0 && <p className="m-0 mt-3 text-[13px]" style={{ color: C.mute }}>Legs {legs.map(x => `${Math.round(x)} m`).join(' · ')} · {Math.round(legs.reduce((s, x) => s + x, 0))} m a lap</p>}
+          {legs.length > 0 && <p className="m-0 mt-3 text-[13px]" style={{ color: C.mute }}>Legs {legs.map(x => `${Math.round(x)} m`).join(' · ')} · {Math.round(legs.reduce((s, x) => s + x, 0))} m in all</p>}
           {can && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="text-[13px]" role="status" style={{ color: C.mute }}>{msg}</span>
