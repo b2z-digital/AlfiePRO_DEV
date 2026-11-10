@@ -212,15 +212,19 @@ export function autoSheet(b: Boat): number {
 
 export interface ContactPair { a: number; b: number; depth: number }
 
-/** Push overlapping hulls apart and slow them. Returns the pairs in contact this step. */
+/**
+ * Push overlapping hulls apart and slow them. Returns the pairs in contact this step. A boat that
+ * has finished never touches one still racing (she's out of the race and out of their way), but
+ * boats waiting after the finish do bump each other.
+ */
 export function collide(boats: Boat[]): ContactPair[] {
   const out: ContactPair[] = [];
   for (let i = 0; i < boats.length; i++) {
     const A = boats[i];
-    if (A.finished || A.retired) continue;
+    if (A.retired) continue;
     for (let j = i + 1; j < boats.length; j++) {
       const B = boats[j];
-      if (B.finished || B.retired) continue;
+      if (B.retired || B.finished !== A.finished) continue;
       const reach = (A.cls.loa + B.cls.loa) / 2 + 0.05;
       if (Math.abs(A.x - B.x) > reach || Math.abs(A.y - B.y) > reach) continue;
       const [a0, a1, ra] = capsule(A), [b0, b1, rb] = capsule(B);

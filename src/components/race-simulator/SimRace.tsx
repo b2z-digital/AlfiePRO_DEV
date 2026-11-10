@@ -91,7 +91,7 @@ function nextTarget(race: Race, p: Boat): { x: number; y: number; name: string; 
   const c = race.course;
   const legIdx = p.started ? p.legIndex : 0;
   const leg = c.legs[legIdx];
-  if (!leg) return null;
+  if (!leg || p.finished) return null;
   if (leg.kind === 'mark') { const m = c.byId[leg.rounding.markId]; return { x: m.p.x, y: m.p.y, name: m.name, upwind: leg.upwind, isMark: true }; }
   if (leg.kind === 'gate') {
     const a = c.byId[leg.options[0].markId], b = c.byId[leg.options[1].markId];
@@ -456,9 +456,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           let scale = (Math.min(size.w, size.h * 1.5) / (30 * L)) * st.zoom;
           let cx = px + lead.x * p.spd * 1.2, cy = py + lead.y * p.spd * 1.2;
           // Keep what you're sailing to in view: the start line before you've started, then the next
-          // mark. Zoom out as far as that needs (to the whole course at most), leaving room for the panels.
+          // mark, and the finish line once you've finished, to watch the rest come in. Zoom out as far
+          // as that needs (to the whole course at most), leaving room for the panels.
           const c = race.course;
-          const pts = !p.started ? [c.start.pin, c.start.stbd] : (() => { const nx = nextTarget(race, p); return nx ? [nx] : []; })();
+          const pts = !p.started ? [c.start.pin, c.start.stbd] : p.finished ? [c.finish.pin, c.finish.stbd] : (() => { const nx = nextTarget(race, p); return nx ? [nx] : []; })();
           if (pts.length && !back) {
             const pad = 3.5 * L;
             let minX = px, maxX = px, minY = py, maxY = py;
@@ -860,7 +861,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             )}
             {!replay && !moment && (
               <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 xl:block">
-                <BoatStrip {...hud.boat} auto={race.settings.autoTrim} />
+                <BoatStrip {...hud.boat} auto={race.settings.autoTrim} finished={hud.finished} />
               </div>
             )}
             {!watching && (

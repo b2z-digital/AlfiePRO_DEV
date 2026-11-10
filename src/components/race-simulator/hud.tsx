@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import type { Incident } from '@/sim/types';
 import type { Cue, CoachMode, LineInfo } from './coach';
+import { SAILING_CLEAR } from './coach';
 import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
 
@@ -184,15 +185,19 @@ export function CoachCard({ cue, mode, onHide, onWhy, compact }: { cue: Cue | nu
 }
 
 // ───────────────────────── Boat strip ─────────────────────────
-export function BoatStrip({ tack, pos, spdPct, kn, trim, auto }: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string; auto: boolean }) {
+export function BoatStrip({ tack, pos, spdPct, kn, trim, auto, finished = false }: { tack: 'Starboard' | 'Port'; pos: string; spdPct: number; kn: number; trim: string; auto: boolean; finished?: boolean }) {
   return (
     <Hud className="flex items-center gap-3.5 whitespace-nowrap rounded-2xl px-4 py-2.5">
       <span className={cx('rounded-full px-2.5 py-1 text-[12.5px] font-bold', tack === 'Starboard' ? 'bg-[rgba(42,147,255,0.16)] text-[#A9D2FF]' : 'bg-[rgba(255,159,67,0.16)] text-[#FFCB96]')}>{tack}</span>
       <span className="text-[13.5px]">{pos}</span>
       <span className="h-[18px] w-px bg-white/[0.12]" />
-      <span className="text-[13.5px]">Speed <b>{Math.round(spdPct * 100)}%</b> of target <span style={{ color: C.mute }}>· {kn.toFixed(1)} kn</span></span>
-      <span className="hidden h-[18px] w-px bg-white/[0.12] xl:block" />
-      <span className="hidden text-[13.5px] xl:inline" style={{ color: C.mute }}>{auto ? 'Auto-trim on' : trim}</span>
+      {finished ? <span className="text-[13.5px]">{SAILING_CLEAR}</span> : (
+        <>
+          <span className="text-[13.5px]">Speed <b>{Math.round(spdPct * 100)}%</b> of target <span style={{ color: C.mute }}>· {kn.toFixed(1)} kn</span></span>
+          <span className="hidden h-[18px] w-px bg-white/[0.12] xl:block" />
+          <span className="hidden text-[13.5px] xl:inline" style={{ color: C.mute }}>{auto ? 'Auto-trim on' : trim}</span>
+        </>
+      )}
     </Hud>
   );
 }

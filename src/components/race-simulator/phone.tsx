@@ -8,6 +8,7 @@ import type { BankCam } from './bank';
 import type { CoachMode, Cue } from './coach';
 import CourseMap from './CourseMap';
 import { CourseCard, FleetCard, LineCard, type HudState, type PenaltyProgress } from './hud';
+import { SAILING_CLEAR } from './coach';
 import { SAFE } from './phoneLayout';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, Seg, clock, cx, ordinal } from './ui';
 
@@ -130,7 +131,7 @@ function TurnHint() {
 function BoatChip({ hud, autoTrim }: { hud: HudState; autoTrim: boolean }) {
   const b = hud.boat, li = hud.preStart ? hud.line : null;
   const stbd = b.tack === 'Starboard';
-  const advice = !autoTrim && !li && b.trim !== 'Trim: good' ? b.trim.replace(/^Trim: /, '') : null;
+  const advice = !autoTrim && !li && !hud.finished && b.trim !== 'Trim: good' ? b.trim.replace(/^Trim: /, '') : null;
   return (
     <Hud className="pointer-events-none flex max-w-full flex-col items-center !rounded-[16px] px-3 py-1.5">
       {/* Each part stays whole; on a narrow phone the last part drops to a second line. */}
@@ -141,6 +142,8 @@ function BoatChip({ hud, autoTrim }: { hud: HudState; autoTrim: boolean }) {
             <span className={cx(li.belowL < 0 && 'font-semibold text-[#FFB4B4]')}>{li.belowL < 0 ? `Over the line by ${Math.abs(li.belowL).toFixed(1)} lengths` : `${li.belowL.toFixed(1)} lengths below the line`}</span>
             {li.ttl !== null && li.belowL >= 0 && <span style={{ color: C.mute }}>· {li.ttl.toFixed(1)} s to the line</span>}
           </>
+        ) : hud.finished ? (
+          <span>{SAILING_CLEAR}</span>
         ) : (
           <>
             <span>{b.pos}</span>

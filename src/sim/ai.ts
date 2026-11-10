@@ -252,6 +252,7 @@ export class Skipper implements Helm {
   // ───────────────────────── helm (every step) ─────────────────────────
   helm(h: AiHost, dt: number) {
     const b = this.b;
+    if (b.finished || b.retired) return; // the engine sails her clear (clear.ts)
     const due = h.t - this.lv.reaction * (1.3 - 0.6 * this.persona.consistency);
     let cmd = this.queue[0];
     for (const q of this.queue) { if (q.t <= due) cmd = q; else break; }

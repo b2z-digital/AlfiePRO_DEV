@@ -63,6 +63,9 @@ export function pointOfSail(b: Boat): string {
   return 'Running';
 }
 
+/** After the finish your boat sails herself clear: what the boat strip says then. */
+export const SAILING_CLEAR = 'Finished · keeping clear of the boats still racing';
+
 /**
  * The trim line under your boat. Upwind, radio sailors sail with the sail right in: ease only a touch
  * in very light air, or when a gust lays her over (then sheet back in as it passes).
@@ -187,7 +190,7 @@ export function coachCue(race: Race, p: Boat, mem: WindMemory, li: LineInfo): Cu
     if (p.ocs && !p.returning) return cue('The start', 'Recall: you were over at the gun. Bear away, dip right back below the line, then start again. Keep clear of everyone while you return (Rule 21).', 'warn');
     return cue('The start', 'Cross the line between the pin and the start mark to start.');
   }
-  if (p.finished) return cue('Finish', 'Finished. Sail clear of the line and watch the rest come in.');
+  if (p.finished) return cue('Finish', 'Finished. Your boat sails clear of the line, out of the way of boats still racing. Watch the rest come in.');
 
   // ── Penalty owed ──
   if (p.penalty.owed > 0) return cue('Rules', `You owe a One-Turn Penalty: get clear of other boats, then turn right round the same way, through one tack and one gybe.`, 'warn');
