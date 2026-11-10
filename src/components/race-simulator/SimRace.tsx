@@ -3,22 +3,21 @@
 // the race in full-coach mode. Keyboard, transmitter and on-screen sticks all steer.
 // The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Race } from '@/sim/engine';
+import { Race, RaceLog } from '@/sim/engine';
 import { LEVELS, PERSONAS, Skipper } from '@/sim/ai';
 import { Rng } from '@/sim/math';
 import type { Boat, Incident, RaceSettings } from '@/sim/types';
-import { DT, bankAhead, hullGap } from '@/sim/physics';
+import { DT } from '@/sim/physics';
 import { dir, dist, n180 } from '@/sim/math';
-import { vmgAngles } from '@/sim/classes';
-import { keepClear, spellSail } from '@/sim/referee';
-import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx, windwardBoat } from '@/sim/scene';
+import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
 import type { SceneSpec } from '@/sim/training';
 import { CoachMode, Cue, LineInfo, WindMemory, coachCue, lineInfo, pointOfSail, trimAdvice } from './coach';
 import { Camera, drawRace } from './render';
 import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping } from './input';
 import { RaceAudio } from './audio';
-import { PlayerLog, RaceSummary, summarize } from './stats';
+import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { Moment, findMoments } from './moments';
 import {
   BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, LineCard, ReplayBar,
   ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, SceneResult, Toast, Toasts, WindCard,
@@ -56,7 +55,9 @@ export interface SimRaceProps {
   view: SimView;
   onViewChange: (v: SimView) => void;
   onHome: () => void;
-  onDebrief?: (race: Race, sum: RaceSummary) => void;
+  onDebrief?: (race: Race, sum: RaceSummary, moments: Moment[]) => void;
+  /** Sail a race again from its log up to a step, then take over from there. */
+  resume?: { log: RaceLog; step: number };
   onAgain: () => void;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
@@ -106,7 +107,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -114,7 +115,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
     return b;
   }, [scene]);
-  const race = useMemo(() => built?.race ?? new Race(settings!), [built, settings]);
+  const race = useMemo(() => {
+    if (built) return built.race;
+    const r = new Race(settings!);
+    // Taking over from a moment: the race sails itself again exactly as it went, up to there.
+    if (resume) r.followLog(resume.log, resume.step);
+    return r;
+  }, [built, settings, resume]);
+  // While it catches up, how far it has to go; then a word before you take the helm.
+  const [catchUp, setCatchUp] = useState<{ to: number; at: number } | null>(() => (resume ? { to: resume.step, at: 0 } : null));
+  const [tookOver, setTookOver] = useState<number | null>(null);
   // Stable when there are none: a new [] each render would restart the race loop every frame.
   const overlays: WorldOverlay[] = built?.overlays ?? NO_OVERLAYS;
   useEffect(() => {
@@ -145,6 +155,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const [hud, setHud] = useState<HudState | null>(null);
   const [cue, setCue] = useState<Cue | null>(null);
   const [paused, setPaused] = useState(false);
+  useEffect(() => { if (!paused) setTookOver(null); }, [paused]);
   const [moment, setMoment] = useState<Incident | null>(null);
   const [banner, setBanner] = useState<Incident | null>(null);
   const [replay, setReplay] = useState<{ back: number; playing: boolean } | null>(null);
@@ -308,7 +319,19 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       const st = R.current;
       ctl.update(dtReal, st.mapping);
       const p = race.player;
-      if (!st.paused && !st.replay && !st.ended) {
+      if (race.replaying) {
+        // Sailing back to the moment you chose: as fast as the frame allows, quietly. The old
+        // events are history, but the wind graph and your log keep up.
+        const until = performance.now() + 22;
+        while (race.replaying && performance.now() < until) {
+          race.step();
+          if (p) { mem.update(race.t, race.wind.sample(p.x, p.y, race.t).twd); log.sample(race, p, mem.mean); }
+        }
+        st.evIdx = race.events.length;
+        acc = 0;
+        if (race.replaying) setCatchUp({ to: resume?.step ?? 0, at: race.step_ });
+        else { setCatchUp(null); setTookOver(race.t); st.paused = true; setPaused(true); }
+      } else if (!st.paused && !st.replay && !st.ended) {
         acc += dtReal * (st.fast ? 2.5 : 1);
         let n = 0;
         while (acc >= DT && n < 10) {
@@ -476,7 +499,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
 
   const doTack = useCallback(() => {
     const p = race.player; if (!p) return;
-    race.requestManeuver(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
+    race.act(Math.abs(p.twa) < 90 ? 'tack' : 'gybe');
   }, [race]);
 
   const doPenalty = useCallback(() => {
@@ -485,52 +508,13 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     toast('Turning: one tack and one gybe');
   }, [race, toast]);
 
-  // Hails, in the order a skipper would think of them: answer a room-to-tack hail, protest a foul,
-  // ask for room to tack at the bank, claim mark-room, then right of way.
+  // Hails: the race works out what she calls (answer a room-to-tack hail, protest, room to tack at
+  // the bank, mark-room, right of way), so a replay calls the same; here we say it and show it.
   const doHail = useCallback(() => {
-    const p = race.player; if (!p) return;
-    const L = p.cls.loa;
-    const say = (text: string) => { race.hail(p, text); audio.say(text.replace(/!/g, ''), true); };
-    // Rule 20.2(c): reply "You tack" to a boat hailing us for room to tack.
-    if (race.referee.pendingRoomToTack(race.boats.indexOf(p))) {
-      if (race.replyYouTack(p)) { audio.say('You tack', true); toast('You replied "You tack": now give her room to tack and keep clear of her', 'warn'); }
-      return;
-    }
-    // Protest (Appendix E): own sail number, "protest", the other boat's sail number.
-    const recent = [...race.incidents].reverse().find(i => i.victim === p.id && race.t - i.t < 12);
-    let other: Boat | null = recent ? race.boatById(recent.offender) : null;
-    if (!other) {
-      // A near miss with a boat that had to keep clear of us.
-      for (const o of race.boats) {
-        if (o === p || o.finished) continue;
-        if (hullGap(p, o) < 1.2 * L && keepClear(p, o, race.t).keeper === 1) { other = o; break; }
-      }
-    }
-    if (other && (recent || hullGap(p, other) < 1.2 * L)) {
-      const text = `${spellSail(p.sail)} protest ${spellSail(other.sail)}`;
-      race.hail(p, text); audio.say(text, true);
-      if (race.forgot.has(other.id)) { race.forgot.delete(other.id); toast(`${other.sail} heard your protest and will take her turn`, 'good'); }
-      if (recent && recent.resolved === 'pending') recent.resolved = 'protested';
-      return;
-    }
-    // Rule 20.1: close-hauled at the bank with a boat to windward: hail for room to tack.
-    const up = vmgAngles(p.cls, p.tws).up;
-    if (p.started && Math.abs(p.twa) <= up + 12 && bankAhead(p, race.course) <= 3.2 * L) {
-      const w = windwardBoat(race, p, 2.2 * L);
-      if (w) { race.hailRoomToTack(p, w); audio.say(`Room to tack, ${spellSail(p.sail)}`, true); return; }
-    }
-    const pi = race.boats.indexOf(p);
-    for (let j = 0; j < race.boats.length; j++) {
-      const mr = race.referee.markRoom(pi, j);
-      if (mr?.iEntitled) { say('Room!'); return; }
-    }
-    let best: Boat | null = null, bg = 3 * L;
-    for (const o of race.boats) { if (o === p || o.finished) continue; const g = hullGap(p, o); if (g < bg) { bg = g; best = o; } }
-    if (best) {
-      const kc = keepClear(p, best, race.t);
-      if (kc.keeper === 1) { say(kc.rule === '10' ? 'Starboard!' : kc.rule === '11' ? 'Up, up!' : 'Keep clear!'); return; }
-    }
-    toast('Nothing to hail: you hail when you have right of way, need room, or protest');
+    const r = race.act('hail');
+    if (!r) return;
+    if (r.text) audio.say(r.text.replace(/!/g, ''), true);
+    if (r.note) toast(r.note, r.noteTone ?? 'plain');
   }, [race, audio, toast]);
 
   const closeMoment = useCallback((takePenalty: boolean) => {
@@ -552,7 +536,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
 
   const finish = useCallback(() => {
     const sum = summarize(race, log, mode === 'start' ? 'start' : 'race');
-    onDebrief?.(race, sum);
+    onDebrief?.(race, sum, findMoments(race, log, sum));
   }, [race, log, mode, onDebrief]);
 
   // ── Keyboard ──
@@ -759,12 +743,31 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         )}
 
         {/* Paused (not for a rules moment) */}
+        {catchUp && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <Hud className="flex w-[320px] flex-col items-center gap-3 px-7 py-6 text-center">
+              <p className="m-0 font-display text-[20px] font-bold">Sailing back to your moment</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-[#4DA3FF]" style={{ width: `${Math.round((100 * catchUp.at) / Math.max(1, catchUp.to))}%` }} /></div>
+              <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>The same race, the same wind, every boat sailing it again</p>
+            </Hud>
+          </div>
+        )}
         {paused && !moment && !results && !replay && !sceneOut && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <Hud className="flex flex-col items-center gap-3 px-8 py-6 text-center">
-              <p className="m-0 font-display text-[26px] font-bold">Paused</p>
-              <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>Press Space to carry on</p>
-              <div className="flex gap-2.5"><Btn primary onClick={togglePause}>Resume</Btn><Btn onClick={startReplay}>Replay the last 10 s</Btn></div>
+              {tookOver !== null ? (
+                <>
+                  <div className="flex items-center gap-2.5"><AlfieOrb size={30} /><p className="m-0 font-display text-[24px] font-bold">Back at {tookOver < race.gunT ? `${fmt(race.gunT - tookOver)} to the start` : fmt(tookOver - race.gunT)}</p></div>
+                  <p className="m-0 max-w-[360px] text-[13.5px] leading-normal" style={{ color: C.mute }}>Every boat is where it was, in the same wind. From here she's yours: sail it the better way.</p>
+                  <div className="flex gap-2.5"><Btn primary onClick={() => { setTookOver(null); togglePause(); }}>Take the helm</Btn></div>
+                </>
+              ) : (
+                <>
+                  <p className="m-0 font-display text-[26px] font-bold">Paused</p>
+                  <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>Press Space to carry on</p>
+                  <div className="flex gap-2.5"><Btn primary onClick={togglePause}>Resume</Btn><Btn onClick={startReplay}>Replay the last 10 s</Btn></div>
+                </>
+              )}
             </Hud>
           </div>
         )}

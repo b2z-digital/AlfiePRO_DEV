@@ -530,22 +530,35 @@ function bubble(ctx: CanvasRenderingContext2D, text: string, x: number, y: numbe
 }
 
 /** Debrief map: the course and full tracks from the 5 Hz recording, boats at frame f. */
-export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: number, h: number, dpr: number, frame: number, focus: string[]) {
-  const c = race.course;
-  // Fit the marks and every track into the canvas, with a margin.
+/** The part of the water a replay shows: x0..x1, y0..y1 in metres. */
+export interface ReplayBox { x0: number; y0: number; x1: number; y1: number }
+
+/** Everywhere the race went: the marks and every boat's track. */
+export function raceBox(race: Race): ReplayBox {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   const grow = (x: number, y: number) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
-  for (const m of c.marks) grow(m.p.x, m.p.y);
+  for (const m of race.course.marks) grow(m.p.x, m.p.y);
   for (let k = 0; k < race.track.length; k += 3) { const d = race.track[k].d; for (let i = 0; i < race.boats.length; i++) grow(d[i * 5], d[i * 5 + 1]); }
+  return { x0, y0, x1, y1 };
+}
+
+/**
+ * The replay: tracks up to the frame (the boats in focus bright, the rest faint with a short tail),
+ * the boats as they were and the wind then, within `box` (the whole race by default), with the
+ * names of the boats in focus.
+ */
+export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: number, h: number, dpr: number, frame: number, focus: string[], box?: ReplayBox) {
+  const c = race.course;
+  const B = box ?? raceBox(race);
   const pad = 2 * c.L;
-  const s = Math.min(w / (x1 - x0 + 2 * pad), h / (y1 - y0 + 2 * pad));
-  const cam = { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+  const s = Math.min(w / (B.x1 - B.x0 + 2 * pad), h / (B.y1 - B.y0 + 2 * pad));
+  const cam = { x: (B.x0 + B.x1) / 2, y: (B.y0 + B.y1) / 2 };
   const X = (x: number) => w / 2 + (x - cam.x) * s;
   const Y = (y: number) => h / 2 - (y - cam.y) * s;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#0B1A31';
   ctx.fillRect(0, 0, w, h);
-  if (race.venue) drawVenueLand(ctx, race.venue, (x, y) => [X(x), Y(y)], s, w, h, false);
+  if (race.venue) drawVenueLand(ctx, race.venue, (x, y) => [X(x), Y(y)], s, w, h, s > 6);
   // Line and marks.
   ctx.setLineDash([5, 4]);
   ctx.strokeStyle = '#FFB340';
@@ -553,18 +566,20 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
   ctx.beginPath(); ctx.moveTo(X(c.start.pin.x), Y(c.start.pin.y)); ctx.lineTo(X(c.start.stbd.x), Y(c.start.stbd.y)); ctx.stroke();
   ctx.setLineDash([]);
   for (const m of c.marks) {
+    const r = Math.max(4.5, m.r * s);
     ctx.fillStyle = '#FF9F43';
-    ctx.beginPath(); ctx.arc(X(m.p.x), Y(m.p.y), 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(m.p.x), Y(m.p.y), r, 0, Math.PI * 2); ctx.fill();
+    if (s > 5) label(ctx, m.kind === 'pin' ? 'Pin' : m.kind === 'start-stbd' ? 'S' : m.label === '1' ? 'Mark 1' : m.label, X(m.p.x), Y(m.p.y) - r - 7, 'rgba(235,240,255,0.7)', 11.5, 'center', 600);
   }
   const T = race.track;
   if (!T.length) return;
   const n = race.boats.length;
   const f = Math.max(0, Math.min(T.length - 1, frame | 0));
-  // Tracks up to the frame: focused boats bright, the rest faint.
+  // Tracks up to the frame: focused boats bright, the rest faint, with a brighter last 10 s.
   race.boats.forEach((b, i) => {
     const hot = focus.includes(b.id);
     ctx.strokeStyle = b.color;
-    ctx.globalAlpha = hot ? 0.9 : 0.16;
+    ctx.globalAlpha = hot ? 0.9 : 0.14;
     ctx.lineWidth = hot ? (b.isPlayer ? 2.4 : 2) : 1.2;
     ctx.beginPath();
     for (let k = 0; k <= f; k += 2) {
@@ -573,13 +588,33 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
       if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.stroke();
+    if (!hot) {
+      ctx.globalAlpha = 0.45;
+      ctx.beginPath();
+      for (let k = Math.max(0, f - 50); k <= f; k++) { const d = T[k].d; const x = X(d[i * 5]), y = Y(d[i * 5 + 1]); if (k === Math.max(0, f - 50)) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
   });
   ctx.globalAlpha = 1;
-  // Boats at the frame.
+  // Boats at the frame, big enough to read when zoomed in.
   const d = T[f].d;
+  const Lpx = Math.max(14, Math.min(40, c.L * s));
   for (let i = 0; i < n; i++) {
     const b = race.boats[i];
     const x = X(d[i * 5]), y = Y(d[i * 5 + 1]), hd = d[i * 5 + 2];
-    drawBoat(ctx, x, y, hd, n180(T[f].twd - hd), 0.7, 14, b.color, b.isPlayer, false, focus.includes(b.id) ? 1 : 0.6);
+    const hot = focus.includes(b.id);
+    drawBoat(ctx, x, y, hd, n180(T[f].twd - hd), 0.7, Lpx, b.color, b.isPlayer, false, hot ? 1 : 0.6);
+    if (hot || s > 8) label(ctx, b.isPlayer ? 'You' : b.sail, x + Lpx * 0.55 + 4, y - Lpx * 0.4, b.isPlayer ? '#FFFFFF' : 'rgba(235,240,255,0.8)', b.isPlayer ? 12.5 : 11.5, 'left', b.isPlayer ? 700 : 600);
   }
+  // The wind at that moment.
+  {
+    const wd = dir(T[f].twd + 180), cx = w - 30, cy = 30;
+    ctx.strokeStyle = 'rgba(156,203,255,0.9)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - wd.x * 11, cy + wd.y * 11); ctx.lineTo(cx + wd.x * 11, cy - wd.y * 11);
+    const ax = cx + wd.x * 11, ay = cy - wd.y * 11, pxv = { x: wd.y, y: wd.x };
+    ctx.moveTo(ax, ay); ctx.lineTo(ax - wd.x * 6 + pxv.x * 5, ay + wd.y * 6 + pxv.y * 5);
+    ctx.moveTo(ax, ay); ctx.lineTo(ax - wd.x * 6 - pxv.x * 5, ay + wd.y * 6 - pxv.y * 5);
+    ctx.stroke();
+  }
+  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }

@@ -25,7 +25,8 @@ export class PlayerLog {
     const shift = n180(p.twd - meanTwd);
     const lifted = p.tack === 'stbd' ? shift : -shift;
     if (this.lastTack && p.tack !== this.lastTack && p.started && !p.finished) {
-      if (Math.abs(p.twa) < 100) this.tacks.push({ t: race.t, headed: -lifted, upwind });
+      // How headed she was on the tack she left: the same shift lifts the new tack by as much.
+      if (Math.abs(p.twa) < 100) this.tacks.push({ t: race.t, headed: lifted, upwind });
       else this.gybes++;
     }
     this.lastTack = p.tack;
@@ -157,7 +158,7 @@ function takeaways(s: RaceSummary): Takeaway[] {
   const myInc = s.incidents.filter(i => i.mine && i.rule !== '29.1');
   if (myInc.length) {
     const i = myInc[0];
-    out.push({ tone: 'warn', text: `${i.title} (Rule ${i.rule}) at ${fmt(i.t)} cost you a penalty. ${i.next || 'Read the situation earlier and keep clear in good time.'}`, link: lessonFor(i.rule) });
+    out.push({ tone: 'warn', text: `${i.title} (Rule ${i.rule}) ${i.t < 0 ? 'before the start' : `at ${fmt(i.t)}`} cost you a penalty. ${i.next || 'Read the situation earlier and keep clear in good time.'}`, link: lessonFor(i.rule) });
   }
   if (s.ocs) out.push({ tone: 'warn', text: 'You were over the line at the gun. Judge time-to-line from where you are, and pull the trigger only when it matches the clock.', link: { kind: 'drill', id: 'recall', label: 'Over early: the recovery drill' } });
   else if (s.late !== null) {

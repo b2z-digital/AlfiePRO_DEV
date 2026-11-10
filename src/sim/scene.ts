@@ -2,12 +2,11 @@
 // Boats are placed in hull lengths around a mark or the start line (the wind blows from the top,
 // 0°), each sailed by the player, an AI skipper or a short script, and a goal decides pass or fail.
 // Scenes run on the same engine and referee as a race, so what you learn is what happens in a race.
-import { Race } from './engine';
+import { Race, windwardBoat } from './engine';
 import { AiHost, Helm, LEVELS, PERSONAS, Skipper } from './ai';
 import { bestSheet, polarSpeed, vmgAngles } from './classes';
 import { initialProgress } from './course';
 import { Rng, bearing, clamp, dir, dot, n180, n360, sub } from './math';
-import { hullGap } from './physics';
 import { Referee, spellSail } from './referee';
 import type { Boat, Incident, RaceSettings, SkipperLevel } from './types';
 
@@ -94,18 +93,7 @@ export class ScriptedHelm implements Helm {
 }
 
 /** The nearest boat on the same tack to windward of b, within `within` metres (hull gap). */
-export function windwardBoat(race: Race, b: Boat, within: number): Boat | null {
-  const right = { x: Math.cos((b.hdg * Math.PI) / 180), y: -Math.sin((b.hdg * Math.PI) / 180) };
-  const side = b.tack === 'stbd' ? 1 : -1;
-  let best: Boat | null = null, bg = within;
-  for (const o of race.boats) {
-    if (o === b || o.finished || o.retired || o.disabled || o.tack !== b.tack) continue;
-    if (dot(sub(o, b), right) * side <= 0) continue;
-    const g = hullGap(b, o);
-    if (g < bg) { bg = g; best = o; }
-  }
-  return best;
-}
+export { windwardBoat };
 
 /** Where positions are measured from: a mark, the middle of the start line, or one of its ends. */
 export type Origin = 'W' | 'F' | 'GP' | 'GS' | 'pin' | 'stbd' | 'line';

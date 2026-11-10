@@ -4,7 +4,9 @@
 // file only moves between the screens and keeps your settings and progress.
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { Race } from '@/sim/engine';
+import type { Race, RaceLog } from '@/sim/engine';
+import { DT } from '@/sim/physics';
+import type { Moment } from './moments';
 import type { RaceSettings } from '@/sim/types';
 import type { Outcome, SceneSpec } from '@/sim/training';
 import { DRILLS, LAB, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
@@ -87,8 +89,8 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   void darkMode; // the simulator is always on the water: one dark look
   const [where, setWhere] = useState<Where>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
-  const [run, setRun] = useState<{ settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number } | null>(null);
-  const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary } | null>(null);
+  const [run, setRun] = useState<{ settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number; resume?: { log: RaceLog; step: number } } | null>(null);
+  const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary; moments: Moment[] } | null>(null);
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [training, setTraining] = useState<TrainingProgress>(loadTraining);
   const [academyAt, setAcademyAt] = useState<string | null>(null);
@@ -144,11 +146,21 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
     else start(run.mode === 'start' ? 'start' : 'race', setup);
   }, [run, setup, start, playScene]);
 
-  const toDebrief = useCallback((race: Race, sum: RaceSummary) => {
+  const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
     setProfile(saveRace(sum));
-    setDebrief({ race, sum });
+    setDebrief({ race, sum, moments });
     setWhere('debrief');
   }, []);
+
+  // Sail a finished race again from a moment: the same settings (and seed) and your log up to
+  // there, then you have the helm.
+  const takeOver = useCallback((t: number) => {
+    if (!debrief) return;
+    const r = debrief.race;
+    setRun({ settings: r.settings, mode: debrief.sum.mode, key: Date.now(), resume: { log: r.log, step: Math.max(0, Math.round(t / DT)) } });
+    setRunView(setup.view);
+    setWhere('race');
+  }, [debrief, setup.view]);
 
   const sceneResult = useCallback((o: Outcome) => {
     if (!run?.scene) return;
@@ -193,6 +205,7 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
           onSceneResult={sceneResult}
           onSceneWatch={scene?.spec.solution ? () => playScene(scene.spec, scene.group, true) : undefined}
           onSceneNext={scene ? () => { const n = nextAfter(scene.spec); if (n) playScene(n.spec, scene.group, false); else leaveRace(); } : undefined}
+          resume={run.resume}
         />
       </div>,
       document.body,
@@ -202,7 +215,7 @@ export default function RaceSimulatorPage({ darkMode }: RaceSimulatorPageProps) 
   if (where === 'debrief' && debrief) {
     return (
       <div className="h-full overflow-y-auto">
-        <SimDebrief race={debrief.race} sum={debrief.sum} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} />
+        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={takeOver} />
       </div>
     );
   }

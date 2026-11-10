@@ -6,8 +6,8 @@ import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper } from './ai';
 import { CLASSES, bestSheet, vmgAngles } from './classes';
 import { Course, buildCourse, initialProgress, toCourse } from './course';
 import { Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
-import { DT, bank, bow, collide, integrate, lineSide, localWind, markContacts, stern } from './physics';
-import { Referee, isRacing, spellSail } from './referee';
+import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, stern } from './physics';
+import { Referee, isRacing, keepClear, spellSail } from './referee';
 import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
 import { WindField } from './wind';
 import { Sea, makeSea } from './sea';
@@ -17,6 +17,43 @@ import { VENUES } from './venues';
 export const BOAT_COLORS = ['#2A93FF', '#F472B6', '#2DD4BF', '#94A3B8', '#A78BFA', '#34D399', '#FBBF24', '#FB923C', '#F87171', '#60A5FA', '#E879F9', '#4ADE80', '#FCD34D', '#38BDF8', '#C084FC', '#FDA4AF'];
 
 const HIST = 220; // 11 s of history per boat at 20 Hz
+
+/**
+ * Everything the player did, step by step. With the race's settings (and so its seed) it sails the
+ * race again exactly: the wind, every AI skipper and the referee do the same things again, because
+ * they only ever react to what happens on the water. Replays and "sail it from here" use it.
+ */
+export interface RaceLog {
+  /** The player's input when it changed: [step it applies from, rudder, sheet, penalty assist 0/1]. */
+  input: [number, number, number, number][];
+  /** Tacks, gybes and hails: [step they were made before, what]. */
+  acts: [number, PlayerAct][];
+}
+export type PlayerAct = 'tack' | 'gybe' | 'hail';
+
+/** What a hail by the player turned out to be, for the screen to say and show. */
+export interface HailResult {
+  kind: 'you-tack' | 'protest' | 'room-to-tack' | 'say' | 'none';
+  /** What she called out. */
+  text?: string;
+  /** A note for the screen. */
+  note?: string;
+  noteTone?: 'good' | 'warn';
+}
+
+/** The boat on the same tack close to windward of b (the one a room-to-tack hail goes to). */
+export function windwardBoat(race: { boats: Boat[] }, b: Boat, within: number): Boat | null {
+  const right = { x: Math.cos((b.hdg * Math.PI) / 180), y: -Math.sin((b.hdg * Math.PI) / 180) };
+  const side = b.tack === 'stbd' ? 1 : -1;
+  let best: Boat | null = null, bg = within;
+  for (const o of race.boats) {
+    if (o === b || o.finished || o.retired || o.disabled || o.tack !== b.tack) continue;
+    if (((o.x - b.x) * right.x + (o.y - b.y) * right.y) * side <= 0) continue;
+    const g = hullGap(b, o);
+    if (g < bg) { bg = g; best = o; }
+  }
+  return best;
+}
 
 export interface ResultRow {
   boat: Boat;
@@ -53,6 +90,10 @@ export class Race implements AiHost {
   ended = false;
   /** When true and a skipper is set for the player's boat, that skipper helms her (demos and tests). */
   autopilot = false;
+  /** What the player has done so far: see RaceLog. */
+  log: RaceLog = { input: [], acts: [] };
+  /** Sailing a recorded race again: the log being followed and how far through it we are. */
+  private following: { log: RaceLog; i: number; a: number; until: number; cur: RaceLog['input'][number] | null } | null = null;
   private passed: ('tack' | 'gybe' | null)[] = [];
   private lastSignal = Infinity;
   private helmAssist: { target: number; until: number } | null = null;
@@ -183,6 +224,103 @@ export class Race implements AiHost {
     return null;
   }
 
+  /**
+   * Sail the race again from a log: the player's boat does exactly what was recorded, up to step
+   * `until` (all of it by default). Then the player has her again.
+   */
+  followLog(log: RaceLog, until = Infinity) { this.following = { log, i: 0, a: 0, until, cur: null }; }
+  /** Still following a log? */
+  get replaying(): boolean { return !!this.following; }
+
+  /** The player tacks, gybes or hails. Between steps; recorded, so a replay does the same. */
+  act(a: PlayerAct): HailResult | null {
+    if (this.following) return null; // the log decides what she does
+    this.log.acts.push([this.step_, a]);
+    return this.doAct(a);
+  }
+  private doAct(a: PlayerAct): HailResult | null {
+    if (a === 'hail') return this.playerHail();
+    this.requestManeuver(a);
+    return null;
+  }
+
+  /**
+   * The player hails. What she calls depends on what's going on, in the order a skipper thinks of
+   * it: answer a room-to-tack hail ("You tack"), protest a foul, ask for room to tack at the bank,
+   * claim mark-room, then right of way.
+   */
+  private playerHail(): HailResult {
+    const p = this.player;
+    if (!p) return { kind: 'none' };
+    const L = p.cls.loa;
+    // Rule 20.2(c): reply "You tack" to a boat hailing us for room to tack.
+    if (this.referee.pendingRoomToTack(this.boats.indexOf(p))) {
+      return this.replyYouTack(p) ? { kind: 'you-tack', text: 'You tack', note: 'You replied "You tack": now give her room to tack and keep clear of her', noteTone: 'warn' } : { kind: 'none' };
+    }
+    // Protest (Appendix E): own sail number, "protest", the other boat's sail number.
+    const recent = [...this.incidents].reverse().find(i => i.victim === p.id && this.t - i.t < 12);
+    let other: Boat | null = recent ? this.boatById(recent.offender) : null;
+    if (!other) {
+      // A near miss with a boat that had to keep clear of us.
+      for (const o of this.boats) {
+        if (o === p || o.finished) continue;
+        if (hullGap(p, o) < 1.2 * L && keepClear(p, o, this.t).keeper === 1) { other = o; break; }
+      }
+    }
+    if (other && (recent || hullGap(p, other) < 1.2 * L)) {
+      const text = `${spellSail(p.sail)} protest ${spellSail(other.sail)}`;
+      this.hail(p, text);
+      let note: string | undefined;
+      if (this.forgot.has(other.id)) { this.forgot.delete(other.id); note = `${other.sail} heard your protest and will take her turn`; }
+      if (recent && recent.resolved === 'pending') recent.resolved = 'protested';
+      return { kind: 'protest', text, note, noteTone: 'good' };
+    }
+    // Rule 20.1: close-hauled at the bank with a boat to windward: hail for room to tack.
+    const up = vmgAngles(p.cls, p.tws).up;
+    if (p.started && Math.abs(p.twa) <= up + 12 && bankAhead(p, this.course) <= 3.2 * L) {
+      const w = windwardBoat(this, p, 2.2 * L);
+      if (w) { this.hailRoomToTack(p, w); return { kind: 'room-to-tack', text: `Room to tack, ${spellSail(p.sail)}` }; }
+    }
+    const say = (text: string): HailResult => { this.hail(p, text); return { kind: 'say', text }; };
+    const pi = this.boats.indexOf(p);
+    for (let j = 0; j < this.boats.length; j++) {
+      const mr = this.referee.markRoom(pi, j);
+      if (mr?.iEntitled) return say('Room!');
+    }
+    let best: Boat | null = null, bg = 3 * L;
+    for (const o of this.boats) { if (o === p || o.finished) continue; const g = hullGap(p, o); if (g < bg) { bg = g; best = o; } }
+    if (best) {
+      const kc = keepClear(p, best, this.t);
+      if (kc.keeper === 1) return say(kc.rule === '10' ? 'Starboard!' : kc.rule === '11' ? 'Up, up!' : 'Keep clear!');
+    }
+    return { kind: 'none', note: 'Nothing to hail: you hail when you have right of way, need room, or protest' };
+  }
+
+  /** The log being followed: do what it did at this step, and take its input. */
+  private followStep() {
+    const f = this.following!;
+    if (this.step_ >= f.until) { this.following = null; return; }
+    const { acts, input } = f.log;
+    while (f.a < acts.length && acts[f.a][0] <= this.step_) {
+      const a = acts[f.a++][1];
+      this.log.acts.push([this.step_, a]);
+      this.doAct(a);
+    }
+    // Whatever the screen sets meanwhile, the log's input it is. Past the end of the log she
+    // carries on with the last input, as she did then.
+    while (f.i < input.length && input[f.i][0] <= this.step_) f.cur = input[f.i++];
+    if (f.cur) this.input = { rudder: f.cur[1], sheet: f.cur[2], autoTrim: this.settings.autoTrim, penaltyAssist: f.cur[3] === 1 };
+  }
+
+  /** Quantise the input (so a replay is exact to the bit) and record it when it changes. */
+  private recordInput() {
+    const q = (v: number) => Math.round(v * 1000) / 1000;
+    const rudder = q(this.input.rudder), sheet = q(this.input.sheet), pen = this.input.penaltyAssist ? 1 : 0;
+    this.input = { ...this.input, rudder, sheet };
+    const last = this.log.input[this.log.input.length - 1];
+    if (!last || last[1] !== rudder || last[2] !== sheet || last[3] !== pen) this.log.input.push([this.step_, rudder, sheet, pen]);
+  }
+
   /** Helm assist for the player: turn through a tack or gybe at a good rate. */
   requestManeuver(kind: 'tack' | 'gybe') {
     const p = this.player;
@@ -199,6 +337,8 @@ export class Race implements AiHost {
 
   step() {
     if (this.ended) return;
+    if (this.following) this.followStep();
+    if (this.player) this.recordInput();
     const dt = DT;
     const t = this.t;
     this.wind.step(dt, t);
@@ -244,6 +384,7 @@ export class Race implements AiHost {
 
     this.t = Math.round((t + dt) * 1000) / 1000;
     this.step_++;
+    if (this.following && this.step_ >= this.following.until) this.following = null; // yours from here
     if (this.step_ % 4 === 0) this.recordTrack();
     this.checkEnd();
   }
