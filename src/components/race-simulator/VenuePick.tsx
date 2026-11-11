@@ -37,9 +37,11 @@ interface Props {
   windFrom: number;
   windName: string;
   classId: ClassId; length: CourseLength; fleetSize: number; laps: number;
+  /** Setting a venue up: what a tap on the map does, said in place of the usual line about where you stand. */
+  caption?: React.ReactNode;
 }
 
-export default function VenuePick({ def, spot, onSpot, windFrom, windName, classId, length, fleetSize, laps }: Props) {
+export default function VenuePick({ def, spot, onSpot, windFrom, windName, classId, length, fleetSize, laps, caption }: Props) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const [width, setWidth] = useState(600);
@@ -171,12 +173,14 @@ export default function VenuePick({ def, spot, onSpot, windFrom, windName, class
           <Seg size="sm" label="Map zoom" value={zoom} onChange={setZoom} options={[{ value: 'near', label: 'Near' }, { value: 'wide', label: 'Whole water' }]} />
         </div>
       </div>
+      {caption !== undefined ? <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{caption}{!site ? " A course won't fit off this bank in this wind." : shorter ? ' It is narrow here in this wind, so the course is a shorter one.' : ''}</p> : (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="m-0 min-w-0 flex-1 basis-[260px] text-[13px] leading-snug" style={{ color: C.mute }}>
           <b className="text-[#F1F4FA]">{where}</b> Tap the map to sail somewhere else on this water: you stand on the nearest bank and Alfie lays the course in front of you for the wind.{shorter ? ' It is narrow here in this wind, so the course is a shorter one.' : ''}
         </p>
         {spot && <Btn small onClick={() => onSpot(null)}>Back to the club's spot</Btn>}
       </div>
+      )}
     </div>
   );
 }
