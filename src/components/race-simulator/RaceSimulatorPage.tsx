@@ -613,9 +613,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     if (run?.event) refreshEvents();
   }, [run, leaveRoom, refreshEvents]);
 
-  // Racing fills the window: no page scrolling underneath it.
+  // Racing fills the window, and so does the yacht designer: no page scrolling underneath them.
   useEffect(() => {
-    if (where !== 'race') return;
+    if (where !== 'race' && where !== 'yacht') return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
@@ -725,11 +725,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }
   // You be the judge.
   if (where === 'yacht') {
-    return (
-      <div key={where} className="h-full">
+    // A screen of her own, over the whole window, as a race is. (She is laid out to fill her box,
+    // so she can't sit in the page: the app's page has no height of its own, and there she came
+    // out as nothing at all.)
+    return createPortal(
+      <div className="fixed inset-0 z-[9990]" style={{ background: '#060B1C' }} role="dialog" aria-modal="true" aria-label="Design your yacht">
         <SimYacht yard={yard} me={me} classId={setup.classId} signedIn={!!userId} onChange={yardChanged} onBack={() => setWhere('home')}
           onRace={cls => { if (cls !== setup.classId) changeSetup({ ...setup, classId: cls }); setWhere('home'); }} />
-      </div>
+      </div>,
+      document.body,
     );
   }
   if (where === 'judge') {
