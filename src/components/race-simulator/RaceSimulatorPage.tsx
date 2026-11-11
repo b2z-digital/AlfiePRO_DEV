@@ -7,7 +7,8 @@ import { createPortal } from 'react-dom';
 import type { Race, RaceLog } from '@/sim/engine';
 import { DT } from '@/sim/physics';
 import type { Moment } from './moments';
-import type { RaceSettings } from '@/sim/types';
+import type { BoatLook, RaceSettings } from '@/sim/types';
+import { CLASSES, type ClassId } from '@/sim/classes';
 import type { Outcome, SceneSpec } from '@/sim/training';
 import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
@@ -26,6 +27,8 @@ import { loadNextRace, type NextRace } from './rehearse';
 import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
+import SimYacht from './SimYacht';
+import { cleanYard, loadYard, lookFor, sailFor, saveYard, type Yard } from './yacht';
 import { C, ordinal } from './ui';
 import { VENUES, venueForClub } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
@@ -76,7 +79,7 @@ function storeSetup(s: Setup) {
   try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)); } catch { /* storage unavailable */ }
 }
 
-function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, me: SimIdentity | null, seq: SimSequence | null = null): RaceSettings {
+function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, me: SimIdentity | null, seq: SimSequence | null = null, yard: Yard | null = null): RaceSettings {
   // At a venue: its usual breeze, today's wind there (direction and strength), or any direction.
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const live = def && s.windDir === 'today' && today ? today : null;
@@ -87,8 +90,8 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     venue: def?.id, windFrom, windKnots: knots,
     // Where on the venue's water you've chosen to sail (the club's own spot when you haven't).
     venueSpot: def ? s.spots?.[def.id] : undefined,
-    // Your own name, and your sail number when you have a boat in this class.
-    player: me ? { name: me.name, sail: me.sails[s.classId] ?? '01' } : undefined,
+    // Your own name, your sail number (the one you've given her, or your boat's in Alfie) and how you've finished her.
+    player: playerOf(me, 'name', s.classId, yard),
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
@@ -98,6 +101,13 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     rig: s.classId === 'IOM' && s.rig ? s.rig : undefined,
     seed: Math.floor(Math.random() * 1e9),
   };
+}
+
+/** You, on the water: your name, the number on your sail and how you've finished your boat in this class. */
+function playerOf(me: SimIdentity | null, as: 'name' | 'short', cls: ClassId, yard: Yard | null): RaceSettings['player'] {
+  if (!me && !yard) return undefined;
+  const y: Yard = yard ?? { yachts: [], racing: {}, at: 0 };
+  return { name: me?.[as] ?? 'You', sail: sailFor(y, cls, me).sail, look: lookFor(y, cls) };
 }
 
 /** A short notice over the page (a race's water couldn't be loaded). */
@@ -110,11 +120,11 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
-function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
-  return { ...c.settings, autoTrim, player: me ? { name: me.short, sail: me.sails[c.settings.classId] ?? '01' } : undefined };
+function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean, yard: Yard | null): RaceSettings {
+  return { ...c.settings, autoTrim, player: playerOf(me, 'short', c.settings.classId, yard) };
 }
 type Group = ActiveScene['group'];
 
@@ -173,6 +183,11 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const [chNote, setChNote] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile>(loadProfile);
   const [training, setTraining] = useState<TrainingProgress>(loadTraining);
+  // The boats you've designed: on this device, and (riding with your training progress) in your account.
+  const [yard, setYard] = useState<Yard>(loadYard);
+  // (Read when a race is set up, so the race always carries the boat as she is now.)
+  const yardNow = useRef(yard);
+  yardNow.current = yard;
   const [academyAt, setAcademyAt] = useState<string | null>(null);
   // The view for this race or scene: your saved choice, but lessons open from above, where the
   // situation reads like the diagram. Switching with V in a lesson doesn't change your saved view.
@@ -199,7 +214,12 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     const a = { userId, clubId };
     void loadIdentity(userId, clubId).then(id => { if (live) setMe(id); });
     void pullRaces(a).then(rs => { if (live && rs) { setProfile(mergeRaces(rs)); setSynced(true); } });
-    void syncTraining(a, loadTraining()).then(t => { if (live && t) setTraining(saveTraining(t)); });
+    void syncTraining(a, { ...loadTraining(), yard: loadYard() }).then(t => {
+      if (!live || !t) return;
+      setTraining(saveTraining(t));
+      // The newer of this device's boats and the account's.
+      if (t.yard && t.yard.at > loadYard().at) setYard(saveYard(cleanYard(t.yard)));
+    });
     return () => { live = false; };
   }, [userId, clubId]);
   // The club's StartBox sequences: the race starts with the club's own unless you choose otherwise.
@@ -255,7 +275,12 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     setClubRooms(c);
     return () => { off(); c.close(); setClubRooms(null); };
   }, [userId, clubId]);
-  const liveMe = useCallback(() => ({ id: userId ?? 'guest', name: me?.short ?? me?.name ?? 'Sailor', sails: me?.sails ?? {}, autoTrim: setup.autoTrim }), [userId, me, setup.autoTrim]);
+  const liveMe = useCallback(() => {
+    // In a live race everyone sees your boat as you've finished her, under the number you've given her.
+    const sails: Partial<Record<ClassId, string>> = { ...(me?.sails ?? {}) }, looks: Partial<Record<ClassId, BoatLook>> = {};
+    for (const c of Object.keys(CLASSES) as ClassId[]) { const n = sailFor(yard, c, me); if (n.from !== 'none') sails[c] = n.sail; looks[c] = lookFor(yard, c); }
+    return { id: userId ?? 'guest', name: me?.short ?? me?.name ?? 'Sailor', sails, looks, autoTrim: setup.autoTrim };
+  }, [userId, me, setup.autoTrim, yard]);
   const openLive = useCallback(() => {
     const seq = chosenSequence(sequences, setup.startSeq, setup.sequenceSeconds);
     const full = toSettings(setup, 'race', todayWind, null, seq);
@@ -327,6 +352,18 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     setTraining(t);
     if (userId) void syncTraining({ userId, clubId }, t);
   }, [userId, clubId]);
+  // A boat redesigned: kept here at once, and sent to the account a moment after the last change
+  // (a colour tried and passed over isn't worth a trip).
+  const yardSend = useRef(0);
+  const yardChanged = useCallback((y: Yard) => {
+    setYard(saveYard(y));
+    window.clearTimeout(yardSend.current);
+    yardSend.current = window.setTimeout(() => {
+      const t = saveTraining({ ...loadTraining(), yard: y, updatedAt: Date.now() });
+      setTraining(t);
+      if (userId) void syncTraining({ userId, clubId }, t);
+    }, 1500);
+  }, [userId, clubId]);
 
   // Was there a saved set-up when the page opened, and has one been chosen since?
   const startedFresh = useRef(!hasSetup()), touched = useRef(false);
@@ -383,7 +420,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
     withSequences(list => {
       const seq = chosenSequence(list, s.startSeq, s.sequenceSeconds);
-      setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq, focus: mode === 'race' ? raceFocus(loadProfile()) : null });
+      setRun({ settings: toSettings(s, mode, todayWind, me, seq, yardNow.current), mode, key: Date.now(), sequence: seq, focus: mode === 'race' ? raceFocus(loadProfile()) : null });
       setRunView(s.view);
       setWhere('race');
     });
@@ -411,7 +448,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     };
     withSequences(list => {
       const seq = chosenSequence(list, s.startSeq, s.sequenceSeconds);
-      setRun({ settings: toSettings(s, 'race', w && at ? { from: w.from, kn: w.kn, at: nextRace.date } : null, me, seq), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), rehearsal: true });
+      setRun({ settings: toSettings(s, 'race', w && at ? { from: w.from, kn: w.kn, at: nextRace.date } : null, me, seq, yardNow.current), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), rehearsal: true });
       setRunView(s.view);
       setWhere('race');
     });
@@ -484,7 +521,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     if (!(await waterFor(c.settings))) return;
     // The club's sequence calls it if it's long enough for the challenge's countdown (it joins part-way through); otherwise the simulator does.
     const seq = startSeq && startSeq.seconds >= c.settings.sequenceSeconds ? startSeq : null;
-    setRun({ settings: challengeSettings(c, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: c, ghost, sequence: seq });
+    setRun({ settings: challengeSettings(c, me, setup.autoTrim, yardNow.current), mode: 'race', key: Date.now(), challenge: c, ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
   }, [me, setup.autoTrim, setup.view, startSeq, waterFor]);
@@ -500,7 +537,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     if (!(await waterFor(race.settings))) return;
     const seq = startSeq && startSeq.seconds >= race.settings.sequenceSeconds ? startSeq : null;
     // A race that has closed can only be sailed for practice.
-    setRun({ settings: challengeSettings(race, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race), ghost, sequence: seq });
+    setRun({ settings: challengeSettings(race, me, setup.autoTrim, yardNow.current), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race), ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
   }, [me, setup.autoTrim, setup.view, startSeq, waterFor]);
@@ -686,6 +723,14 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return <div key={where} className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
   }
   // You be the judge.
+  if (where === 'yacht') {
+    return (
+      <div key={where} className="h-full">
+        <SimYacht yard={yard} me={me} classId={setup.classId} signedIn={!!userId} onChange={yardChanged} onBack={() => setWhere('home')}
+          onRace={cls => { if (cls !== setup.classId) changeSetup({ ...setup, classId: cls }); setWhere('home'); }} />
+      </div>
+    );
+  }
   if (where === 'judge') {
     return <div key={where} className="h-full overflow-y-auto"><SimJudge training={training} onBack={() => setWhere('home')} onLink={openLink} onCall={(id, points) => trainingChanged(recordJudge(id, points))} /></div>;
   }
@@ -714,7 +759,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} onOpen={w => { setPlayAt(null); setWhere(w); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}

@@ -197,6 +197,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctl = useRef(new Controls()).current;
+  // A race opens the way a boat goes in the water: sails right out, until you sheet in. (Not in a
+  // drill or a race picked up part-way, which open with her already sailing; nor with auto-trim,
+  // where the sail stick left alone means "trim for me". A transmitter's stick says where it is.)
+  const sheetedFor = useRef<Race | null>(null);
+  if (sheetedFor.current !== race) {
+    sheetedFor.current = race;
+    if (!scene && !resume && race.player && !race.settings.autoTrim && race.t < race.gunT) ctl.sheet = 0;
+  }
   const audio = useRef(new RaceAudio()).current;
   // Alfie's voice (Full coaching), and the sound of the pond.
   const voice = useRef(new CoachVoice()).current;
@@ -293,6 +301,14 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   }, []);
   toastRef.current = toast;
 
+  // Still sitting there with the sails out a few seconds in: say how to get going.
+  useEffect(() => {
+    if (scene || resume || !race.player || race.settings.autoTrim) return;
+    const id = window.setTimeout(() => {
+      if (ctl.sheet < 0.08 && !race.ended) toast(R.current.phone ? 'Your sails are right out. Slide the sail control down to sheet in and get her moving.' : 'Your sails are right out. Sheet in to get her moving: the sail stick down, or the Down arrow.');
+    }, 7000);
+    return () => window.clearTimeout(id);
+  }, [race, scene, resume, toast, ctl]);
   // Your own rig for the day, as the race opens: what you've put on, and what the fleet is carrying.
   useEffect(() => {
     const p = race.player;

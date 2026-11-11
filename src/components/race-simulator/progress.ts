@@ -3,6 +3,7 @@
 // the sailor's account when they're signed in (see sync.ts).
 import { DRILLS, MODULES } from '@/sim/training';
 import type { Outcome, SceneSpec } from '@/sim/training';
+import { newerYard, type Yard } from './yacht';
 
 const KEY = 'alfie-race-sim-training-v1';
 
@@ -16,6 +17,8 @@ export interface TrainingProgress {
   lab: Record<string, LabRecord>;
   /** You be the judge: your best call on each case (0 to 2 points) and when you last made one. */
   judge?: Record<string, { points: number; at: number }>;
+  /** The boats you've designed (see yacht.ts): they ride here so they follow you to every device. */
+  yard?: Yard;
   updatedAt: number;
 }
 
@@ -114,5 +117,6 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
     out.judge = { ...(a.judge ?? {}) };
     for (const [k, r] of Object.entries(b.judge ?? {})) { const m = out.judge[k]; out.judge[k] = !m ? r : { points: Math.max(m.points, r.points), at: Math.max(m.at, r.at) }; }
   }
+  if (a.yard || b.yard) out.yard = newerYard(a.yard, b.yard);
   return out;
 }

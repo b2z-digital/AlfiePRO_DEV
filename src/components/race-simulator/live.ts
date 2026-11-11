@@ -14,7 +14,8 @@
 
 import { Race, type PlayerAct } from '@/sim/engine';
 import type { ClassId } from '@/sim/classes';
-import type { CrewMember, RaceSettings } from '@/sim/types';
+import type { BoatLook, CrewMember, RaceSettings } from '@/sim/types';
+import { cleanLook } from '@/sim/look';
 
 /** Steps (of 50 ms) a helm movement is stamped ahead of the race: the time it has to reach everyone. */
 export const INPUT_DELAY = 6;
@@ -26,7 +27,7 @@ export const HANDOVER_MS = 6000;
 export const CHECK_EVERY = 100;
 
 /** You, as the room sees you. */
-export interface LiveMe { id: string; name: string; sails: Partial<Record<ClassId, string>>; autoTrim: boolean }
+export interface LiveMe { id: string; name: string; sails: Partial<Record<ClassId, string>>; autoTrim: boolean; /** How they've finished their boat in each class. */ looks?: Partial<Record<ClassId, BoatLook>> }
 
 /** Someone in the room. */
 export interface LivePerson extends LiveMe { key: string; ready: boolean; host: boolean; at: number }
@@ -257,7 +258,7 @@ export class LiveRoom {
   /** The host starts the race: the crew in the order they joined, a fresh seed, everyone at once. */
   start(seed = Math.floor(Math.random() * 1e9) + 1) {
     if (!this.canStart || !this.settings) return;
-    const crew: CrewMember[] = this.people.map(p => ({ id: p.id, name: p.name, sail: p.sails[this.settings!.classId] ?? '', autoTrim: p.autoTrim }));
+    const crew: CrewMember[] = this.people.map(p => ({ id: p.id, name: p.name, sail: p.sails[this.settings!.classId] ?? '', autoTrim: p.autoTrim, look: cleanLook(p.looks?.[this.settings!.classId]) }));
     const settings: RaceSettings = { ...this.settings, fleetSize: Math.max(this.settings.fleetSize, crew.length), crew, seed };
     const keys = this.people.map(p => p.key);
     this.link.send({ t: 'start', settings, keys });

@@ -7,6 +7,7 @@ import type { ClassId } from '@/sim/classes';
 import { iomRig, noGoAngle } from '@/sim/classes';
 import { DEG, n180 } from '@/sim/math';
 import type { Sea } from '@/sim/sea';
+import type { BoatLook } from '@/sim/types';
 import { hullMotion } from '@/sim/sea';
 
 export type RigId = 'A' | 'B' | 'C';
@@ -75,6 +76,12 @@ const MODELS: Record<ClassId, Model> = {
   DF65: { L: 0.65, beam: 0.115, stations: iomStations(0.65), hatches: [[0.0, 0.16, 0.6]], rigs: { A: scaleRig(IOM_A, 0.66, 0.65) } },
 };
 
+/** How big a class's model is: hull length, where the mast stands, how tall it is, and where the jib tacks down (m, boat frame). */
+export function modelSize(cls: ClassId, rig: RigId = 'A'): { L: number; mastX: number; mastH: number; jibX: number; boom: number } {
+  const m = MODELS[cls] ?? MODELS.IOM, r = m.rigs[rig] ?? m.rigs.A;
+  return { L: m.L, mastX: r.mastX * m.L, mastH: r.mastH, jibX: r.jibX * m.L, boom: r.boom };
+}
+
 /** The rig a class sails with in this breeze (knots): IOMs change down to the B rig, then the C. */
 export function rigFor(cls: ClassId, knots: number): RigId {
   return cls === 'IOM' ? iomRig(knots) : 'A';
@@ -105,7 +112,14 @@ export interface Pose {
   luff: number;
   /** Running pressed: 0 level, 1 the bow buried (white water over it). */
   dive?: number;
-  color: string; tape: string; ink: string; deck: string;
+  /** Hull; the tape down the leech of both sails (null: none); the sail numbers; the deck. */
+  color: string; tape: string | null; ink: string; deck: string;
+  /** The tape up the jib's luff (the leech tape's colour when not given). */
+  luffTape?: string;
+  /** The patches at the corners of both sails. */
+  patch?: BoatLook['patch'] | null;
+  /** The patches over her deck hatches (dark grey when not given). */
+  hatch?: string;
   sail: string; country: string;
   spd: number; hullSpeed: number;
   isPlayer: boolean; alpha: number;
@@ -182,7 +196,7 @@ class Geo {
     return [this.p.x + x1 * this.sh + y2 * this.ch, this.p.y + x1 * this.ch - y2 * this.sh, z2 + this.p.heave];
   }
   /** Sail surface: f up the sail, g along the chord from the luff. */
-  sail(kind: 'main' | 'jib'): { S: (f: number, g: number) => V3; ang: number; sd: number } {
+  sail(kind: 'main' | 'jib'): { S: (f: number, g: number) => V3; ang: number; sd: number; /** Foot and luff lengths, m. */ foot: number; luffLen: number } {
     const { m, r, p } = this;
     const L = m.L;
     const deck = deckAt(m, r.mastX);
@@ -221,8 +235,49 @@ class Geo {
       const cb = depth * 4 * g * (1 - g) * ch + (flapK ? Math.sin(f * 11 + g * 5 + p.x * 3) * flapK * g : 0);
       return this.w(lx + dx * g * ch + px * cb, ly + dy * g * ch + py * cb, lz);
     };
-    return { S, ang, sd };
+    return { S, ang, sd, foot, luffLen: Math.hypot(x1 - x0, y1 - y0, z1 - z0) };
   }
+}
+
+/**
+ * The patches at a sail's corners, as outlines on the sail's own surface (f up the sail, g along
+ * the chord): at the tack and the clew, a plain quarter-round patch or a fan of fingers; at the
+ * head, a small band. Colour one, and colour two taking turn about with it when there is one.
+ */
+export function patchShapes(patch: NonNullable<Pose['patch']>, foot: number, luffLen: number): { color: string; pts: [number, number][] }[] {
+  const out: { color: string; pts: [number, number][] }[] = [];
+  const r0 = Math.min(0.26 * foot, 0.085 * luffLen);
+  const two = patch.two ?? patch.one;
+  // (rho metres from the corner, at theta from the foot towards straight up the sail.)
+  const at = (f0: number, g0: number, sg: number, rho: number, th: number): [number, number] =>
+    [Math.max(0, Math.min(1, f0 + (rho * Math.sin(th)) / luffLen)), Math.max(0, Math.min(1, g0 + (sg * rho * Math.cos(th)) / foot))];
+  for (const [g0, sg, r] of [[0, 1, r0 * 0.85], [1, -1, r0]] as const) {
+    if (patch.style === 'solid') {
+      for (const [k, color] of (patch.two ? [[0.66, patch.one], [0.38, two]] : [[0.6, patch.one]]) as [number, string][]) {
+        const pts: [number, number][] = [[0, g0]];
+        for (let a = 0; a <= 8; a++) pts.push(at(0, g0, sg, r * k, (a / 8) * (Math.PI / 2)));
+        out.push({ color, pts });
+      }
+    } else {
+      // Each finger starts at the corner, widens to its width and runs out to a round end (as the
+      // real ones are cut: a point would lift and peel).
+      const n = 5;
+      for (let i = 0; i < n; i++) {
+        const th = (6 + (i * 78) / (n - 1)) * DEG, len = r * (0.78 + 0.22 * Math.sin((Math.PI * i) / (n - 1)));
+        const hw = len * 0.09, ax = Math.cos(th), ay = Math.sin(th);
+        // (d along the finger from the corner, s across it: both in metres on the sail.)
+        const on = (d: number, s: number): [number, number] =>
+          [Math.max(0, Math.min(1, (d * ay + s * ax) / luffLen)), Math.max(0, Math.min(1, g0 + (sg * (d * ax - s * ay)) / foot))];
+        const pts: [number, number][] = [[0, g0], on(len * 0.34, -hw)];
+        for (let a = 0; a <= 8; a++) { const q = -Math.PI / 2 + (a / 8) * Math.PI; pts.push(on(len - hw + Math.cos(q) * hw, Math.sin(q) * hw)); }
+        pts.push(on(len * 0.34, hw));
+        out.push({ color: i % 2 ? two : patch.one, pts });
+      }
+    }
+  }
+  const h = Math.min(0.04, (0.5 * r0) / luffLen);
+  out.push({ color: patch.one, pts: [[1 - h, 0], [1 - h, 1], [1, 1], [1, 0]] });
+  return out;
 }
 
 export interface DrawOpts {
@@ -232,6 +287,8 @@ export interface DrawOpts {
   dpr: number;
   cam: V3;
   t: number;
+  /** How bright her shaded side is, 0 to 1 (0.6 on the water; more under studio light, so a colour reads true all the way round). */
+  ambient?: number;
 }
 
 const FONT = "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -367,7 +424,8 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     // Only what's above the water.
     const vis = wet(pts);
     if (vis.length < 3) return;
-    const lit = (isDeck ? 0.78 : 0.6) + (isDeck ? 0.22 : 0.4) * Math.max(0, dot(nrm, SUN));
+    const amb = isDeck ? Math.max(0.78, o.ambient ?? 0) : o.ambient ?? 0.6;
+    const lit = amb + (1 - amb) * Math.max(0, dot(nrm, SUN));
     const d = o.P(cen[0], cen[1], cen[2]).z;
     faces.push({ d, pts: vis, color: shade(color, lit) });
   };
@@ -400,7 +458,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
   // Hatch covers (only when you can see her deck) and the bow bumper (only from ahead of her stem).
   const o0 = g.w(0, 0, 0), upV = sub(g.w(0, 0, 1), o0), fwdV = sub(g.w(1, 0, 0), o0);
   if (size > 30) {
-    ctx.fillStyle = 'rgba(38,44,54,0.88)';
+    ctx.fillStyle = p.hatch ?? 'rgba(38,44,54,0.88)';
     for (const [hx, hl, hw] of m.hatches) {
       const hc = g.w(hx * L, 0, deckAt(m, hx));
       if (dot(upV, sub(o.cam, hc)) <= 0 || above(hc) < 0) continue;
@@ -472,13 +530,25 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       ctx.stroke();
     }
     ctx.lineCap = 'round';
-    ctx.strokeStyle = p.tape; ctx.lineWidth = tw * 1.5;
-    ctx.beginPath(); ctx.moveTo(scr[0][ng].x, scr[0][ng].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][ng].x, scr[i][ng].y); ctx.stroke();
+    if (p.tape) {
+      ctx.strokeStyle = p.tape; ctx.lineWidth = tw * 1.5;
+      ctx.beginPath(); ctx.moveTo(scr[0][ng].x, scr[0][ng].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][ng].x, scr[i][ng].y); ctx.stroke();
+    }
     ctx.strokeStyle = 'rgba(154,163,179,0.7)'; ctx.lineWidth = tw * 0.9;
     ctx.beginPath(); ctx.moveTo(scr[0][0].x, scr[0][0].y); for (let j = 1; j <= ng; j++) ctx.lineTo(scr[0][j].x, scr[0][j].y); ctx.stroke();
-    if (sl.kind === 'jib') {
-      ctx.strokeStyle = p.tape; ctx.lineWidth = tw * 1.3;
+    if (sl.kind === 'jib' && (p.luffTape ?? p.tape)) {
+      ctx.strokeStyle = (p.luffTape ?? p.tape)!; ctx.lineWidth = tw * 1.5;
       ctx.beginPath(); ctx.moveTo(scr[0][0].x, scr[0][0].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][0].x, scr[i][0].y); ctx.stroke();
+    }
+    // Corner patches (close enough to see them): stuck on the film, so they show from both sides.
+    if (p.patch && size > 42) {
+      ctx.globalAlpha = p.alpha * 0.94;
+      ctx.lineJoin = 'round';
+      for (const sh of patchShapes(p.patch, sl.foot, sl.luffLen)) {
+        ctx.fillStyle = sh.color;
+        poly(ctx, sh.pts.map(([f, gg]) => o.P(...sl.S(f, gg)))); ctx.fill();
+      }
+      ctx.globalAlpha = p.alpha;
     }
     const bats = sl.kind === 'main' ? r.mainBattens : r.jibBattens;
     if (size > 45) {
