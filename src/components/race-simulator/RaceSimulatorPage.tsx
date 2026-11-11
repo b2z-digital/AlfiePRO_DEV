@@ -94,6 +94,8 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
     sequenceSeconds: seq ? seq.seconds : s.sequenceSeconds, coach: s.coach, autoTrim: s.autoTrim,
     forgetfulSkippers: s.forgetfulSkippers, seaState: s.seaState,
+    // (Your own rig is for a race you set up: an IOM, and never a start drill.)
+    rig: s.classId === 'IOM' && s.rig ? s.rig : undefined,
     seed: Math.floor(Math.random() * 1e9),
   };
 }

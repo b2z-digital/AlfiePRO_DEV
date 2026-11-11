@@ -44,11 +44,23 @@ export function iomRig(knots: number): 'A' | 'B' | 'C' {
   return knots >= 20 ? 'C' : knots >= 12.5 ? 'B' : 'A';
 }
 
+/** Each IOM rig's power against the A rig: its sail area, near enough, and so how hard it heels and drives her. */
+export const RIG_POWER: Record<'A' | 'B' | 'C', number> = { A: 1, B: 0.72, C: 0.5 };
+
 /** The rig's heeling power for the breeze (1 = the class's A rig): IOMs change down as it builds. */
 export function rigPower(cls: ClassId, knots: number): number {
   if (cls !== 'IOM') return 1;
-  const r = iomRig(knots);
-  return r === 'C' ? 0.5 : r === 'B' ? 0.72 : 1;
+  return RIG_POWER[iomRig(knots)];
+}
+
+/**
+ * Sailing a rig you chose and not the one for the breeze: how much wind she feels she has, as a
+ * share of the real wind. Drive goes with sail area times wind speed squared, so the B rig in an
+ * A-rig breeze sails as if there were about 15% less wind, and the A rig in a B-rig breeze as if
+ * there were 18% more (and heels and nose-dives to match, which is what costs her).
+ */
+export function rigDrive(chosen: 'A' | 'B' | 'C', knots: number): number {
+  return Math.sqrt(RIG_POWER[chosen] / RIG_POWER[iomRig(knots)]);
 }
 
 /**

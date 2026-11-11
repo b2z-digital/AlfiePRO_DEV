@@ -454,7 +454,7 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
   const set = sailSet(twa, b.sheet, b.tws, !!b.disabled, live ? b.tack : undefined);
   const t = trim(b.color);
   const p: Pose = {
-    cls: b.cls.id, rig: rigFor(b.cls.id, race.wind.baseTws / 0.514444),
+    cls: b.cls.id, rig: b.rig ?? rigFor(b.cls.id, race.wind.baseTws / 0.514444),
     x: bx, y: by, hdg: bh,
     // Diving, she pivots about a point well forward: the bow goes under a little and the stern lifts a lot.
     heel, pitch: live ? b.pitch : 0, heave: live ? Math.sin(-b.pitch * DEG) * b.cls.loa * 0.2 : 0, dive: live ? b.dive : 0,

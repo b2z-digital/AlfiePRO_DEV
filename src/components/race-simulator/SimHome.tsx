@@ -54,6 +54,8 @@ export interface Setup {
   todayStrength?: boolean;
   /** The StartBox sequence to start with (an id); null for the simulator's own calls; unset, the club's. */
   startSeq?: string | null;
+  /** IOM: the rig you put on for the day. Unset or null, the right one for the breeze is put on for you. */
+  rig?: 'A' | 'B' | 'C' | null;
 }
 
 /** The default race: an IOM against 8 State-level skippers at Lake Macquarie RYC in its sea breeze,
@@ -610,7 +612,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <SetupRow icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
             </SetupGroup>
             <SetupGroup title="Boat and fleet">
-              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'} onClick={() => setPick('boat')} />
+              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={`${me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'}${s.classId === 'IOM' && s.rig ? `, ${s.rig} rig` : ''}`} onClick={() => setPick('boat')} />
               <SetupRow icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
               <SetupRow icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
             </SetupGroup>
@@ -875,6 +877,17 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           <Opts>
             {(['IOM', 'DF95', 'DF65', '10R', 'M'] as ClassId[]).map(c => <Opt key={c} on={s.classId === c} onClick={() => set({ classId: c })} title={CLASS_LABEL[c]} text={CLASS_TEXT[c]} badge={me?.sails[c] ? `Sail ${me.sails[c]}` : undefined} />)}
           </Opts>
+          {s.classId === 'IOM' && (
+            <>
+              <Opts label="Your rig for the day" cols={4}>
+                <Opt on={!s.rig} onClick={() => set({ rig: null })} title="Alfie picks" text="The right rig for the breeze, like the rest of the fleet." />
+                <Opt on={s.rig === 'A'} onClick={() => set({ rig: 'A' })} title="A rig" text="The big one. Up to about 12 knots." />
+                <Opt on={s.rig === 'B'} onClick={() => set({ rig: 'B' })} title="B rig" text="From about 12 knots to 20." />
+                <Opt on={s.rig === 'C'} onClick={() => set({ rig: 'C' })} title="C rig" text="The storm rig. 20 knots and over." />
+              </Opts>
+              <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Choose it yourself and you live with it for the race, as you do at the pond. Too small and she's short of drive in the lulls; too big and she lies over, loses her rudder and buries her bow on the run. The other skippers carry the right rig for the breeze.</p>
+            </>
+          )}
         </Sheet>
       )}
       {pick === 'fleet' && (
