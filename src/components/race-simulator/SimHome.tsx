@@ -21,6 +21,8 @@ import { PLAYS, practiceLink } from './playbook';
 import { todaysPlan } from './plan';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
+import { todaysCases } from './judge';
+import { GRADE_NAME, passport } from './passport';
 import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
@@ -53,6 +55,8 @@ export interface Setup {
   todayStrength?: boolean;
   /** The StartBox sequence to start with (an id); null for the simulator's own calls; unset, the club's. */
   startSeq?: string | null;
+  /** IOM: the rig you put on for the day. Unset or null, the right one for the breeze is put on for you. */
+  rig?: 'A' | 'B' | 'C' | null;
 }
 
 /** The default race: an IOM against 8 State-level skippers at Lake Macquarie RYC in its sea breeze,
@@ -64,6 +68,8 @@ export const DEFAULT_SETUP: Setup = {
   seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
 
+/** The day on this device, as YYYY-MM-DD. */
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const CHARACTER_WORD: Record<WindCharacter, string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging' };
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
@@ -408,7 +414,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
 
 export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
   onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -450,6 +456,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const lic = licence(training);
   const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
   const firstWon = FIRST.filter(m => training.lab[m.id]?.won).length;
+  // You be the judge: today's five cases (the first is the call of the day), and how many you've called today.
+  const judgeToday = useMemo(() => todaysCases(localDay()), []);
+  const calledToday = (id: string) => { const r = training.judge?.[id]; return r && localDay(new Date(r.at)) === localDay() ? r : null; };
+  const callToday = calledToday(judgeToday[0].id);
+  const judgedToday = judgeToday.filter(c => calledToday(c.id)).length;
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
@@ -473,6 +484,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
   // The one thing your next race is for: your biggest leak lately.
   const focus = useMemo(() => raceFocus(profile), [profile]);
+  const pp = useMemo(() => passport(profile), [profile]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -602,7 +614,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <SetupRow icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
             </SetupGroup>
             <SetupGroup title="Boat and fleet">
-              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'} onClick={() => setPick('boat')} />
+              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={`${me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'}${s.classId === 'IOM' && s.rig ? `, ${s.rig} rig` : ''}`} onClick={() => setPick('boat')} />
               <SetupRow icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
               <SetupRow icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
             </SetupGroup>
@@ -665,6 +677,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <Btn primary onClick={() => onOpen(advice.where)}>Start the session</Btn>
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:px-5">
+                <span aria-hidden="true" className="sim-set-icon flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B4FF]"><Glyph name="flag" size={21} /></span>
+                <div className="min-w-[200px] flex-1">
+                  <Cap>Call of the day</Cap>
+                  <p className="m-0 mt-0.5 font-display text-[17px] font-bold leading-tight">{callToday ? `Called: ${callToday.points} of 2` : 'One incident. Who broke a rule, and which one?'}</p>
+                  <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{callToday ? `${judgedToday} of today's five cases done. The same five for everyone, new tomorrow.` : "Watch a short clip from above and make the call. The simulator's referee gives the verdict."}</p>
+                </div>
+                <Btn primary={!callToday} onClick={() => onOpen('judge')}>{callToday ? (judgedToday < 5 ? 'Carry on judging' : 'More cases') : 'Make the call'}</Btn>
+              </div>
               <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
                 <AcademyCard icon="book" tint="#34D3C8" kicker={`${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
                   progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
@@ -726,6 +747,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       </div>
                     ))}
                   </div>
+                  {pp && (
+                    <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                      <b className="font-semibold text-[#F1F4FA]">Passport:</b> {pp.total.grade && pp.against
+                        ? `${GRADE_NAME[pp.total.grade]} overall against ${pp.against}, with Gold in ${pp.skills.filter(k => k.grade === 'gold').length} of 8 parts.`
+                        : pp.graded >= 3 ? `No grade overall yet against ${pp.against ?? 'the fleet'}: give away less than a quarter of the fleet for Bronze.`
+                          : `${pp.graded} of the 3 finished races it takes to be graded.`}
+                    </p>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
                     <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>
@@ -858,6 +887,17 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           <Opts>
             {(['IOM', 'DF95', 'DF65', '10R', 'M'] as ClassId[]).map(c => <Opt key={c} on={s.classId === c} onClick={() => set({ classId: c })} title={CLASS_LABEL[c]} text={CLASS_TEXT[c]} badge={me?.sails[c] ? `Sail ${me.sails[c]}` : undefined} />)}
           </Opts>
+          {s.classId === 'IOM' && (
+            <>
+              <Opts label="Your rig for the day" cols={4}>
+                <Opt on={!s.rig} onClick={() => set({ rig: null })} title="Alfie picks" text="The right rig for the breeze, like the rest of the fleet." />
+                <Opt on={s.rig === 'A'} onClick={() => set({ rig: 'A' })} title="A rig" text="The big one. Up to about 12 knots." />
+                <Opt on={s.rig === 'B'} onClick={() => set({ rig: 'B' })} title="B rig" text="From about 12 knots to 20." />
+                <Opt on={s.rig === 'C'} onClick={() => set({ rig: 'C' })} title="C rig" text="The storm rig. 20 knots and over." />
+              </Opts>
+              <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Choose it yourself and you live with it for the race, as you do at the pond. Too small and she's short of drive in the lulls; too big and she lies over, loses her rudder and buries her bow on the run. The other skippers carry the right rig for the breeze.</p>
+            </>
+          )}
         </Sheet>
       )}
       {pick === 'fleet' && (

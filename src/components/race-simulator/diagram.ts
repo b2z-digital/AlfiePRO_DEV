@@ -8,7 +8,8 @@ import { drawBoat } from './render';
 export interface DiagramBoat {
   label: string; color: string; isPlayer: boolean; disabled: boolean;
   pts: { x: number; y: number; hdg: number; twa: number; sheet: number }[];
-  hail: { x: number; y: number; text: string } | null;
+  /** What she hailed, where, and at which point of her track. */
+  hail: { x: number; y: number; text: string; at?: number } | null;
 }
 
 export interface DiagramData {
@@ -37,7 +38,7 @@ export function sceneDiagram(scene: SceneDef, plan: PlanFn | 'ai' | undefined, s
       const e = race.events[ev];
       if (e.type !== 'hail') continue;
       const i = race.boats.findIndex(b => b.id === e.boat);
-      if (i >= 0 && !boats[i].hail) boats[i].hail = { x: race.boats[i].x, y: race.boats[i].y, text: e.text };
+      if (i >= 0 && !boats[i].hail) boats[i].hail = { x: race.boats[i].x, y: race.boats[i].y, text: e.text, at: boats[i].pts.length };
     }
   }
   const c = race.course, L = c.L;
@@ -63,15 +64,18 @@ function text(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, co
   ctx.fillStyle = color; ctx.fillText(s, x, y);
 }
 
-/** Draw the diagram to fit the canvas. */
-export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: number, h: number, dpr: number) {
+/**
+ * Draw the diagram to fit the canvas. For a clip being played (`live`): only the track so far and
+ * each boat where she is now, framed to fit the whole clip (`fit`) so the picture doesn't move.
+ */
+export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: number, h: number, dpr: number, opts: { fit?: DiagramData; live?: boolean } = {}) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#0B1A31';
   ctx.fillRect(0, 0, w, h);
   // Fit the tracks, with room for labels.
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   const grow = (x: number, y: number) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); };
-  for (const b of d.boats) for (const p of b.pts) grow(p.x, p.y);
+  for (const b of (opts.fit ?? d).boats) for (const p of b.pts) grow(p.x, p.y);
   for (const m of d.marks) grow(m.x, m.y);
   const L = d.L;
   const pad = 2.2 * L;
@@ -135,6 +139,7 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: nu
   const Lpx = Math.max(18, Math.min(30, L * s));
   for (const b of d.boats) {
     const n = b.pts.length;
+    if (opts.live) { const e = b.pts[n - 1]; drawBoat(ctx, X(e.x), Y(e.y), e.hdg, e.twa, b.disabled ? 0 : e.sheet, Lpx, b.color, b.isPlayer, b.disabled, 1); continue; }
     for (let k = 8; k < n - 1; k += 8) {
       const p = b.pts[k];
       drawBoat(ctx, X(p.x), Y(p.y), p.hdg, p.twa, b.disabled ? 0 : p.sheet, Lpx * 0.9, b.color, b.isPlayer, b.disabled, 0.18);
@@ -144,13 +149,23 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: nu
     const p0 = b.pts[0];
     drawBoat(ctx, X(p0.x), Y(p0.y), p0.hdg, p0.twa, b.disabled ? 0 : p0.sheet, Lpx, b.color, b.isPlayer, b.disabled, 1);
   }
-  // Labels at the start positions, nudged off the hull.
-  for (const b of d.boats) {
-    const p0 = b.pts[0];
+  // Labels at the start positions (in a clip, where each boat is now), nudged off the hull, and
+  // spread apart when two boats are close enough for their names to land on each other.
+  const tags = d.boats.map(b => {
+    const p0 = opts.live ? b.pts[b.pts.length - 1] : b.pts[0];
     const side = n180(p0.hdg - 90) > 0 ? 1 : -1;
-    const tone = b.isPlayer ? '#A9D2FF' : b.color === '#FB923C' ? '#FFCB96' : 'rgba(235,240,255,0.85)';
-    text(ctx, b.label, X(p0.x) + side * (Lpx * 0.7 + 6), Y(p0.y) + Lpx * 0.55, tone, 12.5, side > 0 ? 'left' : 'right', 700);
-    if (b.hail) text(ctx, `“${b.hail.text}”`, X(b.hail.x), Y(b.hail.y) - Lpx * 0.9 - 8, '#FFFFFF', 11.5, 'center', 600);
+    return { b, side, x: X(p0.x) + side * (Lpx * 0.7 + 6), y: Y(p0.y) + Lpx * 0.55 };
+  });
+  const byY = [...tags].sort((a, z) => a.y - z.y);
+  for (let k = 1; k < byY.length; k++) {
+    const up = byY[k - 1], t = byY[k];
+    if (t.side === up.side && Math.abs(t.x - up.x) < 90 && t.y - up.y < 15) t.y = up.y + 15;
+  }
+  for (const t of tags) {
+    const b = t.b;
+    const tone = b.isPlayer ? '#A9D2FF' : b.color === '#FB923C' ? '#FFCB96' : b.color === '#B48CFF' ? '#D9C7FF' : 'rgba(235,240,255,0.85)';
+    text(ctx, b.label, t.x, t.y, tone, 12.5, t.side > 0 ? 'left' : 'right', 700);
+    if (b.hail && (!opts.live || b.pts.length > (b.hail.at ?? 0))) text(ctx, `“${b.hail.text}”`, X(b.hail.x), Y(b.hail.y) - Lpx * 0.9 - 8, '#FFFFFF', 11.5, 'center', 600);
   }
   // Wind arrow.
   const ax = w - 34, ay = 26;
@@ -160,4 +175,18 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: nu
   const hx = ax + v.x * 16, hy = ay - v.y * 16, a = Math.atan2(-v.y, v.x);
   ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - 7 * Math.cos(a - 0.5), hy - 7 * Math.sin(a - 0.5)); ctx.moveTo(hx, hy); ctx.lineTo(hx - 7 * Math.cos(a + 0.5), hy - 7 * Math.sin(a + 0.5)); ctx.stroke();
   text(ctx, 'WIND', ax, ay + 26, 'rgba(235,240,255,0.6)', 10, 'center', 600);
+}
+
+/** The clip as it stands `t` of the way through (0 to 1), each boat eased between the points kept, for playing it. */
+export function diagramAt(d: DiagramData, t: number): DiagramData {
+  const n = Math.max(...d.boats.map(b => b.pts.length));
+  const f = Math.max(0, Math.min(1, t)) * (n - 1), k = Math.floor(f), u = f - k;
+  return {
+    ...d,
+    boats: d.boats.map(b => {
+      const a = b.pts[Math.min(k, b.pts.length - 1)], z = b.pts[Math.min(k + 1, b.pts.length - 1)];
+      const now = { x: a.x + (z.x - a.x) * u, y: a.y + (z.y - a.y) * u, hdg: a.hdg + n180(z.hdg - a.hdg) * u, twa: a.twa + n180(z.twa - a.twa) * u, sheet: a.sheet + (z.sheet - a.sheet) * u };
+      return { ...b, pts: [...b.pts.slice(0, Math.min(k, b.pts.length - 1) + 1), now] };
+    }),
+  };
 }

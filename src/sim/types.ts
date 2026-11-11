@@ -46,6 +46,8 @@ export interface RaceSettings {
   flatWind?: boolean;
   /** Flat water (default), chop or rough water. */
   seaState?: 'flat' | 'chop' | 'rough';
+  /** The rig you've chosen for the day (IOM, sailing on your own device): not set, the right one for the breeze is put on for you, as it is for every other boat. */
+  rig?: 'A' | 'B' | 'C';
 }
 
 /** Someone in a live race, sailing their boat from their own device. */
@@ -106,6 +108,8 @@ export interface Boat {
   heelRate: number;      // deg/s
   luffUp: number;        // deg a gust has rounded her up (weather helm), easing back as she comes upright
   rigPower: number;      // the rig's heeling power, 1 = the class's A rig
+  rig?: 'A' | 'B' | 'C';  // IOM: the rig she's carrying
+  rigDrive?: number;     // a rig you chose that isn't the one for the breeze: the wind she feels she has, as a share of the real wind (1 otherwise)
   sheetFelt: number;     // the sheet as the rig feels it: a sail sheeted in fills and loads up over a moment, eased it spills at once
   runPower: number;      // how hard her rig presses her bow down on a run, 1 = the class's biggest rig (every class changes down as it blows up)
   dive: number;          // running pressed: 0 riding level, about 1 the bow buried and the stern lifting, more and she's tripping over it

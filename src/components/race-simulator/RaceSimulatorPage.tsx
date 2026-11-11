@@ -17,12 +17,13 @@ import SimTrainer from './SimTrainer';
 import SimAcademy from './SimAcademy';
 import SimPlaybook from './SimPlaybook';
 import SimPassport from './SimPassport';
+import SimJudge from './SimJudge';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
 import { loadNextRace, type NextRace } from './rehearse';
-import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining } from './progress';
+import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import { C, ordinal } from './ui';
@@ -93,6 +94,8 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
     sequenceSeconds: seq ? seq.seconds : s.sequenceSeconds, coach: s.coach, autoTrim: s.autoTrim,
     forgetfulSkippers: s.forgetfulSkippers, seaState: s.seaState,
+    // (Your own rig is for a race you set up: an IOM, and never a start drill.)
+    rig: s.classId === 'IOM' && s.rig ? s.rig : undefined,
     seed: Math.floor(Math.random() * 1e9),
   };
 }
@@ -107,7 +110,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
@@ -666,6 +669,10 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'playbook') {
     return <div key={where} className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
+  }
+  // You be the judge.
+  if (where === 'judge') {
+    return <div key={where} className="h-full overflow-y-auto"><SimJudge training={training} onBack={() => setWhere('home')} onLink={openLink} onCall={(id, points) => trainingChanged(recordJudge(id, points))} /></div>;
   }
   // The skill passport.
   if (where === 'passport') {

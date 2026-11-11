@@ -176,7 +176,9 @@ export function integrate(b: Boat, dt: number, t: number, sea: Sea | null = null
   const ng = noGoAngle(b.tws);
   const perfect = polarSpeed(c, b.tws, a);
   b.targetSpd = perfect;
-  let target = perfect * trimEfficiency(b.sheet, a, b.tws);
+  // (Carrying a rig that isn't the one for the breeze, she drives as if the wind were that much lighter or stronger.)
+  const drive = b.rigDrive ?? 1;
+  let target = (drive === 1 ? perfect : polarSpeed(c, b.tws * drive, a)) * trimEfficiency(b.sheet, a, b.tws);
   const drag = 1 - 0.3 * b.rudder * b.rudder * clamp(b.spd / c.hullSpeed, 0, 1);
   target *= drag;
   // Laid over too far she slows: more drag, less drive, and nearly stopped when she's knocked flat.

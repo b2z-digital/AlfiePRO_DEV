@@ -2,7 +2,8 @@
 // turned into the debrief numbers and the three things to work on.
 import type { Race } from '@/sim/engine';
 import type { Boat, Incident } from '@/sim/types';
-import { dist, dot, n180, sub } from '@/sim/math';
+import { dist, dot, n180, sub, KN } from '@/sim/math';
+import { iomRig } from '@/sim/classes';
 import { DRILLS, LAB, MODULES } from '@/sim/training';
 import { LossTally, versus, type Cause, type Ledger } from './ledger';
 import type { Focus } from './focus';
@@ -86,6 +87,8 @@ export interface RaceSummary {
   ledger?: Ledger;
   /** The one thing this race was for, and whether it was met. */
   focus?: Focus;
+  /** A rig you chose yourself (IOM): yours, the one the fleet carried, and the breeze in knots. */
+  rig?: { mine: 'A' | 'B' | 'C'; fleet: 'A' | 'B' | 'C'; knots: number };
 }
 
 /** The practice that fixes each cause of lost lengths. */
@@ -175,6 +178,7 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
     // (Away from the favoured end of a biased line: that far along it, times the sine of the bias.)
     ledger: mode === 'race' ? log.tally.result(p, fromFavouredL === null ? 0 : fromFavouredL * Math.sin((Math.abs(bias) * Math.PI) / 180)) : undefined,
   };
+  if (s.rig && p.rig) { const kn = race.wind.baseTws / KN; sum.rig = { mine: p.rig, fleet: iomRig(kn), knots: Math.round(kn) }; }
   // Against the fleet: every other boat that raced most of what you did (like with like, so without
   // the favoured-end allowance only your own start has).
   if (sum.ledger && mine.status === 'finished') {
@@ -186,6 +190,9 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
     if (others.length >= 3) sum.ledger.vs = versus(own, others, s.level);
   }
   sum.takeaways = takeaways(sum);
+  // The wrong rig for the day comes first: nothing else you did mattered as much.
+  const rigNote = rigTakeaway(sum);
+  if (rigNote) sum.takeaways = [rigNote, ...sum.takeaways].slice(0, 3);
   return sum;
 }
 
@@ -197,6 +204,19 @@ function countHeaders(up: Sample[]): number {
     else if (inHeader && x.shift > -2) inHeader = false;
   }
   return n;
+}
+
+/** You chose your own rig and it wasn't the fleet's: what that did. */
+export function rigTakeaway(s: RaceSummary): Takeaway | null {
+  const r = s.rig;
+  if (!r || r.mine === r.fleet) return null;
+  const big = r.mine < r.fleet; // 'A' < 'B' < 'C': a letter earlier is a bigger rig
+  return {
+    tone: 'warn',
+    text: `You carried the ${r.mine} rig in ${r.knots} knots; the fleet was on the ${r.fleet}. ${big
+      ? 'With too much sail she lies over past 28 degrees, where the hull drags and the rudder loses its grip, and she buries her bow on the run.'
+      : "With too little sail she's short of drive, most of all in the lulls and out of the tacks."} It shows under boat speed in where your race went.`,
+  };
 }
 
 function takeaways(s: RaceSummary): Takeaway[] {

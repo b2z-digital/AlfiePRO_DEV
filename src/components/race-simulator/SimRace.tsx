@@ -10,6 +10,7 @@ import type { Boat, Incident, RaceSettings } from '@/sim/types';
 import { DT } from '@/sim/physics';
 import { Smoother } from './smooth';
 import { dir, dist, n180 } from '@/sim/math';
+import { iomRig } from '@/sim/classes';
 import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
 import type { SceneSpec } from '@/sim/training';
 import { CoachMode, CoachVoice, Cue, WindMemory, coachCue, cueCall, handlingCall, lineInfo, pointOfSail, trimAdvice } from './coach';
@@ -280,6 +281,15 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     setToasts(ts => [...ts.slice(-2), { id, text, tone }]);
     window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 3600);
   }, []);
+
+  // Your own rig for the day, as the race opens: what you've put on, and what the fleet is carrying.
+  useEffect(() => {
+    const p = race.player;
+    if (scene || !p?.rig || !race.settings.rig) return;
+    const kn = race.wind.baseTws / KN, fleet = iomRig(kn);
+    const id = window.setTimeout(() => toast(p.rig === fleet ? `${p.rig} rig on, the same as the fleet, in ${Math.round(kn)} knots.` : `${p.rig} rig on in ${Math.round(kn)} knots. The fleet is on the ${fleet}.`, p.rig === fleet ? 'plain' : 'warn'), 400);
+    return () => window.clearTimeout(id);
+  }, [race, scene, toast]);
 
   // The race's focus, as it opens: on screen, and in Alfie's voice when he's coaching.
   useEffect(() => {
