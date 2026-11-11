@@ -14,6 +14,8 @@ export interface TrainingProgress {
   drills: Record<string, DrillRecord>;
   lessons: Record<string, LessonRecord>;
   lab: Record<string, LabRecord>;
+  /** You be the judge: your best call on each case (0 to 2 points) and when you last made one. */
+  judge?: Record<string, { points: number; at: number }>;
   updatedAt: number;
 }
 
@@ -54,6 +56,15 @@ export function recordScene(spec: SceneSpec, o: Outcome, higherIsBetter = false)
     if (o.pass) r.won = true;
     p.lab[spec.id] = r;
   }
+  return saveTraining(p);
+}
+
+/** Record a call in You be the judge (0 to 2 points): the best call on a case is kept, and when you last made one. */
+export function recordJudge(id: string, points: number): TrainingProgress {
+  const p = loadTraining();
+  const j = p.judge ?? {};
+  j[id] = { points: Math.max(points, j[id]?.points ?? 0), at: Date.now() };
+  p.judge = j;
   return saveTraining(p);
 }
 
@@ -98,6 +109,10 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
   for (const [k, r] of Object.entries(b.lab)) {
     const m = out.lab[k];
     out.lab[k] = !m ? r : { won: m.won || r.won, tries: Math.max(m.tries, r.tries), at: Math.max(m.at, r.at) };
+  }
+  if (a.judge || b.judge) {
+    out.judge = { ...(a.judge ?? {}) };
+    for (const [k, r] of Object.entries(b.judge ?? {})) { const m = out.judge[k]; out.judge[k] = !m ? r : { points: Math.max(m.points, r.points), at: Math.max(m.at, r.at) }; }
   }
   return out;
 }

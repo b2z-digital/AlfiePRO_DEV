@@ -21,6 +21,7 @@ import { PLAYS, practiceLink } from './playbook';
 import { todaysPlan } from './plan';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
+import { todaysCases } from './judge';
 import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
@@ -64,6 +65,8 @@ export const DEFAULT_SETUP: Setup = {
   seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
 
+/** The day on this device, as YYYY-MM-DD. */
+const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const CHARACTER_WORD: Record<WindCharacter, string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging' };
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
@@ -408,7 +411,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
 
 export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
   onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -450,6 +453,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const lic = licence(training);
   const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
   const firstWon = FIRST.filter(m => training.lab[m.id]?.won).length;
+  // You be the judge: today's five cases (the first is the call of the day), and how many you've called today.
+  const judgeToday = useMemo(() => todaysCases(localDay()), []);
+  const calledToday = (id: string) => { const r = training.judge?.[id]; return r && localDay(new Date(r.at)) === localDay() ? r : null; };
+  const callToday = calledToday(judgeToday[0].id);
+  const judgedToday = judgeToday.filter(c => calledToday(c.id)).length;
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
@@ -665,6 +673,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <Btn primary onClick={() => onOpen(advice.where)}>Start the session</Btn>
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:px-5">
+                <span aria-hidden="true" className="sim-set-icon flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B4FF]"><Glyph name="flag" size={21} /></span>
+                <div className="min-w-[200px] flex-1">
+                  <Cap>Call of the day</Cap>
+                  <p className="m-0 mt-0.5 font-display text-[17px] font-bold leading-tight">{callToday ? `Called: ${callToday.points} of 2` : 'One incident. Who broke a rule, and which one?'}</p>
+                  <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{callToday ? `${judgedToday} of today's five cases done. The same five for everyone, new tomorrow.` : "Watch a short clip from above and make the call. The simulator's referee gives the verdict."}</p>
+                </div>
+                <Btn primary={!callToday} onClick={() => onOpen('judge')}>{callToday ? (judgedToday < 5 ? 'Carry on judging' : 'More cases') : 'Make the call'}</Btn>
+              </div>
               <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
                 <AcademyCard icon="book" tint="#34D3C8" kicker={`${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
                   progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
