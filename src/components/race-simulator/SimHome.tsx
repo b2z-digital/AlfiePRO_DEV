@@ -66,7 +66,7 @@ const LEVEL_NAME: Record<SkipperLevel, string> = { club: 'Club', state: 'State',
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
   club: 'Learning the ropes: late starts, wide roundings, and the odd foul you can protest.',
   state: 'Solid starts, play the big shifts, rarely foul. The odd late tack on the layline.',
-  national: 'Sharp starts and tight roundings. They tack on small shifts and give little away.',
+  national: 'Sharp starts, tight roundings and clean tacks. They pick their shifts and give little away.',
   world: 'On the line at the gun and on the right side of every shift. One mistake and they are gone.',
 };
 
@@ -455,6 +455,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const [building, setBuilding] = useState<Water | 'new' | null>(null);
   const builtIn = venueForClub(clubId);
   const startFrom = builtIn && !myWaters.some(w => w.venueId === builtIn.venueId) ? builtIn : null;
+  // Venue practice is at the venue you've chosen; on the practice pond, at your club's (or the first that comes with the app).
+  const practiceAt = venue ?? builtIn ?? VENUES[DEFAULT_VENUE];
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
   const summary = [CLASS_LABEL[s.classId], `${s.fleetSize} boats`, `${LEVEL_NAME[s.level]} skippers`, venue ? venue.short : 'Practice pond', `${strengthName}, ${CHARACTER[s.windCharacter][0].toLowerCase()}`];
@@ -556,11 +558,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   progress={stars.of ? stars.got / stars.of : 0} progressText={`${stars.got}/${stars.of} stars`} action={() => onOpen('trainer')} actionLabel={stars.got ? 'Carry on' : 'Begin'} />
                 <AcademyCard icon="book" tint="#B692FF" kicker="6 modules" title="Rules Academy" text="26 situations from the Racing Rules with Appendix E. Answer each one, then sail it, and earn your licence."
                   progress={lic.level / 6} progressText={`Level ${lic.level}/6`} action={() => onOpen('academy')} actionLabel={lic.level ? 'Next module' : 'Begin'} />
-                <AcademyCard icon="flask" tint="#FF9F43" kicker={`${LAB.length} moments`} title="Scenario Lab" text="Port-tack approaches, crowded roundings, gate choices. Replay a moment until you win it."
+                <AcademyCard icon="flask" tint="#FF9F43" kicker={`${LAB.length} scenarios`} title="Scenario Lab" text="Boat speed upwind and down, tacks, gybes and roundings against the clock, and classic race moments. Replay each until you win it."
                   progress={LAB.length ? labWon / LAB.length : 0} progressText={`${labWon}/${LAB.length} won`} action={() => onOpen('lab')} actionLabel={labWon ? 'Carry on' : 'Begin'} />
-                <AcademyCard icon="pin" tint="#34D399" kicker="Today's wind" title="Venue practice" text={`${VENUES[DEFAULT_VENUE].name}'s real water in the wind blowing there today. Rehearse the shifts before you get to the club.`}
-                  progress={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? 1 : 0} progressText={s.venue === DEFAULT_VENUE && s.windDir === 'today' ? 'Set up' : 'Live wind'}
-                  action={() => { set({ venue: DEFAULT_VENUE, windDir: 'today', todayStrength: true }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' }); }} actionLabel="Use today's wind" />
+                <AcademyCard icon="pin" tint="#34D399" kicker="Today's wind" title="Venue practice" text={`${practiceAt.name}'s real water in the wind blowing there today. Rehearse the shifts before you get to the club.`}
+                  progress={s.venue === practiceAt.id && s.windDir === 'today' ? 1 : 0} progressText={s.venue === practiceAt.id && s.windDir === 'today' ? 'Set up' : 'Live wind'}
+                  action={() => { set({ venue: practiceAt.id, windDir: 'today', todayStrength: true }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' }); }} actionLabel="Use today's wind" />
               </div>
             </section>
           </div>

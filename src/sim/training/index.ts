@@ -8,8 +8,8 @@ import type { SceneKind, SceneSpec } from './common';
 export * from './common';
 export { DRILLS, findDrill } from './drills';
 export type { Drill, DrillGroup } from './drills';
-export { LAB, findMoment } from './lab';
-export type { LabMoment } from './lab';
+export { LAB, LAB_GROUPS, findMoment } from './lab';
+export type { LabGroup, LabMoment } from './lab';
 export { MODULES, findSituation, lessonSpecs } from './lessons';
 export type { Answer, RulesModule, Situation } from './lessons';
 

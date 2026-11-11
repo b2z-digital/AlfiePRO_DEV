@@ -75,7 +75,7 @@ export default function SimHero({ setup, children, className }: { setup: Setup; 
       // look at a point a little to the fleet's left.
       const vx = target.x - cam.x, vy = target.y - cam.y, d = Math.hypot(vx, vy) || 1;
       const off = size.w > 760 && cam.ready ? d * Math.tan(0.2 * cam.fov * (Math.PI / 180)) : 0;
-      followCam(cam, r, { x: target.x - (vy / d) * off, y: target.y + (vx / d) * off }, dt, 1.5, false);
+      followCam(cam, r, { x: target.x - (vy / d) * off, y: target.y + (vx / d) * off }, dt, 1.5, false, r.t < r.gunT + 4);
       // A wide, low window: look out level, with the far shore and some sky across the top of it.
       const F = (size.w / 2) / Math.tan((cam.fov / 2) * (Math.PI / 180));
       cam.pitch = Math.atan((0.27 * size.h) / F) * (180 / Math.PI);

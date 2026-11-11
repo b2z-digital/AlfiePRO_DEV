@@ -79,7 +79,8 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
   const detail = v.detail ?? 2;
   // Where the ripples have drifted to (added up frame by frame, so they only ever drift downwind).
   const drift = rippleDrift(race, { x: cam.x, y: cam.y });
-  const wind = detail >= 1 ? tex(ctx, 'wind') : null;
+  // (Always: the ripples are how you read the wind, and one fill of the screen costs little.)
+  const wind = tex(ctx, 'wind');
   if (wind) {
     mapAt(wind, flat, { x: cam.x, y: cam.y }, acrossW, wd, tm, 0, drift.O);
     ctx.globalAlpha = 0.25 + 0.45 * Math.min(1, kn / 13);

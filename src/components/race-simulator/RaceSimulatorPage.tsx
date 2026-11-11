@@ -9,7 +9,7 @@ import { DT } from '@/sim/physics';
 import type { Moment } from './moments';
 import type { RaceSettings } from '@/sim/types';
 import type { Outcome, SceneSpec } from '@/sim/training';
-import { DRILLS, LAB, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
+import { DRILLS, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
@@ -121,8 +121,10 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
     return n ? { spec: n, label: `Next drill: ${n.title}` } : null;
   }
   if (spec.kind === 'lab') {
-    const i = LAB.findIndex(m => m.id === spec.id);
-    const n = LAB[i + 1];
+    // In the order the lab shows them: section by section.
+    const order = LAB_GROUPS.flatMap(g => LAB.filter(m => m.group === g.id));
+    const i = order.findIndex(m => m.id === spec.id);
+    const n = order[i + 1];
     return n ? { spec: n, label: `Next: ${n.title}` } : null;
   }
   const ids = MODULES.flatMap(m => m.situations.filter(s => s.play).map(s => `${m.id}/${s.id}`));

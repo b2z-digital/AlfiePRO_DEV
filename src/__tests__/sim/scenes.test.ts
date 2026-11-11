@@ -3,7 +3,7 @@
 // and doing nothing at all doesn't pass.
 import { describe, expect, it } from 'vitest';
 import { buildScene, runScene } from '@/sim/scene';
-import { DRILLS, LAB, MODULES, lessonSpecs } from '@/sim/training';
+import { DRILLS, LAB, LAB_GROUPS, MODULES, lessonSpecs } from '@/sim/training';
 import type { SceneSpec } from '@/sim/training';
 
 /** Drills whose demo is an AI skipper rather than a script: it usually wins, so we only ask that it runs. */
@@ -76,7 +76,7 @@ describe('Start Trainer', () => {
 });
 
 describe('Scenario Lab', () => {
-  it('has six moments', () => expect(LAB).toHaveLength(6));
+  it('has twenty scenarios, each in a section', () => { expect(LAB).toHaveLength(20); for (const m of LAB) expect(LAB_GROUPS.some(g => g.id === m.group), m.id).toBe(true); expect(new Set(LAB.map(m => m.id)).size).toBe(LAB.length); });
   for (const m of LAB) {
     it(`${m.id}: runs to a result and the same seed gives the same result`, () => {
       const a = runScene(m.scene(4), m.goal, 4, m.solution);
@@ -89,6 +89,14 @@ describe('Scenario Lab', () => {
         const r = runScene(m.scene(1), m.goal, 1, m.mistake);
         expect(r.outcome.pass).toBe(false);
         expectRule(m, r.outcome.incident?.rule);
+      });
+    }
+    // "Watch Alfie's way" plays the first of these seeds, so it has to be a win.
+    if (m.demoSeeds?.length || typeof m.solution === 'function') {
+      it(`${m.id}: Alfie's way wins`, () => {
+        const seed = m.demoSeeds?.[0] ?? 1;
+        const r = runScene(m.scene(seed), m.goal, seed, m.solution);
+        expect(r.outcome.pass, `${m.id} seed ${seed}: ${r.outcome.title}`).toBe(true);
       });
     }
   }

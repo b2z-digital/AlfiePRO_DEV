@@ -1,6 +1,6 @@
-// The Scenario Lab: six classic race moments set up against AI skippers. Play one until you win it,
-// or watch Alfie's way through it.
-import { LAB, LabMoment } from '@/sim/training';
+// The Scenario Lab: boat-speed runs, boat-handling drills and classic race moments, each a real scene
+// on the engine. Play one until you win it, or watch Alfie's way through it.
+import { LAB, LAB_GROUPS, LabMoment } from '@/sim/training';
 import type { TrainingProgress } from './progress';
 import { Btn, C, Cap, Chip } from './ui';
 
@@ -36,13 +36,26 @@ export default function SimLab({ progress, onPlay, onBack }: { progress: Trainin
           </Btn>
           <div className="min-w-0 flex-[1_1_320px]">
             <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">Scenario Lab</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>Classic racing moments, set up mid-race in real wind. Replay each one until you win it.</p>
+            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>Boat speed, boat handling and classic racing moments, set up mid-race in real wind. Replay each one until you win it.</p>
           </div>
           <Chip tone={won === LAB.length ? 'good' : 'blue'}>{won} of {LAB.length} won</Chip>
         </header>
-        <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
-          {LAB.map(m => <MomentCard key={m.id} m={m} progress={progress} onPlay={onPlay} />)}
-        </div>
+        {LAB_GROUPS.map(g => {
+          const ms = LAB.filter(m => m.group === g.id);
+          const done = ms.filter(m => progress.lab[m.id]?.won).length;
+          return (
+            <section key={g.id} aria-labelledby={`lab-${g.id}`} className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2 id={`lab-${g.id}`} className="m-0 font-display text-[20px] font-bold tracking-[-0.01em]">{g.title}</h2>
+                <p className="m-0 min-w-0 flex-1 basis-[260px] text-[13.5px]" style={{ color: C.mute }}>{g.text}</p>
+                <span className="text-[12.5px] font-semibold" style={{ color: C.faint }}>{done} of {ms.length} won</span>
+              </div>
+              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
+                {ms.map(m => <MomentCard key={m.id} m={m} progress={progress} onPlay={onPlay} />)}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

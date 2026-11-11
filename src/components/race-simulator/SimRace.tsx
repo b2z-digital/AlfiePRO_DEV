@@ -370,7 +370,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     };
     // How much detail the water gets: full, unless frames come too slowly on this device. It only
     // ever steps down (never back up and down again, which would make the water flicker and the
-    // frame rate swing), and only after a steady run of slow frames.
+    // frame rate swing), and only after a steady run of slow frames. Less detail is fewer pixels
+    // and coarser ripples and waves, never a sea with none: glassy water in a breeze is wrong.
     const perf = { detail: 2, ft: 1 / 60, slow: 0 };
     // Development only: the race, for the screenshot harness to set a moment up.
     if (import.meta.env.DEV) (window as unknown as { __simRace?: unknown }).__simRace = race;
@@ -512,7 +513,12 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           const nx = nextTarget(race, p);
           const look = !p.started ? { x: (c.start.pin.x + c.start.stbd.x) / 2, y: (c.start.pin.y + c.start.stbd.y) / 2 } : nx ? { x: nx.x, y: nx.y } : null;
           const glance = !!(st.glance && look);
-          followCam(bcam, race, glance && look ? look : { x: px, y: py }, dtReal, st.zoom * st.boost, glance);
+          // Before the start, until she's away, and again on the beat to the finish, you stand on the
+          // line and look straight down it; in between you walk the bank with her.
+          const along = (px - c.origin.x) * c.up.x + (py - c.origin.y) * c.up.y;
+          const finishing = c.legs[p.legIndex]?.kind === 'finish' || p.finished;
+          const sight = !scene && (!p.started || finishing || (p.legIndex === 0 && along < 5 * c.L));
+          followCam(bcam, race, glance && look ? look : { x: px, y: py }, dtReal, st.zoom * st.boost, glance, sight);
         }
       }
       // Draw.
