@@ -15,6 +15,7 @@ import { AlfieOrb, Btn, C, Cap, Chip, Seg, Tile, compassName, cx, ordinal } from
 import { BUILT_IN, DEFAULT_VENUE, VENUES, venueForClub } from '@/sim/venues';
 import { windAt, windsOf } from '@/sim/venue';
 import type { VenueWind as TodayWind } from './venueWind';
+import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
 import VenueBuilder from './VenueBuilder';
 import type { Water } from './waters';
@@ -387,6 +388,22 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
+  // Try Alfie's voice from the coaching sheet: it says a line, and says so here if the browser can't.
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const hearAlfie = () => {
+    const a = new RaceAudio();
+    a.unlock();
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) { setVoiceNote("This browser has no voice, so Alfie's coaching will be written only."); return; }
+    setVoiceNote('Speaking…');
+    // (A moment for the browser's voices to load, the first time.)
+    window.setTimeout(() => a.say("Alfie here. In full coaching I'll call your trim, your tacks and your start as you sail.", true), 150);
+    window.setTimeout(() => {
+      setVoiceNote(a.problem
+        ? `The browser wouldn't speak (${a.problem}). Alfie's coaching will be written only until that's sorted.`
+        : "If you didn't hear Alfie, check this tab isn't muted and your device's volume is up.");
+      a.dispose();
+    }, 8000);
+  };
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -804,6 +821,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <Opt on={s.coach === 'hints'} onClick={() => set({ coach: 'hints' })} title="Hints" text="Written tips as you sail. Incidents show as a banner." />
             <Opt on={s.coach === 'off'} onClick={() => set({ coach: 'off' })} title="Off" text="No tips. Incidents still show briefly." />
           </Opts>
+          <div className="flex flex-wrap items-center gap-3">
+            <Btn small onClick={hearAlfie}>Hear Alfie's voice</Btn>
+            {voiceNote && <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }} role="status">{voiceNote}</p>}
+          </div>
           <Opts label="View">
             <Opt on={s.view === 'bank'} onClick={() => set({ view: 'bank' })} title="From the bank" text="From the control area, the way you see a race. Press V to switch." />
             <Opt on={s.view === 'top'} onClick={() => set({ view: 'top' })} title="From above" text="A chart view with laylines." />
