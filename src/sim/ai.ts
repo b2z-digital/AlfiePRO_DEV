@@ -27,11 +27,18 @@ export interface LevelParams {
   startSense: number;
 }
 
+/**
+ * The four levels. Every skipper sails the same boat in the same wind: nobody is given speed. A
+ * better skipper steers straighter and trims closer (noise, trimNoise), tacks cleanly and only when
+ * it pays (tackRudder, shiftThr, minTack: a tack costs over a length, so tacking on every flick of
+ * the wind loses), judges laylines and roundings tighter, and starts on time at the right end.
+ * Sailed alone round a lap, each level is a little quicker than the one below (see levels.test.ts).
+ */
 export const LEVELS: Record<SkipperLevel, LevelParams> = {
-  club: { reaction: 0.45, noise: 3.5, trimNoise: 0.07, shiftThr: 9, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 7, tackRudder: 0.68, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
-  state: { reaction: 0.32, noise: 2.2, trimNoise: 0.045, shiftThr: 6, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 5.5, tackRudder: 0.78, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
-  national: { reaction: 0.22, noise: 1.4, trimNoise: 0.03, shiftThr: 4.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 4.5, tackRudder: 0.85, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
-  world: { reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 3.5, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 4, tackRudder: 0.9, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
+  club: { reaction: 0.45, noise: 4.2, trimNoise: 0.14, shiftThr: 5.5, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 5.5, tackRudder: 0.62, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
+  state: { reaction: 0.32, noise: 3, trimNoise: 0.1, shiftThr: 6.5, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 6, tackRudder: 0.74, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
+  national: { reaction: 0.22, noise: 1.9, trimNoise: 0.06, shiftThr: 7.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 7, tackRudder: 0.82, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
+  world: { reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 10, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 9, tackRudder: 0.92, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
 };
 
 /**
@@ -86,8 +93,12 @@ interface Plan { hdg: number; sheet: number; intent: string; maneuver?: 'tack' |
 
 const ANGLES = [0, -7, 7, -14, 14, -24, 24, -38, 38, -55, 55, -80, 80];
 
+/** How long a skipper's sense of the average wind direction reaches back, and of the wind now (s). */
+export const WIND_SENSE = { mean: 60, felt: 4 };
+
 export class Skipper implements Helm {
   meanTwd: number;
+  feltTwd: number;
   private ou = 0;
   private ouTrim = 0;
   lastTackT = -99;
@@ -154,6 +165,7 @@ export class Skipper implements Helm {
 
   constructor(public b: Boat, public lv: LevelParams, public persona: Persona, private rng: Rng, public idx: number) {
     this.meanTwd = b.twd;
+    this.feltTwd = b.twd;
     this.desHdg = b.hdg;
     this.desSheet = b.sheet;
     const pre = this.pre;
@@ -167,9 +179,11 @@ export class Skipper implements Helm {
   decide(h: AiHost) {
     const b = this.b;
     if (b.finished || b.retired) { this.desSheet = 0.25; this.intent = 'Finished'; this.push(h.t, b.hdg, 0.2); return; }
-    // Running mean of the wind direction this skipper sees.
-    const k = 0.1 / 75;
-    this.meanTwd = n360(this.meanTwd + n180(b.twd - this.meanTwd) * k * 10);
+    // The wind as this skipper reads it: where it has been coming from on average over the last
+    // minute or so, and where it's settled now (a few seconds' worth, so a puff's passing flick
+    // isn't taken for a shift). A header is the second against the first.
+    this.meanTwd = n360(this.meanTwd + n180(b.twd - this.meanTwd) * (0.1 / WIND_SENSE.mean));
+    this.feltTwd = n360(this.feltTwd + n180(b.twd - this.feltTwd) * (0.1 / WIND_SENSE.felt));
 
     let plan: Plan;
     const owes = b.penalty.owed > 0 && !h.forgot.has(b.id);
@@ -640,7 +654,7 @@ export class Skipper implements Helm {
     const lay = this.lv.layMargin * (0.8 + 0.4 * (1 - this.persona.risk)) * (r && r.side === 'port' && !onStbd && d < 7 * L ? 0.3 : 1);
     const fetchOther = onStbd ? n180(brg - hp) >= lay : n180(hs - brg) >= lay;
     const fetchThis = onStbd ? n180(hs - brg) >= 0 : n180(brg - hp) >= 0;
-    const shift = n180(twd - this.meanTwd);
+    const shift = n180(this.feltTwd - this.meanTwd);
     const lift = onStbd ? shift : -shift;
     const sinceTack = h.t - this.lastTackT;
     let tack = false, why = '';

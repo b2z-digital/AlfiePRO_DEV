@@ -282,7 +282,7 @@ export const DRILLS: Drill[] = [
     }, 4),
     scoreText: v => `${v.toFixed(1)} s late`,
     solution: timedStart({ tack: 'port', margin: 0.4, before: holdForLine(0.1, 2.0, 'port'), duck: true }),
-    demoSeeds: [6, 7, 8],
+    demoSeeds: [7, 8, 2],
     mistakeRule: '',
   },
   {

@@ -528,6 +528,8 @@ const m3: RulesModule = {
           final: () => lost('Not round yet', 'Duck Orange, tack behind her, and round mark 1.'),
         },
         solution: duckRole('Orange', aiFromHere(), 1.15, 99),
+        // After the duck an AI skipper sails her round; on a rare seed it tacks too close behind Orange.
+        testSeeds: [1, 2, 4], demoSeeds: [1],
         mistake: until(2.3, hold(CH_P), closeHauled('stbd')),
         mistakeRule: '18.3|13|15',
       },

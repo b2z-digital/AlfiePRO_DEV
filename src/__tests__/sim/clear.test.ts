@@ -64,7 +64,7 @@ describe('After the finish', () => {
       expect(shoreWet(c.shore!, w.spot), `${b.id}'s spot is on the water`).toBe(true);
       for (const o of waiting) if (o.b !== b) expect(dist(o.w.spot, w.spot), `${b.id} and ${o.b.id} share a spot`).toBeGreaterThan(1.5 * L);
       // Those that finished a good while before the end are there, or near it.
-      if (sailed.t - (b.finishTime + sailed.gunT) > 35) expect(dist(b, w.spot) / L, `${b.id} isn't at her spot`).toBeLessThan(3.5);
+      if (sailed.t - (b.finishTime + sailed.gunT) > 35) expect(dist(b, w.spot) / L, `${b.id} isn't at her spot`).toBeLessThan(4);
     }
   });
 

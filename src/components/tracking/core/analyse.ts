@@ -178,6 +178,41 @@ function firstDip(b: TrackedBoat, g: Gate, t0: number, t1: number, depth: number
   return null;
 }
 
+/** When a boat spins right round between t0 and t1: her heading winds 330° or more one way inside
+ *  10 s, without turning back more than 45° on the way (tacks and gybes either side of a rounding
+ *  unwind). The time is when each turn completes. */
+function fullTurns(b: TrackedBoat, t0: number, t1: number): number[] {
+  const out: number[] = [];
+  const hs: { t: number; acc: number }[] = [];
+  let acc = 0, prevH: number | null = null, blockUntil = -Infinity;
+  for (let t = t0; t <= t1; t += 0.2) {
+    const s = stateAt(b, t);
+    if (!s || !s.fresh) { prevH = null; hs.length = 0; continue; }
+    if (prevH != null) acc += angDiff(s.h, prevH);
+    prevH = s.h;
+    hs.push({ t, acc });
+    while (hs.length && hs[0].t < t - 10) hs.shift();
+    if (t < blockUntil) continue;
+    let hit = false;
+    for (const dirSign of [1, -1]) {
+      // Going back from now: the furthest point she has wound from, with no big unwind since.
+      let peak = acc, ok = false;
+      for (let k = hs.length - 1; k >= 0; k--) {
+        const v = hs[k].acc;
+        if (dirSign * (v - peak) > 45) break;
+        if (dirSign * v < dirSign * peak) peak = v;
+        if (dirSign * (acc - peak) >= 330) { ok = true; break; }
+      }
+      if (ok) { hit = true; break; }
+    }
+    if (!hit) continue;
+    blockUntil = t + 10;
+    hs.length = 0;
+    out.push(t);
+  }
+  return out;
+}
+
 // ── The race ──
 export interface StartCall {
   boatId: string;
@@ -277,12 +312,16 @@ function roundingsFor(b: TrackedBoat, c: TrackedCourse, from: number, to: number
   const ps = passages(c, Math.max(8, set.roundingM * 6));
   let wp = 0;
   let prev: Fix | null = null;
+  // The waypoint she was last taken to have skipped, until she rounds another: if she comes to it
+  // after all she hadn't skipped it (she was doing her turns beside it, or went back for it), and
+  // the course is picked up again from there.
+  let skipped = -1;
   for (const f of b.fixes) {
     if (f.t < from) { prev = f; continue; }
-    if (f.t > to || wp >= ps.length) break;
+    if (f.t > to || (wp >= ps.length && skipped < 0)) break;
     if (!prev) { prev = f; continue; }
-    // This waypoint, or (if she's skipped it) the next.
-    for (const k of [wp, wp + 1]) {
+    // The one she skipped, this waypoint, or (if she's skipped it) the next.
+    for (const k of skipped >= 0 ? [skipped, wp, wp + 1] : [wp, wp + 1]) {
       const pa = ps[k];
       if (!pa) continue;
       const x = segX(prev, f, pa.a, pa.b);
@@ -300,7 +339,13 @@ function roundingsFor(b: TrackedBoat, c: TrackedCourse, from: number, to: number
         mark = dist(at, w.marks[0].p) <= dist(at, w.marks[1].p) ? w.marks[0] : w.marks[1];
       }
       const side: Side | null = pa.kind === 'gate' ? mark.rounding : cr > 0 ? 'port' : 'starboard';
+      if (k === skipped) {
+        const m = missed.findIndex(x => x.boatId === b.id && x.wp === k);
+        if (m >= 0) missed.splice(m, 1);
+        for (let i = out.length - 1; i >= 0; i--) if (out[i].boatId === b.id && out[i].wp > k) out.splice(i, 1);
+      }
       if (k === wp + 1) missed.push({ boatId: b.id, wp, t });
+      skipped = k === wp + 1 ? wp : -1;
       out.push({ boatId: b.id, wp: pa.wp, markId: mark.id, t, closest: dist(at, mark.p), side, wrongSide: !!(pa.kind === 'ray' && mark.rounding && side !== mark.rounding) });
       wp = k + 1;
       break;
@@ -354,7 +399,16 @@ export function analyseRace(boats: TrackedBoat[], c: TrackedCourse, gun: number 
       nextWp[b.id] = wp;
       if (wp >= c.waypoints.length) {
         const after = roundings.filter(r => r.boatId === b.id).reduce((m, r) => Math.max(m, r.t), s.startedAt);
-        const f = firstCrossing(b, finishGate, after, now, false);
+        let f = firstCrossing(b, finishGate, after, now, false);
+        // A boat that crosses still owing a turn hasn't finished: she goes back to the course side
+        // of the line, having done her turn, and crosses again (RRS 44.2). From positions, that's
+        // a boat spinning right round as she crosses or just after, then crossing a second time.
+        // (A muddled penalty at the line, tacking and gybing about it, can't be told from here.)
+        if (f) {
+          const back = firstDip(b, finishGate, f.t, Math.min(now, f.t + 30), 0);
+          const again = back == null ? null : firstCrossing(b, finishGate, back, Math.min(now, f.t + 60), true);
+          if (again && fullTurns(b, f.t - 10, again.t).some(t => t > f!.t)) f = again;
+        }
         if (f) finishes.push({ boatId: b.id, t: f.t, tooClose: [], margin: null });
       }
     }
@@ -426,31 +480,7 @@ export function analyseRace(boats: TrackedBoat[], c: TrackedCourse, gun: number 
     for (const b of boats) {
       const t0 = startedAt[b.id];
       if (t0 == null) continue;
-      const hs: { t: number; acc: number }[] = [];
-      let acc = 0, prevH: number | null = null, blockUntil = -Infinity;
-      for (let t = t0; t <= Math.min(now, finishedAt[b.id] ?? now); t += 0.2) {
-        const s = stateAt(b, t);
-        if (!s || !s.fresh) { prevH = null; hs.length = 0; continue; }
-        if (prevH != null) acc += angDiff(s.h, prevH);
-        prevH = s.h;
-        hs.push({ t, acc });
-        while (hs.length && hs[0].t < t - 10) hs.shift();
-        if (t < blockUntil) continue;
-        let hit = false;
-        for (const dirSign of [1, -1]) {
-          // Going back from now: the furthest point she has wound from, with no big unwind since.
-          let peak = acc, ok = false;
-          for (let k = hs.length - 1; k >= 0; k--) {
-            const v = hs[k].acc;
-            if (dirSign * (v - peak) > 45) break;
-            if (dirSign * v < dirSign * peak) peak = v;
-            if (dirSign * (acc - peak) >= 330) { ok = true; break; }
-          }
-          if (ok) { hit = true; break; }
-        }
-        if (!hit) continue;
-        blockUntil = t + 10;
-        hs.length = 0;
+      for (const t of fullTurns(b, t0, Math.min(now, finishedAt[b.id] ?? now))) {
         // Which encounter it answers: hers, the latest before the turn, within three minutes.
         let ei: number | null = null;
         for (let k = encounters.length - 1; k >= 0; k--) {
