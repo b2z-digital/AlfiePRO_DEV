@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "GOGC=10 GOMEMLIMIT=100MiB vite build",
+    "build": "NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build:check": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:native": "GOGC=10 GOMEMLIMIT=100MiB vite build && cap sync",
+    "build:native": "NODE_OPTIONS=--max-old-space-size=6144 vite build && cap sync",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
     "cap:android": "cap open android",
