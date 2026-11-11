@@ -6,6 +6,7 @@ import type { Cue, CoachMode, LineInfo } from './coach';
 import { SAILING_CLEAR } from './coach';
 import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
+import { rudderWords, sailWords, type DemoCue, type Stick } from './demoTalk';
 
 /** What the race screen shows, refreshed ten times a second from the race. */
 export interface HudState {
@@ -292,32 +293,116 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
 
 /**
  * The sticks as Alfie works them, while you watch a drill sailed the right way: the same sail and
- * rudder sticks you sail with, to look at and not to touch (taps go through to the water).
+ * rudder sticks you sail with, to look at and not to touch (taps go through to the water). Each
+ * says where it is in words, and the one Alfie is talking about lights up.
  */
-export function SticksView({ rudder, sheet, compact }: { rudder: number; sheet: number; compact?: boolean }) {
-  const RW = compact ? 88 : 124, SH = compact ? 64 : 112, K = compact ? 22 : 28, T = K + 8;
+export function SticksView({ rudder, sheet, focus = null, compact }: { rudder: number; sheet: number; focus?: Stick | null; compact?: boolean }) {
+  const RW = compact ? 92 : 148, SH = compact ? 64 : 124, K = compact ? 22 : 30, T = K + 8;
   const knob = 'absolute rounded-full bg-[#4DA3FF] shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-[top,left] duration-100 ease-linear';
   const r = Math.max(-1, Math.min(1, rudder)), sh = Math.max(0, Math.min(1, sheet));
+  const lit = (on: boolean) => cx('relative block rounded-[18px] bg-black/35 transition-shadow duration-200', on ? 'shadow-[inset_0_1px_3px_rgba(0,0,0,0.6),0_0_0_2px_#4DA3FF,0_0_18px_rgba(77,163,255,0.55)]' : 'shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]');
+  const sailOn = focus === 'sail' || focus === 'both', rudOn = focus === 'rudder' || focus === 'both';
+  const word = (on: boolean) => cx('whitespace-nowrap font-semibold tabular-nums', compact ? 'text-[11px]' : 'text-[13px]', on ? 'text-[#A9D2FF]' : 'text-[rgba(235,240,255,0.86)]');
   return (
     <Hud className={cx('pointer-events-none flex flex-col', compact ? 'gap-2 px-3 py-2.5' : 'gap-3 px-[18px] py-4')}
-      role="img" aria-label={`Alfie's sticks: sail ${Math.round(sh * 100)}% in, rudder ${Math.abs(r) < 0.05 ? 'centred' : `${Math.round(Math.abs(r) * 100)}% ${r > 0 ? 'right' : 'left'}`}`}>
+      role="img" aria-label={`Alfie's sticks: sail ${sailWords(sh).toLowerCase()}, rudder ${rudderWords(r).toLowerCase()}`}>
       <Cap className="!text-[10px] !text-[#8FC2FF]">Alfie's sticks</Cap>
-      <div className={cx('flex items-end', compact ? 'gap-3' : 'gap-[18px]')}>
-        <div className="flex flex-col items-center gap-1.5">
+      <div className={cx('flex items-end', compact ? 'gap-3' : 'gap-5')}>
+        <div className="flex flex-col items-center gap-1.5" style={{ minWidth: compact ? 54 : 72 }}>
           {!compact && <span className="text-[11px]" style={{ color: C.mute }}>OUT</span>}
-          <span className="relative block rounded-[18px] bg-black/35 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" style={{ width: T, height: SH }}>
+          <span className={lit(sailOn)} style={{ width: T, height: SH }}>
             <span className={knob} style={{ left: 4, width: K, height: K, top: 4 + sh * (SH - T) }} />
           </span>
           {!compact && <span className="text-[11px]" style={{ color: C.mute }}>IN</span>}
-          <Cap className="!text-[10px]">Sail</Cap>
+          <Cap className="!text-[10px]">Sail stick</Cap>
+          <span className={word(sailOn)}>{sailWords(sh)}</span>
         </div>
         <div className="flex flex-col items-center gap-1.5">
-          <span className="relative block rounded-[18px] bg-black/35 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" style={{ width: RW, height: T }}>
+          <span className={lit(rudOn)} style={{ width: RW, height: T }}>
             <span className="absolute inset-y-1.5 w-0.5 bg-white/[0.14]" style={{ left: RW / 2 - 1 }} />
             <span className={knob} style={{ top: 4, width: K, height: K, left: RW / 2 - K / 2 + r * (RW / 2 - K / 2 - 4) }} />
           </span>
-          <Cap className="!text-[10px]">Rudder</Cap>
+          {!compact && <span className="flex w-full justify-between text-[11px]" style={{ color: C.mute }}><span>LEFT</span><span>RIGHT</span></span>}
+          <Cap className="!text-[10px]">Rudder stick</Cap>
+          <span className={word(rudOn)}>{rudderWords(r)}</span>
         </div>
+      </div>
+    </Hud>
+  );
+}
+
+/**
+ * Alfie talking you through a drill as it's sailed for you: what the sticks are doing now, and why.
+ * It sits where his coaching does when you sail yourself.
+ */
+export function DemoCard({ cue, onHide, compact }: { cue: DemoCue | null; onHide: () => void; compact?: boolean }) {
+  if (!cue) return null;
+  const stick = cue.stick === 'both' ? 'Both sticks' : cue.stick === 'rudder' ? 'Rudder stick' : cue.stick === 'sail' ? 'Sail stick' : null;
+  return (
+    <Hud className={cx('flex flex-col gap-3', compact ? 'px-4 py-3' : 'px-5 py-[18px]')} style={{ width: compact ? '100%' : 432 }}>
+      <div className="flex items-center gap-2.5">
+        <AlfieOrb size={compact ? 26 : 32} />
+        <p className="m-0 text-[15px] font-semibold">Alfie is showing you</p>
+        <span className="rounded-full bg-white/[0.07] px-2.5 py-[3px] text-xs font-semibold">{cue.topic}</span>
+        <button type="button" onClick={onHide} className="ml-auto cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 text-[12.5px] font-semibold text-[#A9D2FF] hover:bg-white/[0.06]">Hide</button>
+      </div>
+      <p className={cx('m-0 leading-[1.5]', compact ? 'text-[14px]' : 'text-[15px]')} aria-live="polite">{cue.text}</p>
+      {stick && <p className="m-0 flex items-center gap-2 text-[12.5px] font-semibold text-[#A9D2FF]"><span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-full bg-[#4DA3FF] shadow-[0_0_8px_rgba(77,163,255,0.8)]" />Watch: {stick.toLowerCase()}</p>}
+    </Hud>
+  );
+}
+
+/**
+ * Before Alfie sails a drill for you: what's being asked, how it's done, and what each stick does,
+ * so you know what to look for. The demonstration waits behind it until you start it.
+ */
+export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, onBack, compact }: {
+  title: string; group: string; brief: string; goal: string; tip: string;
+  sticks?: { sail: string; rudder: string } | null; onStart: () => void; onBack: () => void; compact?: boolean;
+}) {
+  // The drill's advice, a step to a line.
+  const steps = tip.split(/(?<=[.!?])\s+(?=[A-Z"'])/).map(x => x.trim()).filter(Boolean);
+  const row = (name: string, text: string, glyph: React.ReactNode) => (
+    <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-3">
+      <span aria-hidden="true" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(77,163,255,0.14)]">{glyph}</span>
+      <p className="m-0 text-[14px] leading-[1.45]"><b className="text-[#A9D2FF]">{name}.</b> {text}</p>
+    </div>
+  );
+  return (
+    <Hud role="dialog" aria-modal="true" aria-label={`How to sail ${title}`} className={cx('flex max-h-full flex-col gap-4 overflow-y-auto', compact ? 'w-full px-5 py-5' : 'w-[600px] px-8 py-7')}>
+      <div className="flex items-center gap-3">
+        <AlfieOrb size={36} />
+        <div className="min-w-0">
+          <Cap>{group} · Alfie shows you how</Cap>
+          <p className={cx('m-0 font-display font-bold leading-tight', compact ? 'text-[20px]' : 'text-[24px]')}>{title}</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Cap>What's asked</Cap>
+        <p className="m-0 text-[14.5px] leading-[1.5]">{brief} <b>{goal}.</b></p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Cap>How it's done</Cap>
+        <ol className="m-0 flex list-none flex-col gap-2 p-0">
+          {steps.map((x, i) => (
+            <li key={x} className="flex items-start gap-2.5 text-[14.5px] leading-[1.45]">
+              <span aria-hidden="true" className="mt-px flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[12px] font-bold tabular-nums">{i + 1}</span>
+              <span>{x}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Cap>On the sticks</Cap>
+        {row('Sail stick', sticks?.sail ?? 'Down to sheet in, up to let the sail out. Right in upwind, out downwind.',
+          <svg width="18" height="22" viewBox="0 0 18 22" fill="none"><rect x="5" y="1" width="8" height="20" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="9" cy="16" r="3.2" fill="#4DA3FF" /></svg>)}
+        {row('Rudder stick', sticks?.rudder ?? 'Left and right to steer. Small, smooth movements: every big one is a brake.',
+          <svg width="22" height="18" viewBox="0 0 22 18" fill="none"><rect x="1" y="5" width="20" height="8" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="11" cy="9" r="3.2" fill="#4DA3FF" /></svg>)}
+        <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>As he sails, Alfie's sticks show at the bottom of the screen, each with its position in words, and he says what he's doing and why. The stick he's talking about lights up. Pause at any time to read.</p>
+      </div>
+      <div className="flex flex-wrap gap-2.5 pt-1">
+        <Btn primary onClick={onStart} autoFocus={!compact}>Watch Alfie sail it</Btn>
+        <Btn onClick={onBack}>Back</Btn>
       </div>
     </Hud>
   );
