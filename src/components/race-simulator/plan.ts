@@ -20,7 +20,7 @@ const sameDay = (a: number, b: number) => new Date(a).toDateString() === new Dat
 
 /** Lengths given away per race, by cause, over your last few races that kept a ledger (null with none). */
 export function lossPerRace(profile: Profile, last = 5): { races: number; by: Record<Cause, number> } | null {
-  const led = profile.races.filter(r => r.mode === 'race' && r.ledger).slice(-last).map(r => r.ledger!);
+  const led = profile.races.filter(r => r.mode === 'race' && r.ledger).slice(0, last).map(r => r.ledger!);
   if (!led.length) return null;
   const by = Object.fromEntries(CAUSES.map(c => [c, 0])) as Record<Cause, number>;
   for (const l of led) for (const p of l.parts) by[p.cause] += p.lengths / led.length;

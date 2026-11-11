@@ -634,7 +634,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="sim-home h-full overflow-y-auto">
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}

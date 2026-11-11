@@ -454,3 +454,38 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     radial-gradient(1300px 820px at 18% -12%, rgba(30, 108, 255, 0.24), transparent 62%),
     radial-gradient(1000px 700px at 104% 108%, rgba(138, 77, 255, 0.10), transparent 60%);
 }
+
+/* The Sailing Academy's home. The race on the water now runs edge to edge across the top, behind
+   the floating menu, and fades into the page, the way the club's cover photo does on the dashboard
+   (--alfie-rail is the menu's width, set by DashboardLayout; nothing anywhere else). */
+.sim-home { margin-left: calc(-1 * var(--alfie-rail, 0px)); width: calc(100% + var(--alfie-rail, 0px)); }
+.sim-home-hero { position: relative; z-index: 1; display: flex; align-items: flex-end; min-height: clamp(270px, 35vh, 370px); }
+.sim-home-media { position: absolute; left: 0; right: 0; top: 0; height: clamp(450px, 54vh, 600px); overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 44%, transparent 100%); mask-image: linear-gradient(180deg, #000 44%, transparent 100%); }
+.sim-home-scrim { position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(6, 11, 22, 0.32) 0%, rgba(6, 11, 22, 0) 20%, rgba(6, 11, 22, 0) 34%, rgba(6, 11, 22, 0.6) 82%),
+    linear-gradient(90deg, rgba(6, 11, 22, 0.82) 0%, rgba(6, 11, 22, 0.5) 26%, rgba(6, 11, 22, 0) 56%); }
+.sim-home-hero-body, .sim-home-body { position: relative; box-sizing: border-box; width: calc(100% - var(--alfie-rail, 0px)); margin-left: var(--alfie-rail, 0px); }
+.sim-home-hero-body { padding-top: 104px; padding-bottom: 30px; }
+.sim-home-body { z-index: 2; }
+.sim-home-title { margin: 10px 0 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(30px, 3.4vw, 48px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.05; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.45); }
+.sim-home-sub { margin: 10px 0 0; max-width: 560px; font-size: clamp(14.5px, 1.2vw, 17px); line-height: 1.4; color: rgba(255, 255, 255, 0.88); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.55); }
+@media (max-width: 760px) { .sim-home-hero-body { padding-top: 84px; padding-bottom: 22px; } }
+
+/* The race set-up: one sheet of glass over the water, three columns of rows (stacked when it's narrow). */
+.sim-set-card { container-type: inline-size; overflow: hidden; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(9, 15, 29, 0.62);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2); backdrop-filter: blur(22px) saturate(1.2); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 24px 60px rgba(0, 0, 0, 0.38); }
+.sim-set-groups { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.sim-set-group + .sim-set-group { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+@container (min-width: 820px) {
+  .sim-set-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sim-set-group + .sim-set-group { border-top: 0; border-left: 1px solid rgba(255, 255, 255, 0.07); }
+}
+.sim-set-icon { border-radius: 30%; border: 1px solid rgba(255, 255, 255, 0.11); background: rgba(255, 255, 255, 0.035); transition: border-color .15s ease, background-color .15s ease; }
+button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); background: rgba(46, 123, 255, 0.12); }
+.sim-btn-lg { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 48px; padding: 0 20px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.06); color: #F1F4FA; font-family: inherit; font-size: 15px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .15s ease, transform .15s ease; }
+.sim-btn-lg:hover { background: rgba(255, 255, 255, 0.11); }
+.sim-btn-lg:active { transform: scale(0.985); }
+.sim-btn-lg:focus-visible { outline: 2px solid rgba(77, 163, 255, 0.9); outline-offset: 2px; }
+.sim-btn-go { padding: 0 26px; border-color: transparent; background: linear-gradient(180deg, #2A93FF, #0A78F0); color: #fff; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 8px 22px rgba(10, 132, 255, 0.38); }
+.sim-btn-go:hover { background: linear-gradient(180deg, #40A0FF, #1384FF); }

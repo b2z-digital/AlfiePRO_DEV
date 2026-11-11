@@ -131,20 +131,31 @@ function Glyph({ name, size = 20 }: { name: keyof typeof GLYPH; size?: number })
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={GLYPH[name]} /></svg>;
 }
 
-/** One thing about the race, as a tile: what it is and what it's set to. Tap it to change it. */
-function SetupTile({ icon, label, value, sub, onClick }: { icon: Pick; label: string; value: string; sub?: string; onClick: () => void }) {
+/** One thing about the race, as a row of the set-up card: what it is and what it's set to. Tap it to change it. */
+function SetupRow({ icon, label, value, sub, onClick }: { icon: Pick; label: string; value: string; sub?: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} aria-haspopup="dialog"
-      className="group flex min-h-[92px] cursor-pointer flex-col justify-between gap-2 rounded-[18px] border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-3.5 text-left text-[#F1F4FA] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[transform,border-color,background-color] duration-150 hover:-translate-y-0.5 hover:border-[rgba(77,163,255,0.5)] active:translate-y-0 active:scale-[0.985]">
-      <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: C.mute }}>
-        <span className="text-[#9CCBFF]"><Glyph name={icon} size={16} /></span>{label}
-        <svg className="ml-auto opacity-40 transition-opacity group-hover:opacity-90" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      className="group flex w-full cursor-pointer items-center gap-3 rounded-[14px] border-0 bg-transparent px-2.5 py-2.5 text-left text-[#F1F4FA] transition-colors duration-150 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4DA3FF]">
+      <span aria-hidden="true" className="sim-set-icon flex h-10 w-10 shrink-0 items-center justify-center text-[#9CCBFF]"><Glyph name={icon} size={19} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] font-medium leading-tight" style={{ color: C.faint }}>{label}</span>
+        <span className="mt-[3px] block truncate text-[15px] leading-tight">
+          <span className="font-semibold">{value}</span>
+          {sub && <span style={{ color: C.mute }}> · {sub}</span>}
+        </span>
       </span>
-      <span className="min-w-0">
-        <span className="block truncate font-display text-[17px] font-bold leading-tight">{value}</span>
-        {sub && <span className="mt-0.5 block truncate text-[12.5px]" style={{ color: C.mute }}>{sub}</span>}
-      </span>
+      <svg className="shrink-0 opacity-35 transition-[opacity,transform] group-hover:translate-x-0.5 group-hover:opacity-90" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
     </button>
+  );
+}
+
+/** A column of the set-up card: a few rows that belong together. */
+function SetupGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="sim-set-group flex min-w-0 flex-col gap-0.5 px-2.5 py-3 sm:px-3.5">
+      <Cap className="px-2.5 pb-1.5">{title}</Cap>
+      {children}
+    </div>
   );
 }
 
@@ -483,7 +494,6 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const practiceAt = venue ?? builtIn ?? VENUES[DEFAULT_VENUE];
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
-  const summary = [CLASS_LABEL[s.classId], `${s.fleetSize} boats`, `${LEVEL_NAME[s.level]} skippers`, venue ? venue.short : 'Practice pond', `${strengthName}, ${CHARACTER[s.windCharacter][0].toLowerCase()}`];
 
   // Alfie's pick: the session that works on what your racing says you need most.
   const advice: { where: 'trainer' | 'academy' | 'lab'; title: string; text: string } = !sk
@@ -494,79 +504,73 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
 
   return (
     <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="flex flex-col gap-6 px-4 pb-16 pt-4 sm:px-6 sm:pt-5 2xl:px-8">
-        {/* ── The front window: your race, live ── */}
-        <SimHero setup={s} className="min-h-[clamp(340px,44vh,500px)] rounded-[28px] border border-white/[0.09] shadow-[0_24px_70px_rgba(0,0,0,0.5)]">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(4,9,20,.88) 0%, rgba(4,9,20,.62) 34%, rgba(4,9,20,.08) 68%, rgba(4,9,20,0) 100%), linear-gradient(0deg, rgba(4,9,20,.72) 0%, rgba(4,9,20,0) 42%)' }} />
-          <div className="relative flex h-full min-h-[inherit] flex-col justify-between gap-6 p-5 sm:p-8">
-            <div className="flex items-center gap-2.5">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[rgba(6,11,22,0.6)] px-3 py-1.5 text-[11.5px] font-bold uppercase tracking-[0.12em] backdrop-blur-[8px]">
-                <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#34D399]" />On the water now
-              </span>
-              <span className="hidden text-[12.5px] sm:inline" style={{ color: 'rgba(241,244,250,.78)' }}>AI skippers racing in the conditions you've set</span>
+      {/* ── Your race, live: edge to edge under the menu, fading into the page ── */}
+      <section className="sim-home-hero">
+        <div className="sim-home-media" aria-hidden="true">
+          <SimHero setup={s} fill />
+          <div className="sim-home-scrim" />
+        </div>
+        <div className="sim-home-hero-body px-4 sm:px-6 lg:px-10 xl:px-16">
+          <p className="m-0 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(241,244,250,.86)' }}>
+            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#34D399]" />On the water now
+            <span className="hidden font-medium normal-case tracking-normal sm:inline" style={{ color: 'rgba(241,244,250,.72)' }}>· AI skippers racing in the conditions you've set</span>
+          </p>
+          <h1 className="sim-home-title">Sailing Academy</h1>
+          <p className="sim-home-sub">Race skippers who sail like real radio sailors, on your own water, with Alfie coaching from the bank.</p>
+        </div>
+      </section>
+
+      <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
+        {/* ── Race set-up ── */}
+        <section className="sim-set-card" aria-labelledby="qr-title">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pb-4 pt-5 sm:px-6">
+            <div className="min-w-[220px] flex-1">
+              <h2 id="qr-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your race</h2>
+              <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>About {minutes(s)} minutes. Sail it with the keyboard, touch or a USB transmitter.</p>
             </div>
-            <div className="max-w-[640px]">
-              <h1 className="m-0 font-display text-[clamp(34px,4.6vw,60px)] font-extrabold leading-[1.02] tracking-[-0.03em]">Sailing Academy</h1>
-              <p className="m-0 mt-3 max-w-[520px] text-[clamp(15px,1.25vw,18px)] leading-snug" style={{ color: 'rgba(241,244,250,.86)' }}>
-                Race skippers who sail like real radio sailors, on your own water, with Alfie coaching from the bank.
-              </p>
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <button type="button" onClick={() => onStart('race', s)}
-                  className="inline-flex h-[54px] cursor-pointer items-center gap-3 rounded-2xl border-0 bg-gradient-to-b from-[#3D8BFF] to-[#1E6CFF] px-7 font-display text-[18px] font-bold text-white shadow-[0_10px_30px_rgba(30,108,255,0.5),inset_0_1px_0_rgba(255,255,255,0.3)] transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
-                  Start race
-                </button>
-                <button type="button" onClick={surprise}
-                  className="inline-flex h-[54px] cursor-pointer items-center rounded-2xl border border-white/20 bg-[rgba(6,11,22,0.55)] px-5 text-[15px] font-semibold text-white backdrop-blur-[8px] transition-colors hover:bg-[rgba(6,11,22,0.8)]">
-                  Surprise me
-                </button>
-              </div>
-              <p className="m-0 mt-4 flex flex-wrap gap-x-2 gap-y-1 text-[13px] font-medium" style={{ color: 'rgba(241,244,250,.82)' }}>
-                {summary.map((x, k) => <span key={x} className="inline-flex items-center gap-2">{k > 0 && <span aria-hidden="true" className="opacity-50">·</span>}{x}</span>)}
-              </p>
+            <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+              <button type="button" onClick={surprise} className="sim-btn-lg flex-1 sm:flex-none">Surprise me</button>
+              <button type="button" onClick={() => onStart('race', s)} className="sim-btn-lg sim-btn-go flex-1 sm:flex-none">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
+                Start race
+              </button>
             </div>
           </div>
-        </SimHero>
+          <div className="sim-set-groups">
+            <SetupGroup title="Water and wind">
+              <SetupRow icon="venue" label="Where" value={venue ? venue.short : 'Practice pond'} sub={venue ? windDirName : 'Sheltered, tree-lined'} onClick={() => setPick('venue')} />
+              <SetupRow icon="wind" label="Wind" value={strengthName} sub={CHARACTER[s.windCharacter][0]} onClick={() => setPick('wind')} />
+              <SetupRow icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
+            </SetupGroup>
+            <SetupGroup title="Boat and fleet">
+              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'} onClick={() => setPick('boat')} />
+              <SetupRow icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
+              <SetupRow icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
+            </SetupGroup>
+            <SetupGroup title="The race">
+              <SetupRow icon="course" label="Course" value={`${s.laps} lap${s.laps > 1 ? 's' : ''}, ${s.length}`} sub="Windward–leeward, gate" onClick={() => setPick('course')} />
+              <SetupRow icon="start" label="Start" value={startName} sub={startSeq ? (startSeq.club ? "Your club's sequence" : 'StartBox sequence') : 'Called by the simulator'} onClick={() => setPick('start')} />
+              <SetupRow icon="aids" label="Coaching" value={`Alfie: ${s.coach === 'full' ? 'full' : s.coach === 'hints' ? 'hints' : 'off'}`} sub={`${s.autoTrim ? 'Auto-trim' : 'Sails on your stick'}, ${s.view === 'bank' ? 'bank view' : 'from above'}`} onClick={() => setPick('aids')} />
+            </SetupGroup>
+          </div>
+        </section>
 
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,26vw)]">
           <div className="flex min-w-0 flex-col gap-6">
-            {/* ── Race set-up ── */}
-            <section className="flex flex-col gap-3.5" aria-labelledby="qr-title">
+            {/* ── Training ── */}
+            <section className="flex flex-col gap-4" aria-labelledby="train-title">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-0 flex-1">
-                  <h2 id="qr-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Your race</h2>
-                  <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Tap anything to change it. Every skipper in the fleet has a game plan, a personality and the rules in their head.</p>
-                </div>
-                <span className="hidden text-[12.5px] md:inline" style={{ color: C.mute }}>About {minutes(s)} minutes · keyboard, touch or a USB transmitter</span>
-              </div>
-              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(176px, 46%), 1fr))' }}>
-                <SetupTile icon="venue" label="Where" value={venue ? venue.short : 'Practice pond'} sub={venue ? windDirName : 'Sheltered, tree-lined'} onClick={() => setPick('venue')} />
-                <SetupTile icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'} onClick={() => setPick('boat')} />
-                <SetupTile icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
-                <SetupTile icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
-                <SetupTile icon="wind" label="Wind" value={strengthName} sub={CHARACTER[s.windCharacter][0]} onClick={() => setPick('wind')} />
-                <SetupTile icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
-                <SetupTile icon="course" label="Course" value={`${s.laps} lap${s.laps > 1 ? 's' : ''} · ${s.length}`} sub="Windward–leeward, gate" onClick={() => setPick('course')} />
-                <SetupTile icon="start" label="Start" value={startName} sub={startSeq ? (startSeq.club ? "Your club's sequence" : 'StartBox sequence') : 'Called by the simulator'} onClick={() => setPick('start')} />
-                <SetupTile icon="aids" label="Coaching" value={`Alfie: ${s.coach === 'full' ? 'full' : s.coach === 'hints' ? 'hints' : 'off'}`} sub={`${s.autoTrim ? 'Auto-trim' : 'Sails on your stick'} · ${s.view === 'bank' ? 'bank view' : 'from above'}`} onClick={() => setPick('aids')} />
-              </div>
-            </section>
-
-            {/* ── Sailing Academy ── */}
-            <section className="flex flex-col gap-3.5 rounded-[26px] border border-white/[0.08] bg-gradient-to-br from-[rgba(138,77,255,0.12)] via-[rgba(46,123,255,0.06)] to-transparent p-4 sm:p-6" aria-labelledby="train-title">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(138,77,255,0.22)] text-[#C9B4FF]"><Glyph name="academy" size={24} /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="m-0 text-[11px] font-bold uppercase tracking-[0.12em] text-[#C9B4FF]">Coaching and drills</p>
-                  <h2 id="train-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Your training</h2>
+                  <h2 id="train-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your training</h2>
+                  <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Coaching, drills and the Playbook: learn it here, then take it to the pond.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Chip tone={lic.level ? 'blue' : 'plain'}>Rules licence · level {lic.level} of 6</Chip>
                   <Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} start stars</Chip>
                 </div>
               </div>
-              {onLink && plan.length > 0 && (
-                <div className="flex flex-col gap-3 rounded-[20px] border border-white/10 bg-[rgba(6,11,22,0.55)] p-4">
+              {onLink && plan.length > 0 ? (
+                <div className="flex flex-col gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
                   <div className="flex flex-wrap items-center gap-3">
                     <AlfieOrb size={36} />
                     <div className="min-w-0 flex-1">
@@ -575,11 +579,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     </div>
                     <Chip tone={plan.every(p => p.done) ? 'good' : 'blue'}>{plan.filter(p => p.done).length} of {plan.length} done</Chip>
                   </div>
-                  <ol className="m-0 flex list-none flex-col gap-2 p-0">
+                  <ol className="m-0 flex list-none flex-col p-0">
                     {plan.map((it, i) => {
                       const link = practiceLink(it.link);
                       return (
-                        <li key={`${it.link.kind}:${it.link.id}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5">
+                        <li key={`${it.link.kind}:${it.link.id}`} className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] py-3 last:pb-0">
                           <span aria-hidden="true" className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold', it.done ? 'bg-[rgba(126,226,168,0.18)] text-[#7EE2A8]' : 'bg-white/[0.08]')}>{it.done ? '✓' : i + 1}</span>
                           <span className="min-w-[180px] flex-1">
                             <span className="block text-[14.5px] font-semibold">{link.label.replace(/^(Start Trainer|Scenario): /, '')}</span>
@@ -591,19 +595,17 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     })}
                   </ol>
                 </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
+                  <AlfieOrb size={44} />
+                  <div className="min-w-[200px] flex-1">
+                    <Cap>Alfie's pick for you</Cap>
+                    <p className="m-0 mt-0.5 font-display text-[18px] font-bold leading-tight">{advice.title}</p>
+                    <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>{advice.text}</p>
+                  </div>
+                  <Btn primary onClick={() => onOpen(advice.where)}>Start the session</Btn>
+                </div>
               )}
-              <button type="button" onClick={() => onOpen(advice.where)}
-                className="group flex cursor-pointer flex-wrap items-center gap-4 rounded-[20px] border border-white/10 bg-[rgba(6,11,22,0.55)] p-4 text-left text-[#F1F4FA] transition-colors hover:border-white/25">
-                <AlfieOrb size={44} />
-                <span className="min-w-[200px] flex-1">
-                  <span className="block text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: C.mute }}>Alfie's pick for you</span>
-                  <span className="mt-0.5 block font-display text-[18px] font-bold leading-tight">{advice.title}</span>
-                  <span className="mt-1 block text-[13.5px] leading-snug" style={{ color: C.mute }}>{advice.text}</span>
-                </span>
-                <span className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/10 px-4 text-[14px] font-semibold transition-colors group-hover:bg-white/[0.16]">Start the session
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                </span>
-              </button>
               <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
                 <AcademyCard icon="book" tint="#34D3C8" kicker={`${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
                   progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
