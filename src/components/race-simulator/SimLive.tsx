@@ -3,6 +3,7 @@
 import { useEffect, useReducer, useState } from 'react';
 import { VENUES } from '@/sim/venues';
 import { CLASSES } from '@/sim/classes';
+import { cleanLook } from '@/sim/look';
 import type { LiveRoom, RoomSettings } from './live';
 import { Btn, C, Cap, Chip, cx, Page } from './ui';
 
@@ -91,10 +92,14 @@ export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
               {room.people.map(p => {
                 const sail = s ? p.sails[s.classId] : undefined;
+                const hull = (s ? cleanLook(p.looks?.[s.classId]) : undefined)?.hull;
                 const you = p.key === room.key;
                 return (
                   <li key={p.key} className={cx('flex items-center gap-3 rounded-[14px] px-3.5 py-3', you ? 'bg-[rgba(30,108,255,.12)]' : 'bg-white/[0.035]')}>
-                    <span className="inline-flex h-9 min-w-[44px] items-center justify-center rounded-[10px] bg-white/[0.07] px-2 font-display text-[15px] font-bold tabular-nums">{sail || '—'}</span>
+                    <span className="inline-flex h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-[10px] bg-white/[0.07] px-2 font-display text-[15px] font-bold tabular-nums">
+                      {hull && <span aria-hidden="true" className="h-3 w-3 shrink-0" style={{ borderRadius: '50%', background: hull, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.35)' }} />}
+                      {sail || '—'}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="m-0 truncate text-[14.5px] font-semibold">{p.name}{you && p.id === myId ? ' (you)' : ''}</p>
                       <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{p.host ? 'Opened the room' : 'Joined'}{p.autoTrim ? ' · auto-trim' : ''}</p>

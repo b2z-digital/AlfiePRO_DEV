@@ -54,7 +54,7 @@ describe('Challenges', () => {
     for (let k = 0; k < 1500; k++) { mine.input = { rudder: 0, sheet: 0.6, autoTrim: false }; mine.step(); ghost.step(); }
     expect(ghost.player!.x).toBeCloseTo(leader.player!.x, 6);
     expect(ghost.player!.y).toBeCloseTo(leader.player!.y, 6);
-    expect(ghost.player!.sail).toBe('7');
+    expect(ghost.player!.sail).toBe('07');
     expect(ghost.player!.name).toBe('Lee D');
   }, 60000);
 });

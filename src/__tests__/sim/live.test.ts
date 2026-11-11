@@ -68,9 +68,9 @@ const state = (r: Race) => r.boats.map(b => [b.x, b.y, b.hdg, b.spd, b.heel, b.l
 describe('Live races', () => {
   it('seats the crew in the first boats with their own numbers, the AI boats clear of them', () => {
     const r = new Race({ ...base, seat: 1 });
-    expect(r.boats.slice(0, 3).map(b => [b.name, b.sail, b.human])).toEqual([['Ann', '12', true], ['Ben', '13', true], ['Cal', '7', true]]);
+    expect(r.boats.slice(0, 3).map(b => [b.name, b.sail, b.human])).toEqual([['Ann', '12', true], ['Ben', '112', true], ['Cal', '07', true]]);
     expect(r.player?.name).toBe('Ben');
-    expect(r.boats.slice(3).every(b => !b.human && !['12', '13', '7'].includes(b.sail))).toBe(true);
+    expect(r.boats.slice(3).every(b => !b.human && !['12', '112', '07'].includes(b.sail))).toBe(true);
     expect(r.live).toBe(true);
   });
 

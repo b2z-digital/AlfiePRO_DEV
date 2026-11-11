@@ -23,7 +23,7 @@ export interface RaceSettings {
    *  set: the club's own control area. */
   venueSpot?: [number, number];
   /** Who's sailing: the member's name and their sail number in this class (from their boats). */
-  player?: { name: string; sail: string };
+  player?: { name: string; sail: string; /** How they've finished their boat (Design your yacht). */ look?: BoatLook };
   /** A live race: everyone racing from their own device, in seat order. Each sails one of the boats. */
   crew?: CrewMember[];
   /** Which seat in the crew is sailing on this device. */
@@ -59,6 +59,24 @@ export interface CrewMember {
   sail: string;
   /** Their sail trims itself (each person's own choice, the same on every device). */
   autoTrim?: boolean;
+  /** How they've finished their boat. */
+  look?: BoatLook;
+}
+
+/**
+ * How a boat is finished: her colours, and the patches at the corners of her sails. Looks only:
+ * nothing here changes how she sails, and it never reaches the engine's sums.
+ */
+export interface BoatLook {
+  hull: string;
+  /** The tape up the front edge of the jib: the one strip of colour a sail carries. (Nothing down the back edge of either sail: real ones don't have it.) */
+  jibLuff: string;
+  /** Corner patches, at the foot corners and the head: plain, or fingers fanned out from the corner; in one colour, or two taking turn about. */
+  patch: { style: 'solid' | 'fingers'; one: string; two: string | null };
+  /** The patches over the hatches in her deck. */
+  deckPatch?: string;
+  /** The country letters under the sail number. */
+  country?: string;
 }
 
 /**
@@ -104,6 +122,8 @@ export interface Boat {
   human?: boolean;
   cls: ClassDef;
   persona?: Persona;
+  /** Her own finish, when her skipper has designed one (the player, or someone in a live race). */
+  look?: BoatLook;
 
   // dynamics
   x: number; y: number;

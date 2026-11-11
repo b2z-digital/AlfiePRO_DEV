@@ -4,6 +4,7 @@
 // in 3D, heeled to the wind and moving on the waves, with mainsail and jib set to her sheet.
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
+import { DEFAULT_LOOK } from '@/sim/look';
 import { DEG, dir, n180 } from '@/sim/math';
 import { seaLevel } from '@/sim/sea';
 import type { WorldOverlay } from '@/sim/scene';
@@ -403,7 +404,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   if (v.ghost && v.back === 0) {
     const g = v.ghost.b, d = V.depth(g.x, g.y);
     if (d > 0.7) {
-      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd, g.heel), color: '#E8F1FF', tape: '#B9C7DA', deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
+      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd, g.heel), color: '#E8F1FF', luffTape: '#B9C7DA', patch: null, deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
       items.push({ z: d, draw: () => {
         const { top } = drawBoat3d(ctx, pose, o);
         label(ctx, v.ghost!.label, top.x, top.y - 10, 'rgba(232,241,255,0.75)', 11.5, 600);
@@ -437,8 +438,18 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   if (race.venue && v.credit !== false) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
 }
 
-/** Hull tape and deck colours that go with a hull colour. */
-function trim(color: string): { tape: string; deck: string } {
+/**
+ * The corner patches of a boat whose skipper hasn't designed her own: every sail has them, in her
+ * hull colour, some plain and some fingers, some with black or white between (by her sail number,
+ * so she always looks the same).
+ */
+function fleetPatch(b: Boat): NonNullable<Pose['patch']> {
+  const n = parseInt(b.sail, 10) || 0;
+  return { style: n % 3 === 0 ? 'solid' : 'fingers', one: b.color, two: n % 4 === 1 ? '#1B2330' : n % 4 === 3 ? '#FFFFFF' : null };
+}
+
+/** The jib luff tape and deck colours that go with a hull colour. */
+export function trim(color: string): { tape: string; deck: string } {
   const n = parseInt(color.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   const light = 0.299 * r + 0.587 * g + 0.114 * b > 200;
@@ -459,8 +470,12 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
     // Diving, she pivots about a point well forward: the bow goes under a little and the stern lifts a lot.
     heel, pitch: live ? b.pitch : 0, heave: live ? Math.sin(-b.pitch * DEG) * b.cls.loa * 0.2 : 0, dive: live ? b.dive : 0,
     sd: set.sd, boom: set.boom, jib: set.jib, luff: set.luff,
-    color: b.color, tape: b.isPlayer ? '#2A93FF' : t.tape, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
-    sail: b.sail, country: 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
+    color: b.color, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
+    // Her own finish when she has one; your boat before you've designed her is the blue she always was.
+    ...(b.look ? { luffTape: b.look.jibLuff, patch: b.look.patch, hatch: b.look.deckPatch }
+      : b.isPlayer ? { luffTape: DEFAULT_LOOK.jibLuff, patch: DEFAULT_LOOK.patch }
+        : { luffTape: t.tape, patch: fleetPatch(b) }),
+    sail: b.sail, country: b.look?.country ?? 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
   };
   return onWaves(p, race.sea, race.t);
 }

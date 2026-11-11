@@ -2,6 +2,7 @@
 // step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
 // collisions → start/rounding/finish progress → referee → recording.
 
+import { cleanLook, clearOf, sailNumber } from './look';
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, ownLevel, sharpStarter, strengthsFor } from './ai';
 import { CLASSES, RIG_POWER, bestSheet, iomRig, overpowerEase, rigDrive, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
@@ -188,17 +189,15 @@ export class Race implements AiHost {
     // Numbers are drawn as if the player were 01, so the rest of the race (positions, personas)
     // comes out the same whatever her real number: everyone in a challenge sails the same race.
     // Then she gets her own, and an AI boat that drew it takes 01, which no AI boat ever draws.
-    const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? s.player.sail : '01';
+    const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? sailNumber(s.player.sail) : '01';
     // A live race: the crew take the first boats, in seat order, with their own numbers (two people
-    // with the same number: the later one gets the next free one). The AI boats keep clear of them.
+    // with the same two digits: the later one carries a 1 in front). The AI boats keep clear of them.
     const crew = s.crew && s.crew.length ? s.crew.slice(0, n) : null;
     const crewSails: string[] = [];
     if (crew) {
       const taken = new Set<string>();
       crew.forEach((m, k) => {
-        let sail = /^\d{1,4}$/.test(m.sail) ? m.sail : String(k + 1).padStart(2, '0');
-        let num = Number(sail);
-        while (taken.has(sail)) { num = (num + 1) % 10000; sail = String(num).padStart(2, '0'); }
+        const sail = clearOf(/^\d{1,4}$/.test(m.sail) ? sailNumber(m.sail) : String(k + 1).padStart(2, '0'), taken);
         taken.add(sail);
         crewSails.push(sail);
       });
@@ -227,12 +226,14 @@ export class Race implements AiHost {
       const p = { x: c.origin.x + c.up.x * along + c.right.x * across, y: c.origin.y + c.up.y * along + c.right.y * across };
       const hdg = n360(c.axis + (near ? -95 : 95) + this.rng.range(-8, 8));
       const persona = isPlayer || isCrew ? undefined : { ...personas[i % personas.length] };
+      // Her own finish, when her skipper has designed one. (Looks only: the race is the same without it.)
+      const look = cleanLook(isCrew ? crew![i].look : isPlayer ? s.player?.look : undefined);
       // Your own choice of rig for the day (an IOM, on your own): everyone else carries the one for the breeze.
       const kn0 = this.wind.baseTws / KN;
       const own = isPlayer && !crew && cls.id === 'IOM' && s.rig ? s.rig : null;
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
-        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : persona!.name, color: BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona,
+        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : persona!.name, color: look?.hull ?? BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona, look,
         x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: own ? RIG_POWER[own] : rigPower(cls.id, kn0), rig: cls.id === 'IOM' ? own ?? iomRig(kn0) : undefined, rigDrive: own ? rigDrive(own, kn0) : 1, sheetFelt: 0.6, runPower: own ? RIG_POWER[own] : runPower(kn0), dive: 0, pitch: 0,
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,

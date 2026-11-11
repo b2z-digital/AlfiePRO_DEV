@@ -36,6 +36,8 @@ import type { SimSequence } from './startbox';
 import type { OpenRoom } from './live';
 import type { PadInfo } from './transmitter';
 import SimHero from './SimHero';
+import YachtStage from './YachtStage';
+import { lookFor, sailFor, yachtFor, type Yard } from './yacht';
 
 export interface Setup {
   classId: ClassId; fleetSize: number; level: SkipperLevel;
@@ -266,6 +268,23 @@ function RehearseCard({ race, at, onRehearse }: { race: NextRace; at: VenueDef |
 }
 
 // ───────────────────────── The Sailing Academy ─────────────────────────
+/** Your yacht as you've finished her, and the way into the yard to change her. */
+function YachtCard({ yard, cls, me, onDesign }: { yard: Yard; cls: ClassId; me: SimIdentity | null; onDesign: () => void }) {
+  const y = yachtFor(yard, cls), look = lookFor(yard, cls), sail = sailFor(yard, cls, me).sail;
+  return (
+    <section className="relative flex flex-col overflow-hidden sim-card" aria-labelledby="yacht-title">
+      <YachtStage still className="block aspect-[16/10] w-full" cls={cls} look={look} sail={sail} inset={{ bottom: 8 }} />
+      <div className="flex flex-wrap items-center gap-3 p-4 sm:p-5">
+        <div className="min-w-0 flex-1">
+          <h2 id="yacht-title" className="sim-h3">{y ? y.name : 'Your yacht'}</h2>
+          <p className="m-0 mt-0.5 text-[13.5px]" style={{ color: C.mute }}>{CLASS_LABEL[cls]} · {look.country ?? 'AUS'} {sail}{yard.yachts.length > 1 ? ` · ${yard.yachts.length} yachts saved` : ''}</p>
+        </div>
+        <Btn primary onClick={onDesign}>{y ? 'Your yachts' : 'Design your yacht'}</Btn>
+      </div>
+    </section>
+  );
+}
+
 function AcademyCard({ icon, kicker, title, text, progress, progressText, action, actionLabel, tint }: {
   icon: keyof typeof GLYPH; kicker: string; title: string; text: string; progress: number; progressText: string; action: () => void; actionLabel: string; tint: string;
 }) {
@@ -414,9 +433,11 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
+  /** The boats you've designed (Design your yacht). */
+  yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
   onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -713,6 +734,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           {/* ── You ── */}
           <aside className="flex min-w-0 flex-col gap-5">
             {next && <RehearseCard {...next} race={next.race} />}
+            <YachtCard yard={yard} cls={s.classId} me={me} onDesign={() => onOpen('yacht')} />
             <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="pf-title">
               <div className="flex items-center gap-3">
                 <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>
@@ -889,8 +911,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       {pick === 'boat' && (
         <Sheet icon="boat" title="Your boat" text="The whole fleet sails the same class." onClose={closePick}>
           <Opts>
-            {(['IOM', 'DF95', 'DF65', '10R', 'M'] as ClassId[]).map(c => <Opt key={c} on={s.classId === c} onClick={() => set({ classId: c })} title={CLASS_LABEL[c]} text={CLASS_TEXT[c]} badge={me?.sails[c] ? `Sail ${me.sails[c]}` : undefined} />)}
+            {(['IOM', 'DF95', 'DF65', '10R', 'M'] as ClassId[]).map(c => <Opt key={c} on={s.classId === c} onClick={() => set({ classId: c })} title={CLASS_LABEL[c]} text={CLASS_TEXT[c]} badge={sailFor(yard, c, me).from !== 'none' ? `Sail ${sailFor(yard, c, me).sail}` : undefined} />)}
           </Opts>
+          <div className="flex flex-wrap items-center gap-3">
+            <Btn onClick={() => { closePick(); onOpen('yacht'); }}>Design your yacht</Btn>
+            <span className="text-[13px]" style={{ color: C.mute }}>Her hull colour, sail tapes, corner patches and number.</span>
+          </div>
           {s.classId === 'IOM' && (
             <>
               <Opts label="Your rig for the day" cols={4}>
