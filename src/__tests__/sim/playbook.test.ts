@@ -1,7 +1,8 @@
 // The Playbook: every play is complete and points at practice that exists.
 import { describe, expect, it } from 'vitest';
+import { buildScene } from '@/sim/scene';
 import { DRILLS, LAB, MODULES } from '@/sim/training';
-import { CHAPTERS, PLAYS, READING, playsFor } from '@/components/race-simulator/playbook';
+import { CHAPTERS, PLAYS, READING, playsFor, playPicture } from '@/components/race-simulator/playbook';
 import { CAUSES } from '@/components/race-simulator/ledger';
 
 const exists = (l: { kind: string; id: string }) => {
@@ -40,4 +41,26 @@ describe('The Playbook', () => {
   it('says where to read more', () => {
     expect(READING.length).toBeGreaterThanOrEqual(4);
   });
+});
+
+describe('The picture for each play', () => {
+  it('every play with a drill or scenario Alfie can sail has one, and it runs on the engine', () => {
+    let n = 0;
+    for (const p of PLAYS) {
+      const pic = playPicture(p);
+      const sailable = p.practise.some(l => l.kind !== 'lesson');
+      if (!sailable) { expect(pic, p.id).toBeNull(); continue; }
+      expect(pic, p.id).not.toBeNull();
+      expect(pic!.seconds, p.id).toBeGreaterThanOrEqual(8);
+      expect(pic!.seconds, p.id).toBeLessThanOrEqual(120);
+      const { race } = buildScene(pic!.scene, pic!.seed, pic!.plan);
+      const from = race.boats.map(b => ({ x: b.x, y: b.y }));
+      for (let k = 0; k < pic!.seconds * 20; k++) race.step();
+      // Something happens in it: the boat you'd be sailing moves.
+      const me = race.player ?? race.boats[0], i = race.boats.indexOf(me);
+      expect(Math.hypot(me.x - from[i].x, me.y - from[i].y), p.id).toBeGreaterThan(me.cls.loa);
+      n++;
+    }
+    expect(n).toBeGreaterThanOrEqual(24);
+  }, 180000);
 });
