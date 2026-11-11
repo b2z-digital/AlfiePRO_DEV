@@ -265,7 +265,9 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     const id = window.setTimeout(() => setBanner(b => (b === banner ? null : b)), 9000);
     return () => window.clearTimeout(id);
   }, [banner]);
-  useEffect(() => () => audio.stop(), [audio]);
+  useEffect(() => () => audio.dispose(), [audio]);
+  // Said once, if the browser reports it can't speak: so a silent coach isn't a mystery.
+  const voiceWarned = useRef(false);
 
   const toast = useCallback((text: string, tone: Toast['tone'] = 'plain') => {
     const id = ++R.current.toastId;
@@ -325,7 +327,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         }
         case 'hail': {
           const b = race.boatById(e.boat);
-          if (p && b !== p && dist(b, p) < 8 * p.cls.loa) audio.say(e.text, true);
+          if (p && b !== p && dist(b, p) < 8 * p.cls.loa) audio.hail(e.text);
           else if (live && p && b === p) audio.say(e.text.replace(/!/g, ''), true);
           break;
         }
@@ -601,6 +603,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           kn: (p ? p.tws : race.wind.meanTws(race.t)) / KN, fast: p ? p.spd / p.cls.hullSpeed : 0, sea: !race.sea ? 0 : race.sea.kind === 'rough' ? 1 : 0.5,
           running: live ? !st.ended : !st.paused && !st.replay && !st.ended && !race.replaying, muted: audio.muted,
         });
+        if (audio.problem && !voiceWarned.current && st.coach === 'full' && !audio.muted) {
+          voiceWarned.current = true;
+          toast(`Alfie's voice isn't working in this browser (${audio.problem === 'not-allowed' ? 'it needs a tap or key press first' : audio.problem}). His written coaching carries on.`, 'warn');
+        }
         if (p && scene?.watch) {
           // Watching it sailed the right way: Alfie says what the sticks are doing, as they do it
           // (and aloud, in Full coaching).
