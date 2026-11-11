@@ -404,7 +404,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   if (v.ghost && v.back === 0) {
     const g = v.ghost.b, d = V.depth(g.x, g.y);
     if (d > 0.7) {
-      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd, g.heel), color: '#E8F1FF', tape: '#B9C7DA', luffTape: '#B9C7DA', patch: null, deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
+      const pose = { ...poseOf(v.ghost.race, g, g.x, g.y, g.hdg, g.spd, g.heel), color: '#E8F1FF', luffTape: '#B9C7DA', patch: null, deck: '#E8F1FF', ink: '#5A6B85', alpha: 0.42, isPlayer: false };
       items.push({ z: d, draw: () => {
         const { top } = drawBoat3d(ctx, pose, o);
         label(ctx, v.ghost!.label, top.x, top.y - 10, 'rgba(232,241,255,0.75)', 11.5, 600);
@@ -448,7 +448,7 @@ function fleetPatch(b: Boat): NonNullable<Pose['patch']> {
   return { style: n % 3 === 0 ? 'solid' : 'fingers', one: b.color, two: n % 4 === 1 ? '#1B2330' : n % 4 === 3 ? '#FFFFFF' : null };
 }
 
-/** Hull tape and deck colours that go with a hull colour. */
+/** The jib luff tape and deck colours that go with a hull colour. */
 export function trim(color: string): { tape: string; deck: string } {
   const n = parseInt(color.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
@@ -472,9 +472,9 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
     sd: set.sd, boom: set.boom, jib: set.jib, luff: set.luff,
     color: b.color, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
     // Her own finish when she has one; your boat before you've designed her is the blue she always was.
-    ...(b.look ? { tape: b.look.leech, luffTape: b.look.jibLuff, patch: b.look.patch, hatch: b.look.deckPatch }
-      : b.isPlayer ? { tape: DEFAULT_LOOK.leech, luffTape: DEFAULT_LOOK.jibLuff, patch: DEFAULT_LOOK.patch }
-        : { tape: t.tape, luffTape: t.tape, patch: fleetPatch(b) }),
+    ...(b.look ? { luffTape: b.look.jibLuff, patch: b.look.patch, hatch: b.look.deckPatch }
+      : b.isPlayer ? { luffTape: DEFAULT_LOOK.jibLuff, patch: DEFAULT_LOOK.patch }
+        : { luffTape: t.tape, patch: fleetPatch(b) }),
     sail: b.sail, country: b.look?.country ?? 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
   };
   return onWaves(p, race.sea, race.t);

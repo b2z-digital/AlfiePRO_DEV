@@ -1,6 +1,6 @@
 // Design your yacht: your boat on the water in front of you, your saved yachts down one side and
 // the paint locker down the other. Start a new one, name her, pick her class, then her hull and
-// deck patches, the tapes on her sails, the patches at their corners and her number. Every change
+// deck patches, the tape up her jib, the patches at the corners of her sails and her number. Every change
 // is on the boat as you make it and saved as you go; the one you race in each class is yours to pick.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CLASSES, type ClassId } from '@/sim/classes';
@@ -13,7 +13,7 @@ import YachtStage, { type StagePart } from './YachtStage';
 const CLASS_ORDER: ClassId[] = ['IOM', '10R', 'M', 'DF95', 'DF65'];
 const CLASS_NOTE: Record<ClassId, string> = { IOM: 'One Metre', '10R': 'Ten Rater', M: 'Marblehead', DF95: 'DragonFlite 95', DF65: 'DragonForce 65' };
 type Part = 'boat' | Exclude<StagePart, 'all'>;
-const PARTS: { id: Part; label: string }[] = [{ id: 'boat', label: 'Boat' }, { id: 'hull', label: 'Hull' }, { id: 'tapes', label: 'Tapes' }, { id: 'patches', label: 'Patches' }, { id: 'number', label: 'Number' }];
+const PARTS: { id: Part; label: string }[] = [{ id: 'boat', label: 'Boat' }, { id: 'hull', label: 'Hull' }, { id: 'tapes', label: 'Jib tape' }, { id: 'patches', label: 'Patches' }, { id: 'number', label: 'Number' }];
 
 /** A pot of paint: round, glossy, ringed when it's the one in use. */
 function Pot({ paint, on, onPick, size = 44 }: { paint: Paint | null; on: boolean; onPick: () => void; size?: number }) {
@@ -76,12 +76,12 @@ function StyleCard({ on, label, note, onPick, children }: { on: boolean; label: 
   );
 }
 
-/** Keys for a sail number: up to four digits, no keyboard needed. */
+/** Keys for a sail number: two digits, as the sail carries them. No keyboard needed. */
 function NumberPad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const press = (k: string) => {
     if (k === 'del') onChange(value.slice(0, -1));
     else if (k === 'clr') onChange('');
-    else if (value.length < 4) onChange(value === '0' ? k : value + k);
+    else if (value.length < 2) onChange(value + k);
   };
   const key = 'h-12 cursor-pointer rounded-xl border border-white/12 bg-white/[0.06] font-display text-[20px] font-bold text-[#F1F4FA] transition-colors hover:bg-white/[0.14] active:bg-[rgba(46,123,255,0.35)]';
   return (
@@ -250,8 +250,7 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
       {part === 'tapes' && (
         <>
           <Shelf label="Jib luff tape" paints={SAIL_COLOURS} value={yacht.jibLuff} onPick={h => h && set({ jibLuff: h })} />
-          <Shelf label="Leech tape" paints={SAIL_COLOURS} value={yacht.leech} none="None" onPick={h => set({ leech: h })} />
-          <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>The luff tape runs up the front of the jib. The leech tape edges the back of both sails: plenty of boats sail without it.</p>
+          <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>The tape up the front of the jib: the one strip of colour on her sails.</p>
         </>
       )}
 
@@ -260,7 +259,7 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
           <div className="flex flex-col gap-2.5">
             <Cap>Style</Cap>
             <div className="flex gap-2.5">
-              <StyleCard on={yacht.patch.style === 'fingers'} label="Fingers" note="Fanned out from each corner" onPick={() => set({ patch: { ...yacht.patch, style: 'fingers' } })}>
+              <StyleCard on={yacht.patch.style === 'fingers'} label="Fingers" note="Fanned out from each corner, foot and head" onPick={() => set({ patch: { ...yacht.patch, style: 'fingers' } })}>
                 <PatchPicture style="fingers" one={yacht.patch.one} two={yacht.patch.two} />
               </StyleCard>
               <StyleCard on={yacht.patch.style === 'solid'} label="Plain" note="A solid corner patch" onPick={() => set({ patch: { ...yacht.patch, style: 'solid' } })}>

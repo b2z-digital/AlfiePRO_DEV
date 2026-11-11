@@ -7,7 +7,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const hex = (v: unknown, fallback: string): string => (typeof v === 'string' && HEX.test(v) ? v.toUpperCase() : fallback);
 
 /** The player's boat before anyone has designed one: the blue she has always been. */
-export const DEFAULT_LOOK: BoatLook = { hull: '#2A93FF', jibLuff: '#2A93FF', leech: '#2A93FF', patch: { style: 'fingers', one: '#2A93FF', two: null }, deckPatch: '#262C36', country: 'AUS' };
+export const DEFAULT_LOOK: BoatLook = { hull: '#2A93FF', jibLuff: '#2A93FF', patch: { style: 'fingers', one: '#2A93FF', two: null }, deckPatch: '#262C36', country: 'AUS' };
 
 /** A look with every part valid (a missing or bad part takes the default's), or undefined for nothing usable. */
 export function cleanLook(x: unknown, base: BoatLook = DEFAULT_LOOK): BoatLook | undefined {
@@ -20,9 +20,28 @@ export function cleanLook(x: unknown, base: BoatLook = DEFAULT_LOOK): BoatLook |
   return {
     hull: hex(o.hull, base.hull),
     jibLuff: hex(o.jibLuff, base.jibLuff),
-    leech: o.leech === null ? null : hex(o.leech, base.leech ?? base.jibLuff),
     patch: { style: p.style === 'solid' ? 'solid' : 'fingers', one, two },
     deckPatch: hex(o.deckPatch, base.deckPatch ?? '#262C36'),
     country: country.length === 3 ? country : base.country,
   };
+}
+
+/**
+ * The number a radio yacht carries on her sails: the last two digits of her registered (or her
+ * skipper's personal) number, with a 0 in front of a single digit. "123" and "AUS 2023" both sail
+ * as 23; "7" as 07.
+ */
+export function sailNumber(raw: string): string {
+  return raw.replace(/\D/g, '').slice(-2).padStart(2, '0');
+}
+
+/**
+ * Two boats in one race with the same two digits: the later one carries a 1 in front of hers (the
+ * space for it is left on every sail), then a 2, and so on.
+ */
+export function clearOf(sail: string, taken: ReadonlySet<string>): string {
+  let s = sail;
+  for (let pre = 1; taken.has(s) && pre <= 9; pre++) s = String(pre) + sail.slice(-2);
+  for (let n = 2; taken.has(s); n++) s = String(n).padStart(2, '0');
+  return s;
 }

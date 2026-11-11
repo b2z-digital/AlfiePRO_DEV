@@ -69,11 +69,9 @@ export interface CrewMember {
  */
 export interface BoatLook {
   hull: string;
-  /** The tape up the front edge of the jib. */
+  /** The tape up the front edge of the jib: the one strip of colour a sail carries. (Nothing down the back edge of either sail: real ones don't have it.) */
   jibLuff: string;
-  /** The tape down the back edge of both sails (null: bare film). */
-  leech: string | null;
-  /** Corner patches: plain, or fingers fanned out from the corner; in one colour, or two taking turn about. */
+  /** Corner patches, at the foot corners and the head: plain, or fingers fanned out from the corner; in one colour, or two taking turn about. */
   patch: { style: 'solid' | 'fingers'; one: string; two: string | null };
   /** The patches over the hatches in her deck. */
   deckPatch?: string;

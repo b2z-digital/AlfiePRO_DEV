@@ -10,11 +10,12 @@ const base: RaceSettings = {
 };
 
 describe('Sailing as yourself', () => {
-  it('reads sail numbers the way clubs write them', () => {
-    expect(sailDigits('AUS 123')).toBe('123');
+  it('reads a sail number the way it goes on the sail: the last two digits', () => {
+    expect(sailDigits('AUS 123')).toBe('23');
     expect(sailDigits('7')).toBe('07');
     expect(sailDigits('0042')).toBe('42');
-    expect(sailDigits('AUS-2024')).toBe('2024');
+    expect(sailDigits('AUS-2024')).toBe('24');
+    expect(sailDigits('100')).toBe('00');
     expect(sailDigits('')).toBeNull();
     expect(sailDigits('123456')).toBeNull();
   });

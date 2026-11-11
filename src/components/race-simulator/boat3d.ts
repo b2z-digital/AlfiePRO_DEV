@@ -40,7 +40,7 @@ function fromTable(fx: number[], hb: number[], dez: number[], cz: number[], low:
   return fx.map((f, i) => ({ fx: f, lowHw: low[i][0] * half, lowZ: low[i][1], mbHw: hb[i] * half, mbZ: dez[i] * 0.45, deHw: hb[i] * half * 0.985, deZ: dez[i], crownZ: cz[i] }));
 }
 
-const IOM_A: Rig = { mastX: 0.04, mastH: 1.72, boomH: 0.06, mainLuff: 1.6, boom: 0.355, roach: 0.59, head: 0.02, jibX: 0.45, jibGap: 0.025, hounds: 1.28, jibLuff: 1.325, jibFoot: 0.38, jibHead: 0.02, num: 110, mainBattens: [0.25, 0.5, 0.75], jibBattens: [0.33, 0.67] };
+const IOM_A: Rig = { mastX: 0.04, mastH: 1.72, boomH: 0.03, mainLuff: 1.6, boom: 0.355, roach: 0.59, head: 0.02, jibX: 0.45, jibGap: 0.025, hounds: 1.28, jibLuff: 1.325, jibFoot: 0.38, jibHead: 0.02, num: 110, mainBattens: [0.25, 0.5, 0.75], jibBattens: [0.33, 0.67] };
 const scaleRig = (r: Rig, k: number, kx = k): Rig => ({ ...r, mastH: r.mastH * k, boomH: r.boomH * k, mainLuff: r.mainLuff * k, boom: r.boom * k, head: r.head * k, hounds: r.hounds * k, jibLuff: r.jibLuff * k, jibFoot: r.jibFoot * k, jibHead: r.jibHead * k, num: r.num * Math.sqrt(k), jibGap: r.jibGap * kx });
 
 const MODELS: Record<ClassId, Model> = {
@@ -60,7 +60,7 @@ const MODELS: Record<ClassId, Model> = {
       [0.096, 0.093, 0.09, 0.087, 0.084, 0.081, 0.078, 0.074, 0.07, 0.066, 0.062, 0.058, 0.055, 0.052, 0.05],
       [0.1, 0.108, 0.112, 0.112, 0.111, 0.108, 0.104, 0.096, 0.086, 0.077, 0.07, 0.064, 0.059, 0.055, 0.052],
       [[0.004, 0.016], [0.03, 0.01], [0.07, 0.004], [0.06, 0.0], [0.6, 0.0], [0.73, 0.0], [0.83, 0.0], [0.93, 0.0], [0.96, 0.0], [0.96, 0.0], [0.92, 0.0], [0.82, 0.0], [0.62, 0.0], [0.5, 0.01], [0.42, 0.02]], 0.09),
-    rigs: { A: { mastX: 0.045, mastH: 2.17, boomH: 0.1, mainLuff: 2.01, boom: 0.45, roach: 0.86, head: 0.06, jibX: 0.27, jibGap: 0.025, hounds: 1.785, jibLuff: 1.485, jibFoot: 0.455, jibHead: 0.02, num: 150, mainBattens: [0.2, 0.4, 0.6, 0.8], jibBattens: [0.33, 0.67] } },
+    rigs: { A: { mastX: 0.045, mastH: 2.17, boomH: 0.045, mainLuff: 2.01, boom: 0.45, roach: 0.86, head: 0.06, jibX: 0.27, jibGap: 0.025, hounds: 1.785, jibLuff: 1.485, jibFoot: 0.455, jibHead: 0.02, num: 150, mainBattens: [0.2, 0.4, 0.6, 0.8], jibBattens: [0.33, 0.67] } },
   },
   M: {
     L: 1.27, beam: 0.16, hatches: [[-0.33, 0.2, 0.5], [0.02, 0.07, 0.4], [0.16, 0.16, 0.55]],
@@ -112,10 +112,10 @@ export interface Pose {
   luff: number;
   /** Running pressed: 0 level, 1 the bow buried (white water over it). */
   dive?: number;
-  /** Hull; the tape down the leech of both sails (null: none); the sail numbers; the deck. */
-  color: string; tape: string | null; ink: string; deck: string;
-  /** The tape up the jib's luff (the leech tape's colour when not given). */
-  luffTape?: string;
+  /** Hull; the sail numbers; the deck. */
+  color: string; ink: string; deck: string;
+  /** The tape up the jib's luff: the one strip of colour on her sails (their back edges are bare film, as on a real boat). */
+  luffTape: string;
   /** The patches at the corners of both sails. */
   patch?: BoatLook['patch'] | null;
   /** The patches over her deck hatches (dark grey when not given). */
@@ -202,7 +202,11 @@ class Geo {
     const deck = deckAt(m, r.mastX);
     let x0: number, y0 = 0, z0: number, x1: number, y1 = 0, z1: number, foot: number, ang: number, roach: number, head: number, twist: number, depth: number, sd: number;
     if (kind === 'main') {
-      x0 = r.mastX * L; z0 = deck + r.boomH; z1 = z0 + r.mainLuff; x1 = x0 - 0.018 * L;
+      x0 = r.mastX * L; z0 = deck + r.boomH; x1 = x0 - 0.018 * L;
+      // The main boom sits low, a couple of centimetres off the deck (as the jib's does), and never
+      // closer than that to the highest point under it.
+      if (!r.swing) for (let u = 0; u <= 6; u++) z0 = Math.max(z0, deckAt(m, (x0 - (r.boom * u) / 6) / L) + 0.02);
+      z1 = z0 + r.mainLuff;
       foot = r.boom; ang = p.boom; roach = r.roach; head = r.head; twist = 11; depth = 0.09 - 0.075 * p.luff; sd = p.sd;
     } else {
       const hx = r.mastX * L, hz = deck + r.hounds;
@@ -241,10 +245,12 @@ class Geo {
 
 /**
  * The patches at a sail's corners, as outlines on the sail's own surface (f up the sail, g along
- * the chord): at the tack and the clew, a plain quarter-round patch or a fan of fingers; at the
- * head, a small band. Colour one, and colour two taking turn about with it when there is one.
+ * the chord): fingers, fanned out from the tack and the clew and hanging side by side from the
+ * head; or plain, a quarter-round patch at each foot corner and a small band at the head. Colour
+ * one, and colour two taking turn about with it when there is one. `chord(f)` is the sail's width
+ * at f of the way up, in metres (the fingers at the head are laid out across it).
  */
-export function patchShapes(patch: NonNullable<Pose['patch']>, foot: number, luffLen: number): { color: string; pts: [number, number][] }[] {
+export function patchShapes(patch: NonNullable<Pose['patch']>, foot: number, luffLen: number, chord: (f: number) => number = f => foot * (1 - f) * 1.5 + 0.02): { color: string; pts: [number, number][] }[] {
   const out: { color: string; pts: [number, number][] }[] = [];
   const r0 = Math.min(0.26 * foot, 0.085 * luffLen);
   const two = patch.two ?? patch.one;
@@ -275,8 +281,100 @@ export function patchShapes(patch: NonNullable<Pose['patch']>, foot: number, luf
       }
     }
   }
-  const h = Math.min(0.04, (0.5 * r0) / luffLen);
-  out.push({ color: patch.one, pts: [[1 - h, 0], [1 - h, 1], [1, 1], [1, 0]] });
+  if (patch.style === 'fingers') {
+    // At the head, three long narrow fingers hanging down from the top, side by side: the one by
+    // the leech the longest, the one by the mast the shortest, each a strip of even width run out
+    // to a round end. (The sail is a thumb's width up there, so they start as one and part as it
+    // widens.)
+    const hw = 0.065 * r0, clamp = (x: number) => Math.max(0, Math.min(1, x));
+    ([[0.78, 1.25], [0.5, 1.05], [0.22, 0.75]] as const).forEach(([c, k], i) => {
+      const len = k * r0, pts: [number, number][] = [];
+      const put = (d: number, off: number) => { const f = 1 - d / luffLen, ch = Math.max(1e-3, chord(f)); pts.push([f, clamp((c * ch + off) / ch)]); };
+      for (let a = 0; a <= 5; a++) put(((len - hw) * a) / 5, -hw);
+      for (let a = 1; a < 8; a++) { const q = (a / 8) * Math.PI; put(len - hw + Math.sin(q) * hw, -Math.cos(q) * hw); }
+      for (let a = 5; a >= 0; a--) put(((len - hw) * a) / 5, hw);
+      out.push({ color: i % 2 ? two : patch.one, pts });
+    });
+  } else {
+    const h = Math.min(0.04, (0.5 * r0) / luffLen);
+    out.push({ color: patch.one, pts: [[1 - h, 0], [1 - h, 1], [1, 1], [1, 0]] });
+  }
+  return out;
+}
+
+/** One identification mark on a sail: which face it is stuck to, what it says, how tall its characters are, the space between them and how far up the luff its middle sits (all in metres). */
+export interface IdMark { what: 'number' | 'letters' | 'insignia'; side: 'stbd' | 'port' | 'both'; text: string; h: number; space: number; z: number }
+
+/** A class's sizes for the marks on her sails (metres). */
+export interface IdSpec {
+  /** Height of the sail numbers; the least they may come down to on a sail too small for them. */
+  num: number; numLow: number;
+  /** Space between neighbouring digits. */
+  space: number;
+  /** Clear height between the number on one side and the number on the other; the least it may close to. */
+  rows: number; rowsMin: number;
+  /** National letters: their height (and the least), the space between neighbours, the clear height between rows (and the least). */
+  letters: number; lettersLow: number; letterSpace: number; letterRows: number; letterRowsMin: number;
+  /** The class mark at the head of the mainsail (plain lettering, standing in for the class's own insignia), and its width where the class rules give one. */
+  mark: string; markWide?: number;
+}
+
+// The IRSA classes sail under the Racing Rules' radio sailing appendix (E8) and the IRSA
+// supplementary class rules: numbers 100 to 110 mm tall and 20 to 30 apart, letters 60 to 70 tall
+// and 13 to 23 apart, 40 mm clear between a line on one side and a line on the other (20 at the
+// least); a small headsail's numbers may come down to between 80 and 90.
+const IRSA_ID = { num: 0.105, numLow: 0.08, space: 0.024, rows: 0.04, rowsMin: 0.02, letters: 0.065, lettersLow: 0.04, letterSpace: 0.016, letterRows: 0.04, letterRowsMin: 0.02 };
+export const SAIL_ID: Record<ClassId, IdSpec> = {
+  IOM: { ...IRSA_ID, mark: 'IOM' }, '10R': { ...IRSA_ID, mark: '10R' }, M: { ...IRSA_ID, mark: 'M' },
+  // The DragonFlite 95 and DragonForce 65 have tables of their own in their class rules (H.9, H.10).
+  DF95: { num: 0.105, numLow: 0.1, space: 0.018, rows: 0.04, rowsMin: 0.02, letters: 0.045, lettersLow: 0.04, letterSpace: 0.009, letterRows: 0.02, letterRowsMin: 0.015, mark: '95', markWide: 0.07 },
+  DF65: { num: 0.092, numLow: 0.085, space: 0.016, rows: 0.03, rowsMin: 0.01, letters: 0.045, lettersLow: 0.04, letterSpace: 0.009, letterRows: 0.02, letterRowsMin: 0.015, mark: '65', markWide: 0.06 },
+};
+/** How wide a digit is for its height (a plain, upright face of Helvetica's proportions), and a 1. */
+export const ID_DIGIT = 0.68, ID_ONE = 0.42;
+
+/**
+ * What a sail carries to identify her, laid out by the rules for identification on sails. Every
+ * sail has her number on both sides: two digits, the starboard side's uppermost and the port
+ * side's clear below it, level, with room left in front for a 1. On the mainsail the numbers sit
+ * above the quarter height, the national letters below them (starboard uppermost again) and the
+ * class mark up at the head, above three-quarter height, back to back.
+ *
+ * Where a sail is too small for all that, the rules give way in their own order: the numbers come
+ * down below the quarter line; the letters close up under the numbers, then on each other, then
+ * shrink, then go; the two rows of numbers close up; and last the numbers themselves come down.
+ *
+ * `chord(f)` is the sail's width at f of the way up the luff, in metres.
+ */
+export function idMarks(cls: ClassId, kind: 'main' | 'jib', luffLen: number, chord: (f: number) => number, sail: string, country?: string, classMark = true): IdMark[] {
+  const R = SAIL_ID[cls], out: IdMark[] = [];
+  const d = sail.replace(/\D/g, '');
+  if (d) {
+    const text = d.length > 2 ? d.slice(-3) : d.padStart(2, '0');
+    // Nothing down among the corner patches along the foot, nor up where the class mark goes.
+    const low = 0.06 * luffLen, top = (kind === 'main' ? 0.72 : 0.8) * luffLen;
+    let h = R.num, rows = R.rows + 0.01;
+    // The foot of the port number: just above the quarter line on a mainsail, a fifth of the way up a jib.
+    let base = kind === 'main' ? 0.25 * luffLen + 0.012 : 0.2 * luffLen;
+    const fits = () => base + 2 * h + rows <= top && 2 * ID_DIGIT * h + R.space + 0.02 <= chord((base + 1.5 * h + rows) / luffLen);
+    if (!fits()) rows = R.rows;
+    while (!fits() && base > low + 0.012) base = Math.max(low + 0.012, base - 0.01);
+    if (!fits()) rows = R.rowsMin;
+    if (!fits()) for (const hh of R.num >= 0.1 && R.numLow < 0.09 ? [0.088, R.numLow] : [R.numLow]) { h = hh; if (fits()) break; }
+    out.push({ what: 'number', side: 'stbd', text, h, space: R.space, z: base + 1.5 * h + rows }, { what: 'number', side: 'port', text, h, space: R.space, z: base + 0.5 * h });
+    if (kind === 'main' && country) {
+      let hl = R.letters, under = R.letterRows, between = R.letterRows;
+      const ok = () => base - under - between - 2 * hl >= low;
+      if (!ok()) under = R.letterRowsMin;
+      if (!ok()) between = R.letterRowsMin;
+      if (!ok()) hl = R.lettersLow;
+      if (ok()) out.push({ what: 'letters', side: 'stbd', text: country, h: hl, space: R.letterSpace, z: base - under - 0.5 * hl }, { what: 'letters', side: 'port', text: country, h: hl, space: R.letterSpace, z: base - under - between - 1.5 * hl });
+    }
+  }
+  if (kind === 'main' && classMark) {
+    const n = R.mark.length, per = n * ID_DIGIT + (n - 1) * 0.2;
+    out.push({ what: 'insignia', side: 'both', text: R.mark, h: Math.min(0.05, (R.markWide ?? 1) / per, (0.8 * chord(0.83)) / per), space: 0, z: 0.83 * luffLen });
+  }
   return out;
 }
 
@@ -355,6 +453,27 @@ function stackOrder<T extends { d: number }>(g: Geo, sails: { kind: 'main' | 'ji
     out.push(left.splice(k, 1)[0]);
   }
   return out;
+}
+
+/**
+ * The ink box of each character at 100 px: left and right of its origin, and its height above the
+ * baseline. Measured, so a mark can be set down at its true size on the sail whatever the typeface.
+ * (Kept for a few seconds only: the web font may not have arrived at the first asking.)
+ */
+let glyphBox = new Map<string, { l: number; r: number; a: number }>(), glyphAt = 0;
+function glyphs(ctx: CanvasRenderingContext2D, chars: string): Map<string, { l: number; r: number; a: number }> {
+  const now = typeof performance !== 'undefined' ? performance.now() : 0;
+  if (now - glyphAt > 4000) { glyphBox = new Map(); glyphAt = now; }
+  let set = false;
+  for (const c of chars) {
+    if (glyphBox.has(c)) continue;
+    if (!set) { ctx.save(); ctx.font = `800 100px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; set = true; }
+    const m = ctx.measureText(c);
+    const l = m.actualBoundingBoxLeft ?? 0, r = m.actualBoundingBoxRight ?? m.width, a = m.actualBoundingBoxAscent || 72;
+    glyphBox.set(c, { l, r: r > -l ? r : m.width, a });
+  }
+  if (set) ctx.restore();
+  return glyphBox;
 }
 
 /** Draw one boat. Returns the screen point above the masthead and at the waterline. */
@@ -483,7 +602,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       poly(ctx, bump); ctx.fill();
     }
   }
-  // Sails: shaded panels, seams, leech tape, battens, numbers, tell-tales.
+  // Sails: shaded panels, seams, the jib's luff tape, corner patches, battens, numbers, tell-tales.
   const sails = (['main', 'jib'] as const).map(kind => {
     const s = g.sail(kind);
     return { kind, ...s, d: o.P(...s.S(0.4, 0.45)).z };
@@ -530,21 +649,21 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       ctx.stroke();
     }
     ctx.lineCap = 'round';
-    if (p.tape) {
-      ctx.strokeStyle = p.tape; ctx.lineWidth = tw * 1.5;
-      ctx.beginPath(); ctx.moveTo(scr[0][ng].x, scr[0][ng].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][ng].x, scr[i][ng].y); ctx.stroke();
-    }
+    // The leech: the bare edge of the film, a fine grey line so the sail has an outline against the water.
+    ctx.strokeStyle = 'rgba(154,163,179,0.7)'; ctx.lineWidth = tw * 0.8;
+    ctx.beginPath(); ctx.moveTo(scr[0][ng].x, scr[0][ng].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][ng].x, scr[i][ng].y); ctx.stroke();
     ctx.strokeStyle = 'rgba(154,163,179,0.7)'; ctx.lineWidth = tw * 0.9;
     ctx.beginPath(); ctx.moveTo(scr[0][0].x, scr[0][0].y); for (let j = 1; j <= ng; j++) ctx.lineTo(scr[0][j].x, scr[0][j].y); ctx.stroke();
-    if (sl.kind === 'jib' && (p.luffTape ?? p.tape)) {
-      ctx.strokeStyle = (p.luffTape ?? p.tape)!; ctx.lineWidth = tw * 1.5;
+    if (sl.kind === 'jib') {
+      ctx.strokeStyle = p.luffTape; ctx.lineWidth = tw * 1.5;
       ctx.beginPath(); ctx.moveTo(scr[0][0].x, scr[0][0].y); for (let i = 1; i <= nf; i++) ctx.lineTo(scr[i][0].x, scr[i][0].y); ctx.stroke();
     }
     // Corner patches (close enough to see them): stuck on the film, so they show from both sides.
     if (p.patch && size > 42) {
       ctx.globalAlpha = p.alpha * 0.94;
       ctx.lineJoin = 'round';
-      for (const sh of patchShapes(p.patch, sl.foot, sl.luffLen)) {
+      const across = (f: number) => { const a = sl.S(f, 0), b = sl.S(f, 1); return Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); };
+      for (const sh of patchShapes(p.patch, sl.foot, sl.luffLen, across)) {
         ctx.fillStyle = sh.color;
         poly(ctx, sh.pts.map(([f, gg]) => o.P(...sl.S(f, gg)))); ctx.fill();
       }
@@ -557,42 +676,72 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       for (const f of bats) { const a = o.P(...sl.S(f, 0.8)), b = o.P(...sl.S(f, 0.99)); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
       ctx.stroke();
     }
-    // Numbers: the starboard side's sit higher than the port side's; the far side shows through, mirrored.
+    // Her number, national letters and class mark, laid out by the rules (see idMarks). Each is stuck
+    // to one face of the sail and reads from that side; from the other it shows through the film,
+    // faint and back to front.
     if (size > 38 && p.sail) {
       const nx = sl.sd * Math.sin(sl.ang * DEG), ny = Math.cos(sl.ang * DEG); // starboard-face normal, boat frame
       const wn = [nx * Math.sin(p.hdg * DEG) + ny * Math.cos(p.hdg * DEG), nx * Math.cos(p.hdg * DEG) - ny * Math.sin(p.hdg * DEG)];
       const cen = sl.S(0.45, 0.45);
       // How squarely each face is turned to you: +1 the starboard face, -1 the port face, 0 edge-on.
-      // The numbers fade out as the sail turns edge-on, so they never flick from one side to the other.
+      // The marks fade out as the sail turns edge-on, so they never flick from one side to the other.
       const toCam = Math.hypot(cen[0] - o.cam[0], cen[1] - o.cam[1]) || 1;
       const face = Math.max(-1, Math.min(1, -(wn[0] * (cen[0] - o.cam[0]) + wn[1] * (cen[1] - o.cam[1])) / toCam / 0.2));
       const stbdVisible = face >= 0;
       const shown = Math.abs(face) * Math.abs(face) * (3 - 2 * Math.abs(face));
-      const spots: [boolean, number, number, string, number][] = sl.kind === 'main'
-        ? [[true, 0.64, 0.47, p.sail, r.num], [false, 0.5, 0.5, p.sail, r.num], ...(size > 70 && p.country ? [[true, 0.35, 0.42, p.country, r.num * 0.5], [false, 0.26, 0.44, p.country, r.num * 0.5]] as [boolean, number, number, string, number][] : [])]
-        : [[true, 0.52, 0.42, p.sail, r.num * 0.9], [false, 0.38, 0.45, p.sail, r.num * 0.9]];
-      for (const [stbd, f, gg, text, mm] of spots) {
-        const vis = stbd === stbdVisible;
-        const O = sl.S(f, gg), U = sl.S(f, Math.min(1, gg + 0.05)), Vv = sl.S(Math.min(1, f + 0.05), gg);
+      const chordAt = (f: number) => { const a = sl.S(f, 0), b = sl.S(f, 1); return Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); };
+      const D = o.dpr;
+      if (shown > 0.02) for (const mk of idMarks(p.cls, sl.kind, sl.luffLen, chordAt, p.sail, size > 70 ? p.country : undefined, size > 70)) {
+        const f = mk.z / sl.luffLen, ch = chordAt(f);
+        const vis = mk.side === 'both' || (mk.side === 'stbd') === stbdVisible;
+        // A mark reads towards the luff on the starboard face and towards the leech on the port face.
+        const toLeech = mk.side === 'both' ? !stbdVisible : mk.side === 'port';
+        // Each character's width and the space between, in millimetres on the sail.
+        const chars = [...mk.text];
+        const g100 = glyphs(ctx, mk.text + '0');
+        const zero = g100.get('0')!, squeeze = Math.min(1, (ID_DIGIT * zero.a) / (zero.l + zero.r));
+        const across = (h: number) => chars.reduce((a, c) => { const m = g100.get(c)!; return a + ((m.l + m.r) * h * squeeze) / zero.a; }, 0) + (mk.what === 'insignia' ? 0.2 * h : mk.space * 1000) * (chars.length - 1);
+        // The class mark is as big as the head of the sail has room for.
+        const hm = mk.h * 1000 * (mk.what === 'insignia' ? Math.min(1, (ch * 700) / across(mk.h * 1000)) : 1);
+        const k = hm / zero.a;
+        const widths = chars.map(c => { const m = g100.get(c)!; return (m.l + m.r) * k * squeeze; });
+        const space = mk.what === 'insignia' ? 0.2 * hm : mk.space * 1000;
+        let wide = across(hm);
+        // A number of two digits keeps the room for a 1 in front of it: the three sit centred on the
+        // sail, and the 1's place stays bare (unless she carries one). Too narrow a sail for that:
+        // the two digits sit in the middle.
+        let lead = 0;
+        if (mk.what === 'number' && chars.length === 2) {
+          const slot = ID_ONE * hm + space;
+          if (wide + slot + 20 <= ch * 1000) lead = slot;
+        }
+        wide += lead;
+        const fitK = Math.min(1, (ch * 1000 - 12) / wide);
+        const O = sl.S(f, 0.5), U = sl.S(f, 0.55), Vv = sl.S(Math.min(1, f + 0.05), 0.5);
         const eu = norm(sub(U, O));
         let ev = norm(sub(Vv, O));
         const kk = dot(ev, eu);
         ev = norm([ev[0] - eu[0] * kk, ev[1] - eu[1] * kk, ev[2] - eu[2] * kk]);
+        const sgn = toLeech ? 1 : -1;
         const p0 = o.P(O[0], O[1], O[2]);
-        const pu = o.P(O[0] + eu[0] * 0.1, O[1] + eu[1] * 0.1, O[2] + eu[2] * 0.1);
+        const pu = o.P(O[0] + eu[0] * 0.1 * sgn, O[1] + eu[1] * 0.1 * sgn, O[2] + eu[2] * 0.1 * sgn);
         const pv = o.P(O[0] + ev[0] * 0.1, O[1] + ev[1] * 0.1, O[2] + ev[2] * 0.1);
-        let ux = (pu.x - p0.x) / 100, uy = (pu.y - p0.y) / 100;
+        const ux = (pu.x - p0.x) / 100, uy = (pu.y - p0.y) / 100;
         const vx = -(pv.x - p0.x) / 100, vy = -(pv.y - p0.y) / 100;
-        if ((ux > 0) !== vis) { ux = -ux; uy = -uy; }
-        const D = o.dpr;
-        ctx.setTransform(ux * D, uy * D, vx * D, vy * D, p0.x * D, p0.y * D);
-        // Three or four digits fit the same space as two.
-        const fit = text === p.sail && text.length > 2 ? (text.length === 3 ? 0.86 : 0.7) : 1;
-        ctx.font = `800 ${mm * fit}px ${FONT}`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = p.ink;
-        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.26) * shown;
-        if (shown > 0.02) ctx.fillText(text, 0, 0);
+        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.22) * shown;
+        ctx.font = `800 100px ${FONT}`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+        let x = (-wide / 2 + lead) * fitK;
+        chars.forEach((c, i) => {
+          const m = g100.get(c)!;
+          // Local millimetres: x along the line of the mark, y down the sail; the character's ink box
+          // is set down exactly on its place, hm tall.
+          ctx.setTransform(ux * D, uy * D, vx * D, vy * D, p0.x * D, p0.y * D);
+          ctx.transform(k * squeeze * fitK, 0, 0, k, x, hm / 2);
+          ctx.fillText(c, m.l, 0);
+          x += (widths[i] + space) * fitK;
+        });
         ctx.setTransform(D, 0, 0, D, 0, 0);
         ctx.globalAlpha = p.alpha;
       }

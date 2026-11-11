@@ -1,6 +1,7 @@
 // Who's sailing: the signed-in member's name and their sail number in each class, from their boats
 // in My Garage (member_boats). The simulator puts that number on their sail.
 import type { ClassId } from '@/sim/classes';
+import { sailNumber } from '@/sim/look';
 
 export interface SimIdentity {
   /** "Stephen Walsh" */
@@ -13,11 +14,14 @@ export interface SimIdentity {
 
 const CLASS_OF: Record<string, ClassId> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10R', 'Ten Rater': '10R', Marblehead: 'M', M: 'M' };
 
-/** "AUS 123" → "123", "7" → "07"; nothing usable (or more than four digits) → null. */
+/**
+ * The number that goes on the sail: the last two digits ("AUS 123" → "23", "7" → "07"). Nothing
+ * usable (or more than four digits) → null.
+ */
 export function sailDigits(s: string | null | undefined): string | null {
-  const d = (s ?? '').replace(/\D/g, '').replace(/^0+(?=\d{2})/, '');
+  const d = (s ?? '').replace(/\D/g, '');
   if (!d || d.length > 4) return null;
-  return d.padStart(2, '0');
+  return sailNumber(d);
 }
 
 export async function loadIdentity(userId: string, clubId?: string | null): Promise<SimIdentity | null> {

@@ -2,7 +2,7 @@
 // step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
 // collisions → start/rounding/finish progress → referee → recording.
 
-import { cleanLook } from './look';
+import { cleanLook, clearOf, sailNumber } from './look';
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, ownLevel, sharpStarter, strengthsFor } from './ai';
 import { CLASSES, RIG_POWER, bestSheet, iomRig, overpowerEase, rigDrive, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
@@ -189,17 +189,15 @@ export class Race implements AiHost {
     // Numbers are drawn as if the player were 01, so the rest of the race (positions, personas)
     // comes out the same whatever her real number: everyone in a challenge sails the same race.
     // Then she gets her own, and an AI boat that drew it takes 01, which no AI boat ever draws.
-    const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? s.player.sail : '01';
+    const mySail = s.player?.sail && /^\d{1,4}$/.test(s.player.sail) ? sailNumber(s.player.sail) : '01';
     // A live race: the crew take the first boats, in seat order, with their own numbers (two people
-    // with the same number: the later one gets the next free one). The AI boats keep clear of them.
+    // with the same two digits: the later one carries a 1 in front). The AI boats keep clear of them.
     const crew = s.crew && s.crew.length ? s.crew.slice(0, n) : null;
     const crewSails: string[] = [];
     if (crew) {
       const taken = new Set<string>();
       crew.forEach((m, k) => {
-        let sail = /^\d{1,4}$/.test(m.sail) ? m.sail : String(k + 1).padStart(2, '0');
-        let num = Number(sail);
-        while (taken.has(sail)) { num = (num + 1) % 10000; sail = String(num).padStart(2, '0'); }
+        const sail = clearOf(/^\d{1,4}$/.test(m.sail) ? sailNumber(m.sail) : String(k + 1).padStart(2, '0'), taken);
         taken.add(sail);
         crewSails.push(sail);
       });

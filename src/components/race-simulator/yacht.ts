@@ -155,7 +155,7 @@ export function sailFor(yard: Yard, cls: ClassId, me: SimIdentity | null): { sai
 
 /** The finish alone, as the race wants it. */
 export function lookOf(y: BoatLook): BoatLook {
-  return { hull: y.hull, jibLuff: y.jibLuff, leech: y.leech, patch: { ...y.patch }, deckPatch: y.deckPatch, country: y.country };
+  return { hull: y.hull, jibLuff: y.jibLuff, patch: { ...y.patch }, deckPatch: y.deckPatch, country: y.country };
 }
 
 /** A finish out of the paint locker: colours that go together, picked by chance. */
@@ -165,5 +165,5 @@ export function surprise(rnd: () => number = Math.random): BoatLook {
   const bright = SAIL_COLOURS.filter(c => c.hex !== '#FFFFFF' && c.hex !== '#14181F');
   const one = pick(bright).hex;
   const two = rnd() < 0.6 ? pick(SAIL_COLOURS.filter(c => c.hex !== one)).hex : null;
-  return { hull, jibLuff: pick([one, one, pick(bright).hex]), leech: rnd() < 0.5 ? one : null, patch: { style: rnd() < 0.72 ? 'fingers' : 'solid', one, two }, deckPatch: rnd() < 0.5 ? '#262C36' : one, country: 'AUS' };
+  return { hull, jibLuff: pick([one, one, pick(bright).hex]), patch: { style: rnd() < 0.72 ? 'fingers' : 'solid', one, two }, deckPatch: rnd() < 0.5 ? '#262C36' : one, country: 'AUS' };
 }
