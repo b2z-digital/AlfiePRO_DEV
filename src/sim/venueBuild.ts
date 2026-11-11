@@ -55,7 +55,7 @@ export function venueQuery(lat: number, lon: number, half = 1200, near = 600): s
   const a = `(around:${half},${lat},${lon})`, b = `(around:${near},${lat},${lon})`;
   return `[out:json][timeout:90];(
 way["natural"="coastline"]${a};way["natural"="water"]${a};relation["natural"="water"]${a};way["natural"="bay"]${a};relation["natural"="bay"]${a};
-way["waterway"~"riverbank|dock|canal"]${a};relation["waterway"="riverbank"]${a};way["landuse"~"reservoir|basin"]${a};
+way["waterway"~"riverbank|dock|canal"]${a};way["waterway"~"^(river|stream)$"]["name"]${b};relation["waterway"="riverbank"]${a};way["landuse"~"reservoir|basin"]${a};
 way["leisure"~"park|pitch|playground|garden|golf_course|nature_reserve"]${b};relation["leisure"~"park|nature_reserve"]${b};
 way["landuse"~"forest|grass|recreation_ground|meadow"]${b};way["natural"~"wood|scrub|beach|wetland|sand"]${b};relation["natural"~"wood|wetland"]${b};
 way["building"]${b};way["man_made"~"pier|breakwater|groyne"]${a};way["amenity"="parking"]${b};

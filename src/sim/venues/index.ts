@@ -14,3 +14,14 @@ export function venueForClub(clubId: string | null | undefined): VenueDef | null
   if (!clubId) return null;
   return Object.values(VENUES).find(v => v.clubs?.includes(clubId)) ?? null;
 }
+
+/** The venues that come with the app (the rest are clubs' own, from the database). */
+export const BUILT_IN: VenueDef[] = [LMRYC, KBRYC, PLRMYC];
+
+/**
+ * Add a club's own water (from the database) to the venues the engine can race at. A venue never
+ * changes under an id: a changed shape is a new version, and so a new id.
+ */
+export function registerVenue(def: VenueDef, as: string = def.id): void {
+  if (!VENUES[as]) VENUES[as] = as === def.id ? def : { ...def, id: as };
+}
