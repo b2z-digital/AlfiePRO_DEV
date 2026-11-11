@@ -123,11 +123,12 @@ function paceGoal(text: string, way: 'up' | 'down', leg: number, seconds: number
     check: (g: GoalCtx): Outcome | null => {
       tally(g, way);
       if (g.player.legIndex <= leg) return null;
-      const r = share(g);
+      // (Judged on the figure you're shown, to the whole per cent: 80% never fails a pass mark of 80%.)
+      const r = Math.round(share(g) * 100) / 100;
       const stars = r >= steps[2] ? 3 : r >= steps[1] ? 2 : r >= steps[0] ? 1 : 0;
       return stars
-        ? won(`${pct(r)} of her best`, stars === 3 ? `That's top-of-the-fleet pace ${way === 'up' ? 'upwind' : 'downwind'}.` : `Good pace. ${pct(steps[stars])} is the next step up. ${advice}`, { stars, score: Math.round(r * 100) })
-        : lost(`${pct(r)} of her best`, `You need ${pct(steps[0])} to pass. ${advice}`, { score: Math.round(r * 100) });
+        ? won(`${pct(r)} of her best`, stars === 3 ? `That's top-of-the-fleet pace ${way === 'up' ? 'upwind' : 'downwind'}.` : `Good pace. ${pct(steps[stars])} or more earns the next star. ${advice}`, { stars, score: Math.round(r * 100) })
+        : lost(`${pct(r)} of her best`, `That's ${Math.round((steps[0] - r) * 100)} points short of the pass mark, ${pct(steps[0])}. The higher the better. ${advice}`, { score: Math.round(r * 100) });
     },
     final: g => lost('Out of time', `Get to ${mark} before the time runs out. You were making ${pct(share(g))} of her best. ${advice}`),
     progress: g => ((g.memo.best as number) > 0.5 ? `Speed made good: ${pct(share(g))} of her best` : null),
@@ -156,12 +157,13 @@ function turnsGoal(text: string, kind: 'tack' | 'gybe', need: number, leg: numbe
       if (m.open && g.t - (m.wt as number) >= 5) close();
       const done = m.done as number;
       if (done >= need) {
-        const a = avg(g);
+        // Lengths lost: the fewer the better. (Judged on the figure you're shown, to a tenth.)
+        const a = Math.round(avg(g) * 10) / 10;
         const stars = a <= steps[0] ? 3 : a <= steps[1] ? 2 : a <= steps[2] ? 1 : 0;
-        const each = `${a.toFixed(1)} lengths lost a ${word}`;
+        const each = `You lost ${a.toFixed(1)} lengths a ${word}`;
         return stars
-          ? won(each, stars === 3 ? `As little as a ${word} costs.` : `Tidy. Under ${steps[stars === 2 ? 0 : 1].toFixed(1)} is the next step. ${advice}`, { stars, score: Math.round(a * 10) / 10 })
-          : lost(each, `You need ${steps[2].toFixed(1)} or less to pass. ${advice}`, { score: Math.round(a * 10) / 10 });
+          ? won(each, stars === 3 ? `As little as a ${word} costs.` : `Tidy. Lose ${steps[stars === 2 ? 0 : 1].toFixed(1)} or fewer for the next star. ${advice}`, { stars, score: a })
+          : lost(each, `That's ${(a - steps[2]).toFixed(1)} too many: to pass, lose ${steps[2].toFixed(1)} lengths or fewer on each ${word}. The fewer the better. ${advice}`, { score: a });
       }
       if (p.legIndex > leg) return lost(`Only ${done} ${word}${done === 1 ? '' : 's'}`, `This drill wants ${need} before the mark. Put them in early, one after another.`);
       return null;
@@ -191,12 +193,13 @@ function roundingGoal(text: string, marks: string[], leg: number, clear: number,
       if (m.at === undefined) { m.at = g.t; m.x = p.x; m.y = p.y; }
       const gone = ((p.x - (m.x as number)) * c.up.x + (p.y - (m.y as number)) * c.up.y) * (clear > 0 ? 1 : -1);
       if (gone < Math.abs(clear) * L) return null;
-      const secs = g.t - (m.in as number);
+      // Seconds: the fewer the better. (Judged on the figure you're shown, to a tenth.)
+      const secs = Math.round((g.t - (m.in as number)) * 10) / 10;
       const stars = secs <= steps[0] ? 3 : secs <= steps[1] ? 2 : secs <= steps[2] ? 1 : 0;
       const title = `${secs.toFixed(1)} s through the corner`;
       return stars
-        ? won(title, stars === 3 ? 'In wide, out tight and fast.' : `Good. ${steps[stars === 2 ? 0 : 1].toFixed(1)} s is the next step. ${advice}`, { stars, score: Math.round(secs * 10) / 10 })
-        : lost(title, `You need ${steps[2].toFixed(1)} s or less to pass. ${advice}`, { score: Math.round(secs * 10) / 10 });
+        ? won(title, stars === 3 ? 'In wide, out tight and fast.' : `Good. ${steps[stars === 2 ? 0 : 1].toFixed(1)} s or quicker earns the next star. ${advice}`, { stars, score: secs })
+        : lost(title, `That's ${(secs - steps[2]).toFixed(1)} s too slow: to pass, take ${steps[2].toFixed(1)} s or less. ${advice}`, { score: secs });
     },
     final: () => lost('Out of time', 'Round the mark and get away up the next leg before the time runs out.'),
     progress: g => (g.memo.in !== undefined ? `${(g.t - (g.memo.in as number)).toFixed(1)} s since the zone` : 'The clock starts at the zone'),
@@ -278,7 +281,7 @@ export const LAB: LabMoment[] = [
     tip: "Go in with full speed (never tack from a pinch). Turn her firmly through the wind so she spends as little time as possible head to wind, then take the rudder off early and come out a few degrees low to build speed before you squeeze back up to close-hauled. Holding the rudder over too long is the usual mistake: it drags, and she ends up reaching.",
     sticks: { sail: 'Right in throughout.', rudder: 'Firmly over to turn her through the wind, back to the middle as the sails fill on the new side, then still while she builds speed.' },
     scene: () => ({ origin: 'line', settings: { length: 'long' }, boats: alone([0, 1.5], CH_S) }),
-    goal: turnsGoal('Make six tacks, losing 1.7 lengths or less on each', 'tack', 6, 0, 120, [1.0, 1.3, 1.7], 'Carry speed in, turn firmly, and straighten up early onto a course just below close-hauled.'),
+    goal: turnsGoal('Make six tacks, losing no more than 1.7 lengths on each', 'tack', 6, 0, 120, [1.0, 1.3, 1.7], 'Carry speed in, turn firmly, and straighten up early onto a course just below close-hauled.'),
     solution: zigzag('tack', 7), mistake: closeHauled('stbd'), mistakeRule: '',
   },
   {
@@ -288,7 +291,7 @@ export const LAB: LabMoment[] = [
     tip: "A good gybe barely slows her. Turn smoothly from her best angle on one gybe to her best angle on the other, no further: a big swing past it has you reaching across the course. Use about half rudder, and start straightening as the boom comes over.",
     sticks: { sail: 'Out throughout: the boom comes across on its own.', rudder: 'A smooth movement to turn her from one angle to the other, centred again as the boom comes over.' },
     scene: () => ({ origin: 'F', settings: { length: 'long' }, boats: alone([-1.5, -3], RUN_S, 2) }),
-    goal: turnsGoal('Make five gybes, losing 0.8 lengths or less on each', 'gybe', 5, 2, 110, [0.3, 0.5, 0.8], "Turn only from her best angle on one gybe to her best angle on the other, with half rudder."),
+    goal: turnsGoal('Make five gybes, losing no more than 0.8 lengths on each', 'gybe', 5, 2, 110, [0.3, 0.5, 0.8], "Turn only from her best angle on one gybe to her best angle on the other, with half rudder."),
     solution: zigzag('gybe', 7), mistake: running('stbd'), mistakeRule: '',
   },
   {
