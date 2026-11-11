@@ -15,6 +15,7 @@ import type { SceneSpec } from '@/sim/training';
 import { CoachMode, CoachVoice, Cue, WindMemory, coachCue, cueCall, handlingCall, lineInfo, pointOfSail, trimAdvice } from './coach';
 import { DemoTalk, type DemoCue } from './demoTalk';
 import { Ambience } from './ambience';
+import { Impacts } from './impact';
 import { Camera, drawRace } from './render';
 import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './input';
@@ -129,8 +130,28 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (resume) r.followLog(resume.log, resume.step);
     return r;
   }, [built, settings, resume, live]);
-  // The club's start sequence, playing against the race clock.
-  const seqPlayer = useMemo(() => (sequence && !scene ? new SequencePlayer(sequence) : null), [sequence, scene]);
+  // The club's StartBox sequence calls every start it's long enough for: a race, and a drill with a
+  // countdown (which joins the recording part-way through, at the drill's time to the gun).
+  const seqPlayer = useMemo(() => {
+    if (!sequence) return null;
+    const count = race.gunT - race.t;
+    if (scene && count < 10) return null;
+    return sequence.seconds >= count - 0.5 ? new SequencePlayer(sequence) : null;
+  }, [sequence, scene, race]);
+  // The race waits a moment at the very start for the club's recording to be ready, so the start is
+  // called by StartBox from the first second (never part by the simulator, part by the recording).
+  const [seqWait, setSeqWait] = useState<'no' | 'quiet' | 'shown'>(() => (seqPlayer && !live && !resume ? 'quiet' : 'no'));
+  useEffect(() => {
+    if (seqWait === 'no' || !seqPlayer) return;
+    const t0 = performance.now();
+    const id = window.setInterval(() => {
+      seqPlayer.prepare(race.gunT - race.t);
+      const waited = performance.now() - t0;
+      if (seqPlayer.ready || !seqPlayer.working || waited > 6000) { window.clearInterval(id); setSeqWait('no'); }
+      else if (waited > 500) setSeqWait('shown');
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [seqPlayer, race]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => seqPlayer?.stop(), [seqPlayer]);
   // The ghost's own race, a step behind nobody: it steps with yours.
   const ghostRace = useMemo(() => {
@@ -167,8 +188,12 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   // What Alfie says while a drill is sailed for you: a fresh commentary for each race.
   const talk = useMemo(() => new DemoTalk(scene?.spec.tip ?? '', false), [race]); // eslint-disable-line react-hooks/exhaustive-deps
   const ambience = useMemo(() => new Ambience(), []);
+  // Hulls touching: a crack, as loud as the hit is hard.
+  const impacts = useMemo(() => new Impacts(), [race]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    // Sound starts with your first tap or key press, as browsers require.
+    // Sound needs the page to have been touched once (the browser's rule): anywhere will do, such
+    // as the button that started this race, so a race you only watch has sound too.
+    ambience.unlock();
     const wake = () => ambience.unlock();
     for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, wake, true);
     return () => { for (const ev of ['pointerdown', 'keydown'] as const) window.removeEventListener(ev, wake, true); ambience.stop(); };
@@ -228,7 +253,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
 
   // Mirrors of state for the animation loop.
   const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, boost: 1, phone: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
-  R.current.paused = paused || intro; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
+  R.current.paused = paused || intro || seqWait !== 'no'; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
   R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
   R.current.view = view; R.current.glance = glance;
   // A phone held upright is narrow: from the bank, look a little closer so the boats aren't specks.
@@ -352,7 +377,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     return {
       T, raceT: Math.max(0, -T), preStart: pre,
       // At a venue the race frame turns with the wind: show the real compass direction.
-      wind: { kn: ws.tws / KN, from: (ws.twd + race.course.rot) % 360, spark, swing: mem.swing(40) },
+      wind: { kn: ws.tws / KN, from: (ws.twd + race.course.rot) % 360, spark, swing: mem.swing(40), off: n180(ws.twd - base), tack: p.started && !p.finished && Math.abs(p.twa) < 70 ? p.tack : null },
       line,
       course: { leg: p.finished ? 'Finished' : legLabel(race, p.started ? p.legIndex : 0), legNo: (p.started ? p.legIndex : 0) + 1, legs, next: nx ? `To ${nx.name}` : '', distL: nx && !p.finished ? Math.round(dist(nx, p) / p.cls.loa) : null, place, of: race.boats.length, status },
       fleet,
@@ -561,6 +586,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       if (ghostRace) smoothGhost.restore(ghostRace);
       // HUD at 10 Hz. The coach line changes at most every 6 s unless something more urgent comes up
       // (a rule risk, or start timing near the gun, which updates every 1.5 s); the rule watch keeps up.
+      // Hulls touching, heard from where you stand on the bank (or from your boat, seen from above).
+      impacts.update(race, st.view === 'bank' && bcam.ready ? bcam : race.player ?? null, !audio.muted && !st.paused && !st.replay && !race.replaying);
       if (now - hudAt > 100) {
         hudAt = now;
         const hs = makeHud();
@@ -610,7 +637,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio, live, talk]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio, live, talk, impacts]);
 
   // ── Canvas size ──
   useEffect(() => {
@@ -781,7 +808,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       <Toasts items={toasts} compact />
     </>
   ) : null;
-  const pausedNow = paused && !intro && !moment && !results && !replay && !sceneOut;
+  const pausedNow = paused && !intro && seqWait === 'no' && !moment && !results && !replay && !sceneOut;
   const safePad = { padding: `${SAFE.top} ${SAFE.right} ${SAFE.bottom} ${SAFE.left}` };
 
   return (
@@ -973,6 +1000,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
               onToggle={() => { const r = { back: replay.back <= 0 ? Math.min(REPLAY_MAX, race.hist[0].x.length - 1) : replay.back, playing: !replay.playing }; R.current.replay = r; setReplay(r); }}
               onScrub={b => { const r = { back: b, playing: false }; R.current.replay = r; setReplay(r); }}
               onExit={exitReplay} />
+          </div>
+        )}
+
+        {/* Waiting (briefly) for the club's start recording */}
+        {seqWait === 'shown' && !intro && (
+          <div className="pointer-events-none absolute inset-x-0 top-[38%] flex justify-center">
+            <Hud className="flex items-center gap-3 px-5 py-3.5" role="status">
+              <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#4DA3FF]" />
+              <p className="m-0 text-[14.5px] font-semibold">Getting your club's start sequence ready…</p>
+            </Hud>
           </div>
         )}
 

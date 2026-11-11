@@ -108,6 +108,30 @@ export class SequencePlayer {
     if (seq.sounds?.length) void preloadSounds(seq.sounds.map(x => x.url));
     // Some browsers (Safari on iPhone and iPad) only let a page play sound that a tap or key press started.
     for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, this.unlock, true);
+    // Others allow it once the page has been touched at all (the button that started this race):
+    // ask now, so the recording can sound from the first second without another tap.
+    this.prime();
+  }
+
+  /**
+   * Before the countdown begins: get the recording loaded and standing at the place the countdown
+   * starts from (`toGun` seconds before the gun), so the club's own start sounds from the first
+   * second instead of the simulator filling in while it loads. Call until `ready`.
+   */
+  prepare(toGun: number) {
+    const el = this.el, a = this.seq.audio;
+    if (!el || !a || this.failed) return;
+    const want = (a.startMs + a.introMs) / 1000 + (this.seq.seconds - toGun);
+    this.want = want;
+    if (el.readyState === 0 && el.networkState !== 2 /* not loading yet */) { try { el.load(); } catch { /* it loads on play */ } return; }
+    if (el.readyState >= 1 && !el.seeking && Math.abs(el.currentTime - want) > 0.35 && performance.now() - this.seekAt > 400) this.seek(want);
+  }
+
+  /** Loaded and in place (or there's no recording to wait for, or it can't be had). */
+  get ready(): boolean {
+    const el = this.el;
+    if (!el || this.failed) return true;
+    return !el.seeking && el.readyState >= 3 && Math.abs(el.currentTime - this.want) <= 0.35;
   }
 
   /** False if the club's recording couldn't be loaded: the simulator calls the start itself then. */
@@ -129,7 +153,7 @@ export class SequencePlayer {
    */
   get calling(): boolean {
     if (this.failed) return false;
-    return this.silentSince == null || performance.now() - this.silentSince < 1500;
+    return this.silentSince == null || performance.now() - this.silentSince < 3000;
   }
 
   /** `toGun`: seconds to the gun (negative after it). `running`: the race clock is moving at `rate`. */

@@ -2,12 +2,15 @@
 // boats near you, spoken with the browser's voice; beeps come from the StartBox audio engine.
 import { getStartBoxEngine } from '../../utils/startBoxAudio';
 import { spellSail } from '@/sim/referee';
+import { soundOut } from './soundHub';
 
 const NUM = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 
 export class RaceAudio {
   muted = false;
   private voice: SpeechSynthesisVoice | null = null;
+  private lines = new Set<SpeechSynthesisUtterance>();
+  private saidAt = 0;
 
   constructor() {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -20,15 +23,26 @@ export class RaceAudio {
   }
 
   /** Call from a click so the browser lets the page make sound. */
-  unlock() { getStartBoxEngine().initialize().catch(() => {}); }
+  unlock() { getStartBoxEngine().initialize().catch(() => {}); soundOut(); }
 
   say(text: string, urgent = false) {
     if (this.muted || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const synth = window.speechSynthesis;
+    // The browser's voice can stick, and then says nothing more: left paused after the tab was
+    // hidden, or "speaking" for ever after a line that never finished. Free it before speaking.
+    try {
+      if (synth.paused) synth.resume();
+      if ((synth.speaking || synth.pending) && performance.now() - this.saidAt > 15000) synth.cancel();
+    } catch { /* carry on */ }
     const u = new SpeechSynthesisUtterance(text);
     if (this.voice) u.voice = this.voice;
     u.rate = urgent ? 1.15 : 1.05;
-    if (urgent) window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
+    // (Kept hold of until it's said: some browsers drop a line nothing refers to, mid-sentence.)
+    this.lines.add(u);
+    u.onend = u.onerror = () => { this.lines.delete(u); };
+    if (urgent) synth.cancel();
+    synth.speak(u);
+    this.saidAt = performance.now();
   }
 
   /** Is something being said right now (a hail, a recall, a call from the coach)? */

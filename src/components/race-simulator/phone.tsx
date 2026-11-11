@@ -8,6 +8,7 @@ import type { BankCam } from './bank';
 import type { CoachMode, Cue } from './coach';
 import CourseMap from './CourseMap';
 import { CourseCard, FleetCard, LineCard, SticksView, type HudState, type PenaltyProgress } from './hud';
+import { compassPoint, shiftWords } from './windWords';
 import type { DemoCue } from './demoTalk';
 import { SAILING_CLEAR } from './coach';
 import { SAFE } from './phoneLayout';
@@ -60,16 +61,17 @@ function ClockChip({ hud, scene, narrow }: { hud: HudState; scene: boolean; narr
   );
 }
 
-function WindChip({ kn, from, swing, narrow }: HudState['wind'] & { narrow: boolean }) {
-  const sw = Math.abs(swing) < 2 ? 'Steady' : `${swing > 0 ? 'Right' : 'Left'} ${Math.round(Math.abs(swing))}°`;
+function WindChip({ kn, from, off, tack, narrow }: HudState['wind'] & { narrow: boolean }) {
+  // Where the wind is against its average, and what that means for the tack you're on.
+  const sw = shiftWords(off, tack);
+  const n = Math.round(Math.abs(off));
+  const short = n < 3 ? 'Average' : tack ? `${sw.tone === 'good' ? 'Lifted' : 'Headed'} ${n}°` : `${off < 0 ? 'Left' : 'Right'} ${n}°`;
+  const colour = sw.tone === 'good' ? '#7EE2A8' : sw.tone === 'warn' ? '#FFCB96' : C.mute;
   return (
-    <Hud className={cx('pointer-events-none flex shrink-0 items-center !rounded-[14px]', narrow ? 'h-10 gap-1.5 pl-2 pr-2.5' : 'h-[46px] gap-2 pl-2.5 pr-3')} title={Math.abs(swing) < 2 ? 'Steady over the last 40 s' : `Swung ${sw.toLowerCase()} in the last 40 s`}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CCBFF" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={`Wind from ${Math.round(from)} degrees`} style={{ transform: `rotate(${from + 180}deg)` }}>
-        <path d="M12 4v16M6 10l6-6 6 6" />
-      </svg>
+    <Hud className={cx('pointer-events-none flex shrink-0 items-center !rounded-[14px]', narrow ? 'h-10 px-2.5' : 'h-[46px] px-3')} title={`Wind from the ${compassPoint(from)}, ${sw.where.toLowerCase()}. ${sw.means}.`}>
       <span className="flex flex-col leading-none">
-        <span className="whitespace-nowrap font-display text-[17px] font-bold tabular-nums">{kn.toFixed(1)}<span className="ml-0.5 text-[11px] font-semibold" style={{ color: C.mute }}>kn</span></span>
-        {!narrow && <span className="mt-1 whitespace-nowrap text-[10.5px]" style={{ color: C.mute }}>{sw}</span>}
+        <span className="whitespace-nowrap font-display text-[17px] font-bold tabular-nums">{kn.toFixed(1)}<span className="ml-0.5 text-[11px] font-semibold" style={{ color: C.mute }}>kn {compassPoint(from)}</span></span>
+        {!narrow && <span className="mt-1 whitespace-nowrap text-[10.5px] font-semibold" style={{ color: colour }}>{short}</span>}
       </span>
     </Hud>
   );

@@ -7,11 +7,13 @@ import { SAILING_CLEAR } from './coach';
 import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
 import { rudderWords, sailWords, type DemoCue, type Stick } from './demoTalk';
+import { compassPoint, shiftWords } from './windWords';
 
 /** What the race screen shows, refreshed ten times a second from the race. */
 export interface HudState {
   T: number; raceT: number; preStart: boolean;
-  wind: { kn: number; from: number; spark: number[]; swing: number };
+  /** `off`: degrees the wind is from its average now (+ right). `tack`: yours, while you're beating; else null. */
+  wind: { kn: number; from: number; spark: number[]; swing: number; off: number; tack: 'stbd' | 'port' | null };
   line: LineInfo | null;
   course: { leg: string; legNo: number; legs: number; next: string; distL: number | null; place: number; of: number; status: string | null };
   fleet: FleetRow[];
@@ -23,35 +25,52 @@ export interface HudState {
 }
 
 // ───────────────────────── Wind ─────────────────────────
-export function WindCard({ kn, from, spark, swing, compact }: { kn: number; from: number; spark: number[]; swing: number; compact?: boolean }) {
-  const w = 240, h = 46;
-  const range = Math.max(6, ...spark.map(v => Math.abs(v)));
-  const pts = spark.map((v, i) => [spark.length > 1 ? (i / (spark.length - 1)) * w : w, h / 2 - (v / range) * (h / 2 - 5)]);
-  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
-  const last = pts[pts.length - 1];
-  const swingText = Math.abs(swing) < 2 ? 'Steady over the last 40 s' : `Swinging ${swing > 0 ? 'right' : 'left'}: ${Math.round(Math.abs(swing))}° in the last 40 s`;
+/**
+ * The wind: how strong, where from, and where it is against its average, drawn the way you see it
+ * looking up the course (left is left). The dot is the wind now; the line hanging from it is where
+ * it has been over the last two minutes, the newest at the top.
+ */
+export function WindCard({ kn, from, spark, swing, off, tack = null, compact }: { kn: number; from: number; spark: number[]; swing: number; off: number; tack?: 'stbd' | 'port' | null; compact?: boolean }) {
+  const w = 240, top = 20, H = 44, h = top + H + 2;
+  const range = Math.max(10, Math.ceil(Math.max(...spark.map(v => Math.abs(v)), Math.abs(off)) / 5) * 5);
+  const X = (v: number) => w / 2 + (Math.max(-range, Math.min(range, v)) / range) * (w / 2 - 12);
+  // Newest first, down the card.
+  const n = spark.length;
+  const d = spark.map((_, i) => { const v = spark[n - 1 - i]; return `${i ? 'L' : 'M'}${X(v).toFixed(1)} ${(top + (n > 1 ? (i / (n - 1)) * H : 0)).toFixed(1)}`; }).join(' ');
+  const sw = shiftWords(off, tack);
+  // Which way it's moving: further out the side it's on, or back towards its average.
+  const out = Math.abs(off) >= 3 && Math.sign(swing) === Math.sign(off);
+  const trend = Math.abs(swing) < 2 ? 'Holding steady' : `${out ? 'Still going' : Math.abs(off) >= 3 ? 'Coming back' : 'Going'} ${swing > 0 ? 'right' : 'left'}: ${Math.round(Math.abs(swing))}° in the last 40 s`;
+  const colour = sw.tone === 'good' ? '#7EE2A8' : sw.tone === 'warn' ? '#FFCB96' : '#A9D2FF';
   return (
     <Hud className={cx('flex flex-col gap-2.5 px-[18px] py-4', compact ? 'w-[200px]' : 'w-[276px]')}>
       <div className="flex items-center justify-between">
         <Cap>Wind</Cap>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9CCBFF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={`Wind from ${Math.round(from)} degrees`} style={{ transform: `rotate(${from + 180}deg)` }}>
-          <path d="M12 4v16M6 10l6-6 6 6" />
-        </svg>
+        <span className="text-[12.5px] font-semibold" style={{ color: C.mute }} aria-label={`From the ${compassPoint(from)}, ${Math.round(from) % 360} degrees`}>from {compassPoint(from)} · {String(Math.round(from) % 360).padStart(3, '0')}°</span>
       </div>
       <div className="flex items-baseline gap-2">
         <span className="font-display text-[30px] font-bold leading-none tabular-nums">{kn.toFixed(1)}</span>
-        <span className="text-[13.5px]" style={{ color: C.mute }}>kn from {String(Math.round(from) % 360).padStart(3, '0')}°</span>
+        <span className="text-[13.5px]" style={{ color: C.mute }}>knots</span>
       </div>
-      {!compact && spark.length > 2 && (
-        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={swingText}>
-          <path d={`M0 ${h / 2} H${w}`} stroke="rgba(255,255,255,.10)" strokeDasharray="2 4" />
-          <path d={d} fill="none" stroke="#4DA3FF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          {last && <circle cx={last[0]} cy={last[1]} r={3.5} fill="#4DA3FF" />}
-          <text x="0" y="9" fill="rgba(235,240,255,.55)" fontSize="10">RIGHT</text>
-          <text x="0" y={h - 1} fill="rgba(235,240,255,.55)" fontSize="10">LEFT</text>
+      {!compact && (
+        <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Wind ${sw.where.toLowerCase()}. ${trend}.`}>
+          <text x="0" y="9" fill="rgba(235,240,255,.6)" fontSize="10" fontWeight="600">LEFT</text>
+          <text x={w / 2} y="9" fill="rgba(235,240,255,.45)" fontSize="10" textAnchor="middle">average</text>
+          <text x={w} y="9" fill="rgba(235,240,255,.6)" fontSize="10" fontWeight="600" textAnchor="end">RIGHT</text>
+          {/* The scale: the average down the middle, a tick every 5°. */}
+          <path d={`M12 ${top} H${w - 12}`} stroke="rgba(255,255,255,.16)" />
+          {Array.from({ length: (2 * range) / 5 + 1 }, (_, i) => -range + i * 5).map(v => <path key={v} d={`M${X(v)} ${top - (v === 0 ? 5 : 3)} V${top + (v === 0 ? 5 : 3)}`} stroke={v === 0 ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.2)'} />)}
+          <path d={`M${w / 2} ${top} V${top + H}`} stroke="rgba(255,255,255,.12)" strokeDasharray="2 4" />
+          {n > 2 && <path d={d} fill="none" stroke="#4DA3FF" strokeOpacity={0.55} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />}
+          <circle cx={X(off)} cy={top} r={6} fill={colour} stroke="rgba(7,13,27,.9)" strokeWidth={2} />
+          <text x={w} y={h - 1} fill="rgba(235,240,255,.5)" fontSize="9" textAnchor="end" stroke="rgba(7,13,27,.9)" strokeWidth={3} paintOrder="stroke">2 min ago</text>
         </svg>
       )}
-      {!compact && <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{swingText}</p>}
+      <div className="flex flex-col gap-0.5">
+        <p className="m-0 text-[13.5px] font-semibold tabular-nums">{sw.where}</p>
+        <p className="m-0 text-[13px] font-semibold" style={{ color: colour }}>{sw.means}</p>
+        {!compact && <p className="m-0 text-[12px]" style={{ color: C.mute }}>{trend}</p>}
+      </div>
     </Hud>
   );
 }
