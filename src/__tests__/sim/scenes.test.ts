@@ -3,7 +3,7 @@
 // and doing nothing at all doesn't pass.
 import { describe, expect, it } from 'vitest';
 import { buildScene, runScene } from '@/sim/scene';
-import { DRILLS, LAB, LAB_GROUPS, MODULES, lessonSpecs } from '@/sim/training';
+import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findMoment, lessonSpecs, nextFirst } from '@/sim/training';
 import type { SceneSpec } from '@/sim/training';
 
 /** Drills whose demo is an AI skipper rather than a script: it usually wins, so we only ask that it runs. */
@@ -99,5 +99,30 @@ describe('Scenario Lab', () => {
         expect(r.outcome.pass, `${m.id} seed ${seed}: ${r.outcome.title}`).toBe(true);
       });
     }
+  }
+});
+
+describe('First sail', () => {
+  it('is five steps, found by id like any scenario, and done in order', () => {
+    expect(FIRST.map(m => m.id)).toEqual(['first-steer', 'first-trim', 'first-tack', 'first-mark', 'first-start']);
+    for (const m of FIRST) { expect(findMoment(m.id)).toBe(m); expect(m.group).toBe('first'); expect(m.trim).toBeDefined(); }
+    expect(nextFirst(() => false)!.id).toBe('first-steer');
+    expect(nextFirst(id => id === 'first-steer' || id === 'first-trim')!.id).toBe('first-tack');
+    expect(nextFirst(() => true)).toBeNull();
+    // Only the trim step puts the sail on your stick.
+    expect(FIRST.filter(m => m.trim === 'yours').map(m => m.id)).toEqual(['first-trim']);
+  });
+
+  for (const m of FIRST) {
+    it(`${m.id}: Alfie's way passes, whatever the seed`, () => {
+      for (const seed of m.demoSeeds ?? [1, 2, 3]) {
+        const r = runScene(m.scene(seed), m.goal, seed, m.solution);
+        expect(r.outcome.pass, `${m.id} seed ${seed}: ${r.outcome.title} ${r.outcome.text}`).toBe(true);
+      }
+    });
+    it(`${m.id}: the mistake fails, and so does doing nothing`, () => {
+      expect(runScene(m.scene(1), m.goal, 1, m.mistake).outcome.pass).toBe(false);
+      expect(runScene(m.scene(1), m.goal, 1).outcome.pass).toBe(false);
+    });
   }
 });

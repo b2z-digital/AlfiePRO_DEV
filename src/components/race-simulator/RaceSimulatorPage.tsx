@@ -9,7 +9,7 @@ import { DT } from '@/sim/physics';
 import type { Moment } from './moments';
 import type { RaceSettings } from '@/sim/types';
 import type { Outcome, SceneSpec } from '@/sim/training';
-import { DRILLS, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
+import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
@@ -114,7 +114,7 @@ function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boole
 }
 type Group = ActiveScene['group'];
 
-const GROUP_PAGE: Record<Group, Where> = { 'Start Trainer': 'trainer', 'Rules Academy': 'academy', 'Scenario Lab': 'lab' };
+const GROUP_PAGE: Record<Group, Where> = { 'Start Trainer': 'trainer', 'Rules Academy': 'academy', 'Scenario Lab': 'lab', 'First sail': 'home' };
 
 /** The next thing to try after a scene: the next drill, situation you can sail, or lab moment. */
 function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
@@ -122,6 +122,10 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
     const i = DRILLS.findIndex(d => d.id === spec.id);
     const n = DRILLS[i + 1];
     return n ? { spec: n, label: `Next drill: ${n.title}` } : null;
+  }
+  if (spec.kind === 'lab' && FIRST.some(m => m.id === spec.id)) {
+    const n = FIRST[FIRST.findIndex(m => m.id === spec.id) + 1];
+    return n ? { spec: n, label: `Next step: ${n.title}` } : null;
   }
   if (spec.kind === 'lab') {
     // In the order the lab shows them: section by section.
@@ -511,7 +515,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const openLink = useCallback((l: TrainLink) => {
     if (l.kind === 'lesson') { setAcademyAt(l.id); setWhere('academy'); return; }
     const spec = l.kind === 'drill' ? findDrill(l.id) : findMoment(l.id);
-    if (spec) playScene(spec, l.kind === 'drill' ? 'Start Trainer' : 'Scenario Lab', false);
+    if (spec) playScene(spec, l.kind === 'drill' ? 'Start Trainer' : FIRST.some(m => m.id === l.id) ? 'First sail' : 'Scenario Lab', false);
   }, [playScene]);
 
   const leaveRace = useCallback(() => {

@@ -46,7 +46,7 @@ export interface ActiveScene {
   seed: number;
   /** Your boat is sailed the right way, for you to watch. */
   watch: boolean;
-  group: 'Start Trainer' | 'Rules Academy' | 'Scenario Lab';
+  group: 'Start Trainer' | 'Rules Academy' | 'Scenario Lab' | 'First sail';
   higherIsBetter?: boolean;
   scoreText?: (v: number) => string;
   best?: string | null;
@@ -123,6 +123,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
     // Sail it your way: the sails follow your stick unless you've turned auto-trim on.
     if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
+    // (A step that's about steering alone trims the sail for you; one that's about the sail never does.)
+    if (!scene.watch && scene.spec.trim) b.race.settings.autoTrim = scene.spec.trim === 'auto';
     return b;
   }, [scene]);
   const race = useMemo(() => {
@@ -214,7 +216,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const [cue, setCue] = useState<Cue | null>(null);
   const [paused, setPaused] = useState(false);
   // Watching a drill sailed for you opens with how it's done; the demonstration waits behind it.
-  const [intro, setIntro] = useState(!!scene?.watch);
+  // A demonstration opens on what's asked and how it's done; so does a First sail step you're about to try.
+  const [intro, setIntro] = useState(!!scene?.watch || scene?.group === 'First sail');
   useEffect(() => { if (!paused) setTookOver(null); }, [paused]);
   const [moment, setMoment] = useState<Incident | null>(null);
   const [banner, setBanner] = useState<Incident | null>(null);
@@ -807,7 +810,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const watching = !!scene?.watch;
   const demoCue = watching && cue && 'stick' in cue ? (cue as DemoCue) : null;
   const outRule = sceneOut?.incident?.rule;
-  const backLabel = scene ? `Back to the ${scene.group}` : 'Simulator home';
+  const backLabel = scene ? (scene.group === 'First sail' ? 'Back to the Sailing Academy' : `Back to the ${scene.group}`) : 'Simulator home';
   const openBanner = () => {
     if (!banner) return;
     setMoment(banner); setBanner(null);
@@ -833,7 +836,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   return (
     <div className={cx('flex h-full flex-col text-[14px] text-[#F1F4FA]', !phone && 'min-h-[560px]')} style={{ background: C.bg, fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       {!phone && <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-2.5 sm:px-5" style={{ background: C.head }}>
-        <Btn onClick={onHome} aria-label={scene ? `Back to the ${scene.group}` : 'Main Menu'}>
+        <Btn onClick={onHome} aria-label={scene ? backLabel : 'Main Menu'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           <span className="hidden sm:inline">{scene ? scene.group : 'Main Menu'}</span>
         </Btn>
@@ -1036,7 +1039,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         {intro && scene && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[rgba(4,8,18,0.62)] backdrop-blur-[2px]" style={phone ? safePad : { padding: 24 }}>
             <WatchIntro title={scene.spec.title} group={scene.group} brief={scene.spec.brief} goal={scene.spec.goal.text} tip={scene.spec.tip} sticks={scene.spec.sticks}
-              onStart={() => setIntro(false)} onBack={onHome} compact={phone} />
+              onStart={() => setIntro(false)} onBack={onHome} compact={phone} mine={!scene.watch} onWatch={onSceneWatch} />
           </div>
         )}
 
