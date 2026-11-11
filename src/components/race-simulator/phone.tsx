@@ -412,7 +412,7 @@ export function CourseSheet({ race, hud, cam, portrait, onClose }: { race: Race;
         </div>
         <div className={cx('flex min-h-0 gap-3', portrait ? 'flex-col items-center overflow-y-auto' : 'flex-1')}>
           <div className={cx('shrink-0', !portrait && 'min-h-0 overflow-y-auto')}>{hud.line ? <LineCard line={hud.line} map={map} /> : <CourseCard {...hud.course} map={map} />}</div>
-          <div className={cx('flex shrink-0', !portrait && 'min-h-0')}><FleetCard rows={hud.fleet} preStart={hud.preStart} /></div>
+          <div className={cx('flex shrink-0', !portrait && 'min-h-0')}><FleetCard rows={hud.fleet} preStart={hud.preStart} sizeUp={hud.T > 25} /></div>
         </div>
       </div>
     </div>

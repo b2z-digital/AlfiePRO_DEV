@@ -4,7 +4,7 @@
 // The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Race, RaceLog } from '@/sim/engine';
-import { LEVELS, PERSONAS, Skipper } from '@/sim/ai';
+import { LEVELS, PERSONAS, Skipper, knownFor } from '@/sim/ai';
 import { Rng } from '@/sim/math';
 import type { Boat, Incident, RaceSettings } from '@/sim/types';
 import { DT } from '@/sim/physics';
@@ -406,6 +406,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       intent: b.isPlayer || (b.human && !race.skippers[i]) ? (pre ? (b.isPlayer ? 'Your start' : 'Racing') : b.finished ? 'Finished' : legLabel(race, b.legIndex)) : b.disabled ? 'Out of control' : race.skippers[i]?.intent ?? '',
       place: race.livePlace(b),
       flag: b.ocs && !b.started && race.t >= race.gunT ? 'OCS' : b.penalty.owed > 0 ? 'P' : b.finished ? '✓' : null,
+      known: !scene && !b.human && race.skippers[i] ? knownFor(b.persona?.strengths) : undefined,
     }));
     fleet.sort((a, z) => (pre ? (a.isPlayer ? -1 : z.isPlayer ? 1 : a.sail.localeCompare(z.sail)) : a.place - z.place));
     let goal: HudState['goal'] = null;
@@ -967,7 +968,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             </div>
             <div className={cx('absolute right-6 top-5 hidden flex-col gap-4 lg:flex', hud.penalty ? 'bottom-[290px]' : 'bottom-[236px]')}>
               {hud.line ? <LineCard line={hud.line} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} /> : <CourseCard {...hud.course} map={<CourseMap race={race} width={240} height={150} cam={view === 'bank' ? bcam : null} />} />}
-              <FleetCard rows={hud.fleet} preStart={hud.preStart} />
+              <FleetCard rows={hud.fleet} preStart={hud.preStart} sizeUp={hud.T > 25} />
             </div>
 
             {/* View tools */}

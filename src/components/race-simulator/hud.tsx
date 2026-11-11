@@ -157,14 +157,15 @@ export function CourseCard({ leg, legNo, legs, next, distL, place, of, status, m
 }
 
 // ───────────────────────── Fleet ─────────────────────────
-export interface FleetRow { id: string; sail: string; color: string; name: string; intent: string; isPlayer: boolean; place: number; flag: string | null }
+export interface FleetRow { id: string; sail: string; color: string; name: string; intent: string; isPlayer: boolean; place: number; flag: string | null; /** What an AI skipper is known for (shown before the start, while you size up the fleet). */ known?: string }
 
-export function FleetCard({ rows, preStart }: { rows: FleetRow[]; preStart: boolean }) {
+export function FleetCard({ rows, preStart, sizeUp = false }: { rows: FleetRow[]; preStart: boolean; /** Early in the countdown: say what each skipper is known for, while there's time to size the fleet up. */ sizeUp?: boolean }) {
+  const known = preStart && sizeUp && rows.some(r => r.known);
   return (
     <Hud className="flex min-h-0 w-[276px] flex-col px-2 pb-2 pt-3.5">
       <div className="flex items-center justify-between px-2.5 pb-1.5">
         <Cap>Fleet</Cap>
-        <span className="text-xs" style={{ color: C.mute }}>{preStart ? "what they're planning" : 'place · what they\'re doing'}</span>
+        <span className="text-xs" style={{ color: C.mute }}>{known ? "what they're known for" : preStart ? "what they're planning" : 'place · what they\'re doing'}</span>
       </div>
       <div className="min-h-0 overflow-y-auto">
         {rows.map(r => (
@@ -173,7 +174,9 @@ export function FleetCard({ rows, preStart }: { rows: FleetRow[]; preStart: bool
             <span className="text-[13px] font-semibold tabular-nums">{preStart ? r.sail : r.place}</span>
             <span className="min-w-0">
               <span className="block truncate text-[13px] font-semibold">{preStart ? r.name : `${r.sail} · ${r.name}`}{r.flag && <span className="ml-1.5 text-[11px] font-bold text-[#FFB067]">{r.flag}</span>}</span>
-              <span className="block truncate text-[12.5px]" style={{ color: C.mute }}>{r.intent}</span>
+              {known && r.known
+                ? <span className="block text-[12.5px] leading-snug text-[#A9D2FF]">{r.known}</span>
+                : <span className="block truncate text-[12.5px]" style={{ color: C.mute }}>{r.intent}</span>}
             </span>
           </div>
         ))}

@@ -61,6 +61,12 @@ export interface CrewMember {
   autoTrim?: boolean;
 }
 
+/**
+ * What a skipper is good and bad at, against the level of the fleet she's in: each part of the
+ * race from -1 (sails it like the level below) to +1 (like the level above). Every fleet is a mix.
+ */
+export interface Strengths { start: number; speed: number; tactics: number; marks: number; rules: number }
+
 export interface Persona {
   key: string;
   name: string;        // shown on screen, e.g. "Pin hunter"
@@ -73,6 +79,8 @@ export interface Persona {
   sidePref: number;    // -1 left, 0 none, +1 right
   /** How much she reads the line and fights for the end that pays (her level's start strategy), 0 to 1. */
   startSense?: number;
+  /** What this kind of skipper is good and bad at; in a race, with her form on the day added. */
+  strengths?: Strengths;
 }
 
 export interface PenaltyState {

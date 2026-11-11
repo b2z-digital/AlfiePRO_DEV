@@ -2,7 +2,7 @@
 // step(): wind → each boat's local wind → AI decisions → helm/player input → physics →
 // collisions → start/rounding/finish progress → referee → recording.
 
-import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, sharpStarter } from './ai';
+import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, ownLevel, sharpStarter, strengthsFor } from './ai';
 import { CLASSES, RIG_POWER, bestSheet, iomRig, overpowerEase, rigDrive, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
 import { Course, buildCourse, fromCourse, initialProgress, toCourse } from './course';
@@ -250,8 +250,13 @@ export class Race implements AiHost {
         this.crew.push({ boat: i, log: { input: [], acts: [] }, upTo: 0, aiFrom: Infinity, input: { rudder: 0, sheet: 1, autoTrim: crew![i].autoTrim ?? s.autoTrim }, assist: null, fi: 0, fa: 0 });
       } else if (isPlayer) { this.playerIndex = i; this.skippers.push(null); }
       else {
+        // Every skipper has her own strengths and her form on the day, so a fleet is a mix: sharp
+        // starters, tight rounders, shift readers, quick boats; some on it and some not. (Drawn
+        // apart from everything else, so the rest of the race is laid out as it always was.)
+        persona!.strengths = strengthsFor(persona!, new Rng(s.seed * 131 + i * 7919 + 17));
+        const own = ownLevel(s.level, persona!.strengths);
         // (Every fourth skipper of a club fleet is one of its sharp starters.)
-        const lv = i % 4 === 1 ? sharpStarter(LEVELS[s.level]) : LEVELS[s.level];
+        const lv = i % 4 === 1 ? sharpStarter(own) : own;
         persona!.startSense = lv.startSense;
         const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
         if (s.forgetfulSkippers && this.rng.chance(lv.forget * 2)) this.forgot.add(b.id);

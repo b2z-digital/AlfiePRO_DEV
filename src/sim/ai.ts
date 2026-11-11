@@ -9,7 +9,7 @@ import { Course, Leg, Rounding, roundingPoint } from './course';
 import { Rng, V2, bearing, clamp, dir, dist, lerp, n180, n360, sub, dot, cross } from './math';
 import { bankAhead, bow, capsule, closest, hullGap, lineSide, stern } from './physics';
 import { keepClear, Referee } from './referee';
-import type { Boat, Persona, SkipperLevel } from './types';
+import type { Boat, Persona, SkipperLevel, Strengths } from './types';
 import type { WindField } from './wind';
 import { datan2, dcos, dexp, dhypot, dsin } from './dmath';
 
@@ -17,6 +17,13 @@ export interface LevelParams {
   reaction: number; noise: number; trimNoise: number; shiftThr: number; layMargin: number;
   startMargin: number; misjudge: number; forget: number; roundIn: number; roundOut: number;
   minTack: number; tackRudder: number; margin: number;
+  /**
+   * The approach to a windward mark. layOut: how many lengths out from the mark she plans to be on
+   * the final layline (the best are on it outside the zone with room to settle; a club sailor
+   * leaves it late and tacks under the mark). layClear: how far above the layline she tacks, in
+   * lengths, to cover what the tack itself costs (a sloppier tack needs more).
+   */
+  layOut: number; layClear: number;
   /** Start judgement: spread of the clock error (s) and of judging the line from the bank (hull lengths). */
   startSigma: number; lineSigma: number;
   /**
@@ -35,10 +42,10 @@ export interface LevelParams {
  * Sailed alone round a lap, each level is a little quicker than the one below (see levels.test.ts).
  */
 export const LEVELS: Record<SkipperLevel, LevelParams> = {
-  club: { reaction: 0.45, noise: 4.2, trimNoise: 0.14, shiftThr: 5.5, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 5.5, tackRudder: 0.62, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
-  state: { reaction: 0.32, noise: 3, trimNoise: 0.1, shiftThr: 6.5, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 6, tackRudder: 0.74, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
-  national: { reaction: 0.22, noise: 1.9, trimNoise: 0.06, shiftThr: 7.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 7, tackRudder: 0.82, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
-  world: { reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 10, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 9, tackRudder: 0.92, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
+  club: { layOut: 3.0, layClear: 0.85, reaction: 0.45, noise: 4.2, trimNoise: 0.14, shiftThr: 5.5, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 5.5, tackRudder: 0.62, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
+  state: { layOut: 4.2, layClear: 0.6, reaction: 0.32, noise: 3, trimNoise: 0.1, shiftThr: 6.5, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 6, tackRudder: 0.74, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
+  national: { layOut: 4.8, layClear: 0.45, reaction: 0.22, noise: 1.9, trimNoise: 0.06, shiftThr: 7.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 7, tackRudder: 0.82, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
+  world: { layOut: 5.0, layClear: 0.35, reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 10, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 9, tackRudder: 0.92, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
 };
 
 /**
@@ -51,15 +58,84 @@ export function sharpStarter(lv: LevelParams): LevelParams {
   return lv.startSense >= st.startSense ? lv : { ...lv, startSense: 0.75, startSigma: st.startSigma, lineSigma: st.lineSigma, startMargin: st.startMargin };
 }
 
+/** Which of a skipper's skills belong to which part of the race. */
+const AREAS: Record<keyof Strengths, (keyof LevelParams)[]> = {
+  start: ['startMargin', 'startSigma', 'lineSigma', 'startSense'],
+  speed: ['noise', 'trimNoise', 'tackRudder'],
+  tactics: ['shiftThr', 'minTack', 'layMargin', 'layOut', 'layClear'],
+  marks: ['roundIn', 'roundOut'],
+  rules: ['reaction', 'misjudge', 'forget', 'margin'],
+};
+const LEVEL_ORDER: SkipperLevel[] = ['club', 'state', 'national', 'world'];
+const NO_STRENGTHS: Strengths = { start: 0, speed: 0, tactics: 0, marks: 0, rules: 0 };
+
+/**
+ * One skipper's own skills: her fleet's level, moved in each part of the race towards the level
+ * above (a strength) or the level below (a weakness). At +1 she starts, say, like the level above;
+ * past the ends of the ladder it's a little over half a step more of the same. Nobody is given
+ * speed: a "fast" skipper steers straighter and trims closer, which is all a fast skipper is.
+ */
+export function ownLevel(level: SkipperLevel, s: Strengths): LevelParams {
+  const i = LEVEL_ORDER.indexOf(level), base = LEVELS[level], out = { ...base };
+  const up = i < 3 ? LEVELS[LEVEL_ORDER[i + 1]] : null, down = i > 0 ? LEVELS[LEVEL_ORDER[i - 1]] : null;
+  for (const area of Object.keys(AREAS) as (keyof Strengths)[]) {
+    const v = clamp(s[area], -1.4, 1.4);
+    if (!v) continue;
+    for (const k of AREAS[area]) {
+      const b = base[k];
+      const to = v > 0 ? (up ? up[k] : b + (b - down![k]) * 0.6) : (down ? down[k] : b + (b - up![k]) * 0.6);
+      out[k] = Math.max(k === 'misjudge' || k === 'forget' ? 0.001 : 0.004, b + (to - b) * Math.abs(v));
+    }
+  }
+  out.startSense = clamp(out.startSense, 0, 1);
+  out.tackRudder = clamp(out.tackRudder, 0.5, 1);
+  return out;
+}
+
+/**
+ * A skipper's strengths for one race: what her kind is good at, her form on the day (the same
+ * across the board: every fleet has boats that are on it and boats that aren't), and a little
+ * of each part of the race going better or worse than usual.
+ */
+export function strengthsFor(p: Persona, rng: Rng): Strengths {
+  const kind = p.strengths ?? NO_STRENGTHS;
+  const form = rng.range(-0.35, 0.35);
+  // (Form doesn't reach her manners: someone having a bad day is slow, not suddenly a danger to the fleet.)
+  const of = (k: keyof Strengths) => Math.round(clamp(kind[k] + (k === 'rules' ? rng.range(-0.12, 0.12) : form + rng.range(-0.25, 0.25)), -1.4, 1.4) * 100) / 100;
+  return { start: of('start'), speed: of('speed'), tactics: of('tactics'), marks: of('marks'), rules: of('rules') };
+}
+
+const KNOWN: Record<keyof Strengths, [string, string]> = {
+  start: ['Sharp off the line', 'slow off the line'],
+  speed: ['Quick in a straight line', 'short of pace'],
+  tactics: ['Reads the shifts', 'misses the shifts'],
+  marks: ['Tight at the marks', 'wide at the marks'],
+  rules: ['Keeps out of trouble', 'gets into tangles'],
+};
+/** What a skipper is known for, in a few words: her best part of the race, and her worst if it's a real weakness. */
+export function knownFor(s: Strengths | undefined): string {
+  if (!s) return '';
+  const ks = Object.keys(KNOWN) as (keyof Strengths)[];
+  const best = ks.reduce((a, k) => (s[k] > s[a] ? k : a)), worst = ks.reduce((a, k) => (s[k] < s[a] ? k : a));
+  // (A strength is worth saying sooner than a weakness: it's what you plan your race round.)
+  const good = s[best] >= 0.3 ? KNOWN[best][0] : null, bad = s[worst] <= -0.55 ? KNOWN[worst][1] : null;
+  if (good && bad) return `${good}, ${bad}`;
+  if (good) return good;
+  if (bad) return bad[0].toUpperCase() + bad.slice(1);
+  return 'Solid all round';
+}
+
 export const PERSONAS: Persona[] = [
-  { key: 'pin', name: 'Pin hunter', aggression: 0.7, risk: 0.6, startEnd: 0.1, startEarly: 0.3, consistency: 0.7, shiftSense: 1, sidePref: -1 },
-  { key: 'squeezer', name: 'Squeezer', aggression: 0.85, risk: 0.5, startEnd: 0.9, startEarly: 0.2, consistency: 0.7, shiftSense: 1.1, sidePref: 1 },
-  { key: 'steady', name: 'Steady', aggression: 0.4, risk: 0.3, startEnd: 0.5, startEarly: 0.9, consistency: 0.9, shiftSense: 1, sidePref: 0 },
-  { key: 'luffer', name: 'Leeward luffer', aggression: 0.9, risk: 0.5, startEnd: 0.62, startEarly: 0.5, consistency: 0.7, shiftSense: 1.2, sidePref: 0 },
-  { key: 'gambler', name: 'Gambler', aggression: 0.6, risk: 0.9, startEnd: 0.3, startEarly: 0, consistency: 0.55, shiftSense: 0.9, sidePref: 1 },
-  { key: 'builder', name: 'Speed builder', aggression: 0.5, risk: 0.4, startEnd: 0.42, startEarly: 0.6, consistency: 0.8, shiftSense: 1.3, sidePref: 0 },
-  { key: 'shifty', name: 'Shift player', aggression: 0.5, risk: 0.5, startEnd: 0.38, startEarly: 0.6, consistency: 0.75, shiftSense: 0.7, sidePref: 0 },
-  { key: 'careful', name: 'Conservative', aggression: 0.25, risk: 0.2, startEnd: 0.56, startEarly: 1.4, consistency: 0.85, shiftSense: 1.1, sidePref: 0 },
+  { key: 'pin', name: 'Pin hunter', aggression: 0.7, risk: 0.6, startEnd: 0.1, startEarly: 0.3, consistency: 0.7, shiftSense: 1, sidePref: -1, strengths: { start: 0.8, speed: 0, tactics: -0.4, marks: 0.1, rules: -0.1 } },
+  { key: 'squeezer', name: 'Squeezer', aggression: 0.85, risk: 0.5, startEnd: 0.9, startEarly: 0.2, consistency: 0.7, shiftSense: 1.1, sidePref: 1, strengths: { start: 0.6, speed: -0.2, tactics: -0.2, marks: 0.6, rules: -0.2 } },
+  { key: 'steady', name: 'Steady', aggression: 0.4, risk: 0.3, startEnd: 0.5, startEarly: 0.9, consistency: 0.9, shiftSense: 1, sidePref: 0, strengths: { start: 0.1, speed: 0.1, tactics: 0.1, marks: 0, rules: 0.5 } },
+  { key: 'luffer', name: 'Leeward luffer', aggression: 0.9, risk: 0.5, startEnd: 0.62, startEarly: 0.5, consistency: 0.7, shiftSense: 1.2, sidePref: 0, strengths: { start: 0, speed: 0.3, tactics: -0.3, marks: 0.3, rules: -0.1 } },
+  { key: 'gambler', name: 'Gambler', aggression: 0.6, risk: 0.9, startEnd: 0.3, startEarly: 0, consistency: 0.55, shiftSense: 0.9, sidePref: 1, strengths: { start: 0.2, speed: 0.2, tactics: -0.7, marks: 0.2, rules: -0.3 } },
+  { key: 'builder', name: 'Speed builder', aggression: 0.5, risk: 0.4, startEnd: 0.42, startEarly: 0.6, consistency: 0.8, shiftSense: 1.3, sidePref: 0, strengths: { start: -0.4, speed: 1, tactics: 0, marks: -0.3, rules: 0.1 } },
+  { key: 'shifty', name: 'Shift player', aggression: 0.5, risk: 0.5, startEnd: 0.38, startEarly: 0.6, consistency: 0.75, shiftSense: 0.7, sidePref: 0, strengths: { start: -0.3, speed: -0.1, tactics: 1, marks: 0, rules: 0.1 } },
+  { key: 'careful', name: 'Conservative', aggression: 0.25, risk: 0.2, startEnd: 0.56, startEarly: 1.4, consistency: 0.85, shiftSense: 1.1, sidePref: 0, strengths: { start: -0.6, speed: 0, tactics: 0.3, marks: -0.6, rules: 0.8 } },
+  { key: 'rounder', name: 'Inside-line hunter', aggression: 0.85, risk: 0.8, startEnd: 0.7, startEarly: 0.5, consistency: 0.65, shiftSense: 1, sidePref: 0, strengths: { start: 0, speed: 0, tactics: -0.2, marks: 1, rules: -0.25 } },
+  { key: 'allround', name: 'All-rounder', aggression: 0.55, risk: 0.45, startEnd: 0.6, startEarly: 0.7, consistency: 0.85, shiftSense: 1, sidePref: 0, strengths: { start: 0.3, speed: 0.3, tactics: 0.3, marks: 0.3, rules: 0.3 } },
 ];
 
 export interface Perceived { x: number; y: number; hdg: number; spd: number; rot: number }
@@ -93,6 +169,13 @@ interface Plan { hdg: number; sheet: number; intent: string; maneuver?: 'tack' |
 
 const ANGLES = [0, -7, 7, -14, 14, -24, 24, -38, 38, -55, 55, -80, 80];
 
+/** How far above close-hauled a skipper will squeeze for the last lengths to a mark (degrees). */
+const PINCH = 9;
+/** With a boat keeping clear of her close by, she comes back to her course this much at a time (degrees a decision: about 9 a second). */
+const COME_UP = 0.9;
+/** A tack she has just made is finished, and she's sailing again, after this long (s). */
+const TACK_SETTLE = 2.6;
+
 /** How long a skipper's sense of the average wind direction reaches back, and of the wind now (s). */
 export const WIND_SENSE = { mean: 60, felt: 4 };
 
@@ -103,6 +186,10 @@ export class Skipper implements Helm {
   private ouTrim = 0;
   lastTackT = -99;
   lastGybeT = -99;
+  /** When she first knew she owed the turn she owes now. */
+  private owedSince = -1;
+  /** When a tack she needed was last called off for traffic. */
+  private tackBlockedT = -99;
   gate: 0 | 1 | null = null;
   /** Pre-start state: the piece of line they want, how deep they hover, when they set up,
    *  and their personal clock and line-sighting errors for this race. */
@@ -205,12 +292,27 @@ export class Skipper implements Helm {
     const clearOfBank = () => !h.course.shore || [0, 60, 120, 180, 240, 300].every(a => bankAhead(b, h.course, b.hdg + a) > 2.2 * L0);
     // Well into her turn she carries on unless someone is about to hit her.
     const turning = b.penalty.active && Math.abs(b.penalty.rot) > 60;
-    const ok = owes && canTurn && clearOfMarks && (turning ? !this.trafficNear(h, 2 * L0, 3) : this.clearOfOthers(h, 4) && !this.trafficNear(h, 2.5 * L0, 5) && clearOfBank());
+    // She wants four clear lengths round her to begin with. In a fleet that can be a long wait,
+    // and the rule is "as soon as possible": the longer she has owed it, the smaller the gap she'll
+    // take (down to two and a half lengths, twenty-odd seconds on), as a skipper does who can see
+    // the fleet isn't going to open up for her.
+    if (!owes) this.owedSince = -1; else if (this.owedSince < 0) this.owedSince = h.t;
+    const owedFor = owes ? h.t - Math.max(this.owedSince, h.gunT - 14) : 0;
+    const press = clamp((owedFor - 5) / 18, 0, 1);
+    const ok = owes && canTurn && clearOfMarks && (turning ? !this.trafficNear(h, 2 * L0, 3) : this.clearOfOthers(h, lerp(4, 2.5, press)) && !this.trafficNear(h, lerp(2.5, 1.9, press) * L0, lerp(5, 3.4, press)) && clearOfBank());
     if (ok) { plan = this.penaltyPlan(h); this.maneuver = null; }
     else if (man) plan = man;
     else if (r2t) plan = r2t;
     else if (h.t < h.gunT || !b.started) plan = this.startPlan(h);
     else plan = this.racePlan(h);
+    // Owing a turn with boats all round her, she doesn't sail on in the pack waiting for it to
+    // open up: she eases off and lets them sail away from her, and turns in the water they leave.
+    // (Two boats that both owe one don't both drop back, or they'd stay in each other's way for good: the one behind does.)
+    const otherOwing = h.boats.some((o, j) => j < this.idx && !o.finished && !o.retired && o.penalty.owed > 0 && dist(o, b) < 6 * L0);
+    if (!ok && owes && canTurn && b.started && owedFor > 3 && !otherOwing && !plan.maneuver && !plan.rounding && h.course.marks.every(m => dist(m.p, b) > 3 * L0)) {
+      const a = Math.abs(n180(b.twd - plan.hdg));
+      plan = { ...plan, sheet: a < 100 ? easedSheet(a, 0.35) : clamp(bestSheet(a) + 0.5, 0, 1), intent: 'Dropping back to take a penalty' };
+    }
     if (plan !== man && (plan.maneuver === 'tack' || plan.maneuver === 'gybe')) this.beginManeuver(h, plan.maneuver);
 
     // Unstick: stopped for a while outside the pre-start hold.
@@ -227,10 +329,10 @@ export class Skipper implements Helm {
     let final = plan.maneuver === 'penalty' ? plan : this.tactics(h, plan);
     if (h.course.shore && !man) final = this.keepOffShore(h, final);
     // Abort a tack to avoid a foul only at its very start; once turning, finish it.
-    if (man && this.maneuver && h.t - this.maneuver.t0 < 0.4 && final !== plan && Math.abs(n180(final.hdg - plan.hdg)) > 30) this.maneuver = null;
+    if (man && this.maneuver && h.t - this.maneuver.t0 < 0.4 && final !== plan && Math.abs(n180(final.hdg - plan.hdg)) > 30) this.blocked(h);
     else if (man && final !== plan) {
       // Mid-manoeuvre she finishes the turn, unless carrying on means hitting someone (Rule 14).
-      if (this.planCost >= 900) this.maneuver = null;
+      if (this.planCost >= 900) this.blocked(h);
       else { final = { ...final, hdg: plan.hdg, intent: plan.intent }; this.pendingAvoid = null; }
     }
     if (this.pendingAvoid) this.lastAvoid = this.pendingAvoid;
@@ -256,6 +358,12 @@ export class Skipper implements Helm {
       }
     }
     return plan;
+  }
+
+  /** A tack or gybe she had begun is called off: someone was in the way. She can try again in a moment. */
+  private blocked(h: AiHost) {
+    if (this.maneuver?.kind === 'tack') { this.tackBlockedT = h.t; this.lastTackT = h.t - (TACK_SETTLE - 0.8); }
+    this.maneuver = null;
   }
 
   private beginManeuver(h: AiHost, kind: 'tack' | 'gybe') {
@@ -343,6 +451,21 @@ export class Skipper implements Helm {
   private closeHauled(tack: 'port' | 'stbd', twd: number, tws: number) {
     const a = vmgAngles(this.b.cls, tws).up + 1.5;
     return n360(tack === 'stbd' ? twd - a : twd + a);
+  }
+
+  /**
+   * Close-hauled and wanting to point a little higher (the last lengths to a windward mark): squeeze
+   * up to it on the tack she's on, by no more than a good skipper can pinch without stopping. She
+   * never crosses the wind this way: a tack is a decision made where room has been looked for.
+   */
+  private squeeze(want: number): number {
+    const b = this.b;
+    const up = vmgAngles(b.cls, b.tws).up + 1.5;
+    const twa = n180(b.twd - want); // + = on starboard
+    const mine = b.tack === 'stbd' ? twa : -twa;
+    if (mine >= up) return want;
+    const a = Math.max(mine, up - PINCH);
+    return n360(b.tack === 'stbd' ? b.twd - a : b.twd + a);
   }
 
   /** Steer as close as possible to `want` without pointing into the wind. */
@@ -614,13 +737,24 @@ export class Skipper implements Helm {
     // Upwind: only once we can fetch (or we're very close).
     const want = bearing(b, roundingPoint(r, M, b.progress + 40, this.lv.roundIn * L));
     const up = vmgAngles(b.cls, b.tws).up;
-    return Math.abs(n180(b.twd - want)) >= up - 2 || d < 2.2 * L || b.progress > -10;
+    const off = n180(b.twd - want);
+    // Beating on the tack that doesn't lead there, she has a tack to make first: that's the beat's
+    // business (it looks for the layline, and for room), not the rounding's.
+    const beating = Math.abs(b.twa) < up + 14;
+    if (beating && Math.abs(off) < 80 && (off >= 0 ? b.tack !== 'stbd' : b.tack !== 'port')) return false;
+    if (b.progress > -10) return true;
+    if (Math.abs(off) >= up - 2) return true;
+    // Close under it: only if she can squeeze round on the tack she's on. (Close under the mark on
+    // the wrong side of the wind she has a tack to make first, which is the beat's business: begun
+    // as a "rounding" it was a tack nobody had looked for room to make.)
+    return d < 2.2 * L && Math.abs(off) >= up - PINCH;
   }
 
   private round(h: AiHost, r: Rounding, M: V2, prog: number): Plan {
     const b = this.b, L = b.cls.loa;
     const frac = clamp((prog + 25) / (r.sweep + 25), 0, 1);
-    const rad = lerp(this.lv.roundIn, this.lv.roundOut, frac) * L;
+    // (The pushier the skipper, the closer she shaves it.)
+    const rad = lerp(this.lv.roundIn, this.lv.roundOut, frac) * (1.08 - 0.16 * this.persona.aggression) * L;
     // Owe mark-room to an inside boat? Go wider.
     let extra = 0;
     h.boats.forEach((o, j) => {
@@ -630,7 +764,22 @@ export class Skipper implements Helm {
     });
     const Q = roundingPoint(r, M, prog + 42, rad + extra);
     const want = bearing(b, Q);
-    const hdg = this.sailable(want, b.tack);
+    let hdg: number;
+    if (h.course.legs[b.legIndex]?.upwind && Math.abs(b.twa) < 90) {
+      const wTwa = n180(b.twd - want);
+      const otherTack = wTwa >= 0 ? b.tack !== 'stbd' : b.tack !== 'port';
+      // (Decidedly on the other tack: a point she's about to sweep past, a few degrees the other side of the wind, isn't a reason to tack.)
+      if (otherTack && Math.abs(wTwa) > vmgAngles(b.cls, b.tws).up - 12 && Math.abs(wTwa) + Math.abs(b.twa) < 180) {
+        // The way round is on the other tack (she came in on port, or was kept from tacking by a
+        // boat on the layline and has sailed past it). That's a tack, and it's asked for as one,
+        // so room is looked for and Rule 18.3 kept; until there's room she holds her course.
+        if (h.t - this.lastTackT > TACK_SETTLE) {
+          this.lastTackT = h.t;
+          return { hdg: this.closeHauled(b.tack === 'stbd' ? 'port' : 'stbd', b.twd, b.tws), sheet: bestSheet(45), intent: 'Tacking round the mark', maneuver: 'tack', rounding: { mark: M, side: r.side } };
+        }
+        hdg = this.closeHauled(b.tack, b.twd, b.tws);
+      } else hdg = this.squeeze(want);
+    } else hdg = this.sailable(want, b.tack);
     const twa = Math.abs(n180(b.twd - hdg));
     return { hdg, sheet: bestSheet(twa), intent: prog < -150 ? `Going back round ${h.course.byId[r.markId].name}` : `Rounding ${h.course.byId[r.markId].name}`, rounding: { mark: M, side: r.side } };
   }
@@ -649,24 +798,69 @@ export class Skipper implements Helm {
     if (Math.abs(twaT) >= vmgAngles(b.cls, tws).up + 20 && Math.abs(twaT) < 100 && (Math.sign(twaT) === Math.sign(b.twa) || Math.abs(b.twa) > 60)) {
       return { hdg: brg, sheet: bestSheet(Math.abs(twaT)), intent: r ? 'Reaching to the mark' : 'Reaching to the finish' };
     }
-    // Coming in on port to a mark left to port: get onto the starboard layline before the zone
-    // (tacking inside it risks Rule 18.3), so tack as soon as starboard lays it.
-    const lay = this.lv.layMargin * (0.8 + 0.4 * (1 - this.persona.risk)) * (r && r.side === 'port' && !onStbd && d < 7 * L ? 0.3 : 1);
+    // Tacking for a mark's final layline she allows for the tack itself: enough above the layline
+    // that she still lays it once she's round and sailing again. (Close in, the point she's laying
+    // is already the room she rounds with, so there's nothing more to add.)
+    const inTack: 'port' | 'stbd' | null = r ? (r.side === 'port' ? 'stbd' : 'port') : null;
+    const lay = this.lv.layMargin * (0.8 + 0.4 * (1 - this.persona.risk)) + (inTack && b.tack !== inTack ? datan2(this.lv.layClear * L * clamp((d - 2 * L) / (3 * L), 0, 1), Math.max(d, L)) * 180 / Math.PI : 0);
     const fetchOther = onStbd ? n180(brg - hp) >= lay : n180(hs - brg) >= lay;
     const fetchThis = onStbd ? n180(hs - brg) >= 0 : n180(brg - hp) >= 0;
     const shift = n180(this.feltTwd - this.meanTwd);
     const lift = onStbd ? shift : -shift;
     const sinceTack = h.t - this.lastTackT;
-    let tack = false, why = '';
-    if (!fetchThis && fetchOther) { tack = true; why = 'Tacking on the layline'; }
-    const thr = this.lv.shiftThr * this.persona.shiftSense;
-    const curOff = Math.abs(n180((onStbd ? hs : hp) - brg)), othOff = Math.abs(n180((onStbd ? hp : hs) - brg));
-    if (!tack && !fetchThis && curOff - othOff > 2 * thr + 8) { tack = true; why = 'Tacking towards the mark'; }
-    if (!tack && !fetchThis && -lift > thr && d > 6 * L && curOff - othOff > -12) { tack = true; why = 'Tacking on a header'; }
-    if (!tack && b.shadow > 0.14) {
-      if (this.shadowSince < 0) this.shadowSince = h.t;
-      if (h.t - this.shadowSince > 3.5 - 2 * this.persona.risk && d > 5 * L && !fetchThis) { tack = true; why = 'Tacking for clear air'; }
-    } else if (b.shadow < 0.06) this.shadowSince = -1;
+    let tack = false, why = '', must = false;
+    let squeeze: number | null = null;
+    // The least room she can round with: half a length off the mark.
+    const Tm = r ? roundingPoint(r, T, 0, 0.5 * L) : T;
+    let laysMark = false, shooting = false;
+    // The approach to a windward mark is sailed to a plan: be on the final layline a few lengths
+    // out, with one tack to get there. Nothing else is worth a tack this close (a header here is
+    // gone before it pays, and every extra tack is a length and a boat or two).
+    const approach = !!inTack && d < clamp(0.3 * h.course.beat, 6 * L, 9 * L);
+    if (approach) {
+      const settled = sinceTack > TACK_SETTLE;
+      if (b.tack !== inTack) {
+        // On the other tack: straight on to the layline, and tack on it. (With boats coming up the
+        // layline in the way she sails on and tacks in the first gap. Slowing to wait for one was
+        // tried, and measured: it cost her more than the lengths she overstands by.)
+        if (fetchOther && settled) { tack = true; must = true; why = 'Tacking on the layline'; }
+      } else if (!fetchThis && !(laysMark = onStbd ? n180(hs - bearing(b, Tm)) >= 0 : n180(bearing(b, Tm) - hp) >= 0)) {
+        // On the final tack and not even laying the mark with half a length to spare (laying it
+        // closer than she'd choose to is still laying it: she carries on). Where would a hitch on
+        // the other tack meet the layline?
+        const brgM = bearing(b, Tm);
+        const dIn = dir(onStbd ? hs : hp), dOut = dir(onStbd ? hp : hs), v = sub(Tm, b);
+        const den = cross(dOut, dIn);
+        const out = Math.abs(den) > 1e-6 ? cross(v, dOut) / -den : 0; // lengths out from the mark, along the layline
+        const hitch = Math.abs(den) > 1e-6 ? cross(v, dIn) / den : 0; // how far she'd sail on the other tack to get there
+        const short = onStbd ? n180(brgM - hs) : n180(hp - brgM);     // degrees above close-hauled the mark bears
+        const plan = this.lv.layOut + 2.4 * (0.5 - this.persona.risk);
+        if (d < 1.8 * L && short <= 26 && b.spd > 0.6 * b.targetSpd) {
+          // A length or so short, with way on: luff and carry her round on what speed she has.
+          squeeze = n360(onStbd ? hs + short + 1.5 : hp - short - 1.5);
+          shooting = true;
+        } else if (d < 3.4 * L && short <= PINCH + 3 && b.spd > 0.4 * b.targetSpd) {
+          // Nearly laying it, close in: squeeze up the last few lengths instead of two tacks in the zone.
+          squeeze = n360(onStbd ? hs + Math.min(PINCH, short + 1.5) : hp - Math.min(PINCH, short + 1.5));
+        } else if (settled && (d < 3.4 * L || (out <= plan * L && hitch > 1.2 * L))) {
+          tack = true; must = true; why = 'Tacking out to the layline';
+        } else if (d < 3.4 * L && h.t - this.tackBlockedT < 2.2) {
+          // Under the mark with boats in the way of her tack: slow down and let them through,
+          // instead of sailing on past the mark.
+          return { hdg: onStbd ? hs : hp, sheet: easedSheet(45, 0.3), intent: 'Waiting for room to tack' };
+        }
+      }
+    } else {
+      if (!fetchThis && fetchOther) { tack = true; must = !!r; why = 'Tacking on the layline'; }
+      const thr = this.lv.shiftThr * this.persona.shiftSense;
+      const curOff = Math.abs(n180((onStbd ? hs : hp) - brg)), othOff = Math.abs(n180((onStbd ? hp : hs) - brg));
+      if (!tack && !fetchThis && curOff - othOff > 2 * thr + 8) { tack = true; why = 'Tacking towards the mark'; }
+      if (!tack && !fetchThis && -lift > thr && d > 6 * L && curOff - othOff > -12) { tack = true; why = 'Tacking on a header'; }
+      if (!tack && b.shadow > 0.14) {
+        if (this.shadowSince < 0) this.shadowSince = h.t;
+        if (h.t - this.shadowSince > 3.5 - 2 * this.persona.risk && d > 5 * L && !fetchThis) { tack = true; why = 'Tacking for clear air'; }
+      } else if (b.shadow < 0.06) this.shadowSince = -1;
+    }
     // Course boundaries.
     const B = h.course.bounds;
     const off = dot(sub(b, h.course.origin), h.course.right);
@@ -674,11 +868,13 @@ export class Skipper implements Helm {
     if (!tack && Math.abs(off) > B.across * 0.82 && Math.sign(outward) === Math.sign(off)) { tack = true; why = 'Tacking away from the bank'; }
     // At a real venue the shore can come first.
     if (!tack && h.course.shore && bankAhead(b, h.course, onStbd ? hs : hp) < 3.6 * L && bankAhead(b, h.course, onStbd ? hp : hs) > 4 * L) { tack = true; why = 'Tacking away from the bank'; }
-    if (tack && sinceTack < this.lv.minTack * (1.2 - 0.4 * this.persona.risk)) tack = false;
+    // Not tacking again straight after a tack is for shifts and lanes: a layline doesn't wait.
+    if (tack && sinceTack < (must ? TACK_SETTLE : this.lv.minTack * (1.2 - 0.4 * this.persona.risk))) tack = false;
     if (tack) {
       this.lastTackT = h.t;
       return { hdg: onStbd ? hp : hs, sheet: bestSheet(45), intent: why, maneuver: 'tack' };
     }
+    if (squeeze != null) return { hdg: squeeze, sheet: bestSheet(Math.abs(n180(twd - squeeze))), intent: shooting ? 'Shooting the mark' : 'Squeezing up to the mark' };
     let hdg = onStbd ? hs : hp;
     let intent = -lift > 2 ? 'On the headed tack' : lift > 2 ? 'On the lifted tack' : 'Beating';
     if (fetchThis) {
@@ -686,8 +882,8 @@ export class Skipper implements Helm {
       // Bear away to the mark only if it's below close-hauled.
       if (onStbd ? n180(hs - aim) > 0 : n180(aim - hp) > 0) hdg = aim;
       intent = r ? 'On the layline' : 'Laying the finish';
-    }
-    if (b.spd < b.targetSpd * 0.8 && !fetchThis) { hdg = n360(onStbd ? hdg - 4 : hdg + 4); intent = 'Building speed'; }
+    } else if (laysMark) intent = 'On the layline';
+    if (b.spd < b.targetSpd * 0.8 && !fetchThis && !laysMark) { hdg = n360(onStbd ? hdg - 4 : hdg + 4); intent = 'Building speed'; }
     return { hdg, sheet: bestSheet(Math.abs(n180(twd - hdg))), intent };
   }
 
@@ -767,7 +963,14 @@ export class Skipper implements Helm {
     const holdHdg = committed && this.lastAvoid.tag === 'hold' ? this.lastAvoid.hdg : b.hdg;
     const offPlan = Math.abs(n180(holdHdg - plan.hdg));
     const rowNear = !plan.rounding && others.some(ot => ot.g0 < 2.5 * L && keepClear(b, ot.o, h.t).keeper === 1);
-    if (rowNear && offPlan > 4 && Math.abs(n180(b.twd - holdHdg)) > ngA + 2) cands.push({ hdg: holdHdg, sheet: sheetAt(holdHdg), extra: offPlan * 0.55, tag: 'hold' });
+    if (rowNear && offPlan > 4 && Math.abs(n180(b.twd - holdHdg)) > ngA + 2) {
+      cands.push({ hdg: holdHdg, sheet: sheetAt(holdHdg), extra: offPlan * 0.55, tag: 'hold' });
+      // Or come back to her course slowly, a little at a time, so the boat keeping clear of her
+      // always has room to (Rule 16.1). Held off her course by a boat to windward, this is how she
+      // gets back up to it instead of being carried off below it for as long as that boat is there.
+      const back = n360(b.hdg + clamp(n180(plan.hdg - b.hdg), -COME_UP, COME_UP));
+      if (Math.abs(n180(b.twd - back)) > ngA + 2) cands.push({ hdg: back, sheet: sheetAt(back), extra: Math.max(0, Math.abs(n180(back - plan.hdg))) * 0.4, tag: 'back' });
+    }
     // Rule 18.3: don't tack from port to starboard in the zone when a starboard boat is coming.
     const legNow = h.course.legs[b.legIndex];
     const zoneMark = legNow && legNow.kind === 'mark' && legNow.upwind && b.started ? h.course.byId[legNow.rounding.markId] : null;
@@ -864,7 +1067,7 @@ export class Skipper implements Helm {
     this.maybeHail(h, others);
     if (best.tag === '') return plan;
     this.pendingAvoid = { t: h.t, hdg: best.hdg, tag: best.tag };
-    const intent = best.tag === 'slow' ? 'Slowing to keep clear' : best.tag === 'tack' ? 'Tacking to keep clear' : best.tag === 'hold' ? 'Holding my course' : bestNote ? `Keeping clear of ${bestNote.split(' ').pop()}` : plan.intent;
+    const intent = best.tag === 'slow' ? 'Slowing to keep clear' : best.tag === 'tack' ? 'Tacking to keep clear' : best.tag === 'hold' ? 'Holding my course' : best.tag === 'back' ? plan.intent : bestNote ? `Keeping clear of ${bestNote.split(' ').pop()}` : plan.intent;
     if (best.tag === 'tack') this.lastTackT = h.t;
     return { hdg: best.hdg, sheet: best.sheet, intent, maneuver: best.tag === 'tack' ? 'tack' : plan.maneuver };
   }
