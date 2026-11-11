@@ -19,6 +19,8 @@ export interface TrainingProgress {
   judge?: Record<string, { points: number; at: number }>;
   /** The boats you've designed (see yacht.ts): they ride here so they follow you to every device. */
   yard?: Yard;
+  /** Cards on the home screen you've said you don't want to see again, and when you said so. */
+  dismissed?: Record<string, number>;
   updatedAt: number;
 }
 
@@ -71,6 +73,13 @@ export function recordJudge(id: string, points: number): TrainingProgress {
   return saveTraining(p);
 }
 
+/** "Don't show me this again", for a card on the home screen. */
+export function dismissCard(id: string): TrainingProgress {
+  const p = loadTraining();
+  p.dismissed = { ...(p.dismissed ?? {}), [id]: Date.now() };
+  return saveTraining(p);
+}
+
 /** Record an answer to a Rules Academy question (`id` is module/situation). */
 export function recordAnswer(id: string, correct: boolean): TrainingProgress {
   const p = loadTraining();
@@ -118,5 +127,10 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
     for (const [k, r] of Object.entries(b.judge ?? {})) { const m = out.judge[k]; out.judge[k] = !m ? r : { points: Math.max(m.points, r.points), at: Math.max(m.at, r.at) }; }
   }
   if (a.yard || b.yard) out.yard = newerYard(a.yard, b.yard);
+  // Dismissed on one device is dismissed on them all.
+  if (a.dismissed || b.dismissed) {
+    out.dismissed = { ...(a.dismissed ?? {}) };
+    for (const [k, at] of Object.entries(b.dismissed ?? {})) out.dismissed[k] = Math.max(at, out.dismissed[k] ?? 0);
+  }
   return out;
 }

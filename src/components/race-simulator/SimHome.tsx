@@ -18,7 +18,7 @@ import type { VenueWind as TodayWind } from './venueWind';
 import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
-import { todaysPlan } from './plan';
+import { offerFirstSail, todaysPlan } from './plan';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
 import { todaysCases } from './judge';
@@ -225,16 +225,22 @@ function Sheet({ title, text, icon, onClose, children }: { title: string; text?:
 }
 
 /** For a newcomer: the five First sail steps, with the next one a tap away. */
-function FirstSailCard({ done, onGo }: { done: (id: string) => boolean; onGo: (id: string) => void }) {
+function FirstSailCard({ done, onGo, onDismiss }: { done: (id: string) => boolean; onGo: (id: string) => void; onDismiss?: () => void }) {
   const next = nextFirst(done);
   if (!next) return null;
   const n = FIRST.findIndex(m => m.id === next.id);
   return (
-    <section className="flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] p-5 sm:px-6" aria-labelledby="fs-title">
+    <section className="relative flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] p-5 pr-12 sm:pl-6 sm:pr-14" aria-labelledby="fs-title">
+      {onDismiss && (
+        <button type="button" onClick={onDismiss} aria-label="Don't show this again" title="Don't show this again"
+          className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center border-0 bg-transparent text-white/60 transition-colors hover:bg-white/10 hover:text-white" style={{ borderRadius: '50%' }}>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2.5 2.5l9 9M11.5 2.5l-9 9" /></svg>
+        </button>
+      )}
       <AlfieOrb size={44} />
       <div className="min-w-[240px] flex-1">
-        <h2 id="fs-title" className="sim-h3">{n === 0 ? 'New to this? Take your first sail' : 'Your first sail'}</h2>
-        <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>Five short steps, about ten minutes: steer her, trim the sail, tack, round a mark and cross a start line. Alfie will show you each one if you ask.</p>
+        <h2 id="fs-title" className="sim-h3">{n === 0 ? 'New to RC sailing? Learn to sail in five short steps' : 'Learning to sail: your next step'}</h2>
+        <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>About ten minutes: steer her, trim the sail, tack, round a mark and cross a start line. Alfie will show you each one if you ask.</p>
         <ol className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
           {FIRST.map((m, k) => (
             <li key={m.id} className={cx('inline-flex h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[12.5px] font-semibold', done(m.id) ? 'border-[rgba(126,226,168,0.4)] bg-[rgba(52,211,153,0.12)] text-[#A7F3D0]' : k === n ? 'border-[rgba(77,163,255,0.55)] bg-[rgba(42,147,255,0.16)]' : 'border-transparent bg-white/[0.06]')} style={done(m.id) || k === n ? undefined : { color: C.mute }}>
@@ -433,9 +439,11 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
+  /** "Don't show this again", for a card on this screen. */
+  onDismiss?: (card: string) => void;
   /** The boats you've designed (Design your yacht). */
   yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -609,7 +617,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       </section>
 
       <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
-        {onLink && profile.races.length < 3 && <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} />}
+        {onLink && offerFirstSail(profile, training) && <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />}
 
         {/* ── Race set-up ── */}
         <section className="sim-set-card" aria-labelledby="qr-title">

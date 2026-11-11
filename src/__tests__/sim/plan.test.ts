@@ -1,6 +1,8 @@
 // Today's ten minutes: three things, from where the races are going and what's due.
 import { describe, expect, it } from 'vitest';
-import { lossPerRace, todaysPlan } from '@/components/race-simulator/plan';
+import { lossPerRace, offerFirstSail, todaysPlan } from '@/components/race-simulator/plan';
+import { mergeTraining } from '@/components/race-simulator/progress';
+import { FIRST } from '@/sim/training/first';
 import { CAUSES, type Cause, type Ledger } from '@/components/race-simulator/ledger';
 import type { Profile } from '@/components/race-simulator/profile';
 import type { TrainingProgress } from '@/components/race-simulator/progress';
@@ -43,5 +45,29 @@ describe("Today's ten minutes", () => {
     const both: TrainingProgress = { ...none, lab: { tacks: { won: true, tries: 2, at: NOW }, gybes: { won: true, tries: 1, at: NOW + DAY } } };
     expect(todaysPlan(profile, both, NOW + 8 * DAY)[0].link.id).toBe('tacks');
     expect(todaysPlan(profile, both, NOW + 8 * DAY)[0].why).toMatch(/lengths a race|due again/);
+  });
+});
+
+describe('"New to RC sailing?"', () => {
+  const ran = (place: number | null, of = 8, status = 'finished'): RaceSummary => ({ mode: 'race', status, place, of } as RaceSummary);
+  it('is offered to someone new, and to someone part-way through learning', () => {
+    expect(offerFirstSail({ races: [] }, none)).toBe(true);
+    expect(offerFirstSail({ races: [ran(7), ran(null, 8, 'dnf')] }, { ...none, lab: { [FIRST[0].id]: { won: true, tries: 1, at: NOW } } })).toBe(true);
+    // A star or two in the Start Trainer is still a beginner having a go.
+    expect(offerFirstSail({ races: [] }, { ...none, drills: { a: { best: 1, stars: 2, tries: 3, at: NOW } } })).toBe(true);
+  });
+  it('stops once they have shown they can sail', () => {
+    expect(offerFirstSail({ races: [ran(8), ran(8), ran(8)] }, none)).toBe(false);
+    expect(offerFirstSail({ races: [ran(4)] }, none)).toBe(false);
+    expect(offerFirstSail({ races: [] }, { ...none, drills: { a: { best: 1, stars: 2, tries: 3, at: NOW }, b: { best: 1, stars: 1, tries: 1, at: NOW } } })).toBe(false);
+    expect(offerFirstSail({ races: [] }, { ...none, lessons: { 'm/s': { answered: true, correct: true, played: true, at: NOW } } })).toBe(false);
+    expect(offerFirstSail({ races: [] }, { ...none, lab: { 'some-scenario': { won: true, tries: 2, at: NOW } } })).toBe(false);
+    expect(offerFirstSail({ races: [] }, { ...none, lab: Object.fromEntries(FIRST.map(m => [m.id, { won: true, tries: 1, at: NOW }])) })).toBe(false);
+  });
+  it('stays away once dismissed, on every device', () => {
+    const gone: TrainingProgress = { ...none, dismissed: { 'first-sail': NOW }, updatedAt: 5 };
+    expect(offerFirstSail({ races: [] }, gone)).toBe(false);
+    expect(offerFirstSail({ races: [] }, mergeTraining(none, gone))).toBe(false);
+    expect(offerFirstSail({ races: [] }, mergeTraining(gone, { ...none, updatedAt: 9 }))).toBe(false);
   });
 });
