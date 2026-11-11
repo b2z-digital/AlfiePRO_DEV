@@ -465,13 +465,14 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       higherIsBetter: drill?.higherIsBetter, scoreText: drill?.scoreText,
       best: drill && rec?.best != null ? drill.scoreText(rec.best) : null,
       nextLabel: next?.label, autoTrim: setup.autoTrim,
+      dress: cls => ({ sail: sailFor(yardNow.current, cls, me).sail, look: lookFor(yardNow.current, cls) }),
     };
     if (spec.kind === 'lesson') setAcademyAt(spec.id);
     // (A drill with a countdown is called by the club's StartBox sequence too, when it's long enough.)
     setRun({ scene, mode: 'scene', key: Date.now(), sequence: startSeq });
     setRunView(spec.kind === 'lesson' ? 'top' : setup.view);
     setWhere('race');
-  }, [training, setup, startSeq]);
+  }, [training, setup, startSeq, me]);
 
   const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
     if (run?.focus && sum.ledger && sum.status !== 'dnf') sum.focus = focusResult(run.focus, sum.ledger);

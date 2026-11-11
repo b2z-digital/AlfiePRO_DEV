@@ -6,11 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Race, RaceLog } from '@/sim/engine';
 import { LEVELS, PERSONAS, Skipper, knownFor } from '@/sim/ai';
 import { Rng } from '@/sim/math';
-import type { Boat, Incident, RaceSettings } from '@/sim/types';
+import type { Boat, BoatLook, Incident, RaceSettings } from '@/sim/types';
 import { DT } from '@/sim/physics';
 import { Smoother } from './smooth';
 import { dir, dist, n180 } from '@/sim/math';
-import { iomRig } from '@/sim/classes';
+import { iomRig, type ClassId } from '@/sim/classes';
 import { GoalCtx, Outcome, WorldOverlay, buildScene, goalCtx } from '@/sim/scene';
 import type { SceneSpec } from '@/sim/training';
 import { CoachMode, CoachVoice, Cue, WindMemory, coachCue, cueCall, handlingCall, lineInfo, pointOfSail, trimAdvice } from './coach';
@@ -54,6 +54,14 @@ export interface ActiveScene {
   nextLabel?: string;
   /** Your auto-trim setting from the home screen (scenes are set up with it on). */
   autoTrim?: boolean;
+  /** Your own yacht for the class the scene is sailed in: her number and her finish (Design your yacht). */
+  dress?: (cls: ClassId) => { sail: string; look: BoatLook };
+}
+
+/** Two hull colours a glance wouldn't tell apart. */
+function alike(a: string, b: string): boolean {
+  const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16);
+  return Math.hypot((p >> 16) - (q >> 16), ((p >> 8) & 255) - ((q >> 8) & 255), (p & 255) - (q & 255)) < 110;
 }
 
 export interface SimRaceProps {
@@ -126,6 +134,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
     // (A step that's about steering alone trims the sail for you; one that's about the sail never does.)
     if (!scene.watch && scene.spec.trim) b.race.settings.autoTrim = scene.spec.trim === 'auto';
+    // Your boat is your own yacht: her sails, patches and deck always, and her number and hull
+    // colour unless one of the scene's boats has them already (a lesson calls its boats by their
+    // colours, so "Orange" has to stay the only orange boat).
+    const p = b.race.player;
+    if (p && scene.dress) {
+      const mine = scene.dress(b.race.settings.classId), rest = b.race.boats.filter(o => o !== p);
+      p.look = mine.look;
+      if (/^#[0-9a-f]{6}$/i.test(mine.look.hull) && !rest.some(o => /^#[0-9a-f]{6}$/i.test(o.color) && alike(o.color, mine.look.hull))) p.color = mine.look.hull;
+      if (!rest.some(o => o.sail === mine.sail)) p.sail = mine.sail;
+    }
     return b;
   }, [scene]);
   const race = useMemo(() => {
