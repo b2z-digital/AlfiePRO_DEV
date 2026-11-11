@@ -21,6 +21,8 @@ export interface SceneSpec {
   brief: string;
   /** How to do it well: shown before you go and when you watch it done. */
   tip: string;
+  /** What each stick does in this one, when that's the point of it: shown before you watch it done. */
+  sticks?: { sail: string; rudder: string };
   scene: (seed: number) => SceneDef;
   goal: Goal;
   /** Sails your boat the right way, for "Watch the right way" (and proves the scene can be won). */

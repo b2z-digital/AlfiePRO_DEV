@@ -8,6 +8,7 @@ import type { BankCam } from './bank';
 import type { CoachMode, Cue } from './coach';
 import CourseMap from './CourseMap';
 import { CourseCard, FleetCard, LineCard, SticksView, type HudState, type PenaltyProgress } from './hud';
+import type { DemoCue } from './demoTalk';
 import { SAILING_CLEAR } from './coach';
 import { SAFE } from './phoneLayout';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, Seg, clock, cx, ordinal } from './ui';
@@ -83,7 +84,7 @@ function MapButton({ race, cam, w, h, onOpen }: { race: Race; cam: BankCam | nul
 }
 
 /** Alfie in a line or two along the top: tap for all of it. */
-function Ticker({ cue, coach, open, onToggle, onHide }: { cue: Cue; coach: CoachMode; open: boolean; onToggle: () => void; onHide: () => void }) {
+function Ticker({ cue, coach, open, onToggle, onHide, long }: { cue: Cue; coach: CoachMode; open: boolean; onToggle: () => void; onHide: () => void; /** A demonstration's lines are longer: give them room. */ long?: boolean }) {
   const watch = cue.watch && coach === 'full' ? cue.watch : null;
   return (
     <Hud className="pointer-events-auto flex w-full min-w-0 items-start gap-1 !rounded-[14px] py-1.5 pl-2 pr-1.5">
@@ -91,7 +92,7 @@ function Ticker({ cue, coach, open, onToggle, onHide }: { cue: Cue; coach: Coach
         <AlfieOrb size={22} />
         <span className="min-w-0 flex-1">
           <span className="sr-only">Alfie: </span>
-          <span aria-live="polite" className={cx('block text-[12.5px] leading-[1.35]', !open && (watch ? 'truncate' : 'line-clamp-2'), cue.tone === 'warn' && 'text-[#FFD7B0]')}>{cue.text}</span>
+          <span aria-live="polite" className={cx('block text-[12.5px] leading-[1.35]', !open && (watch ? 'truncate' : long ? 'line-clamp-5' : 'line-clamp-2'), cue.tone === 'warn' && 'text-[#FFD7B0]')}>{cue.text}</span>
           {watch && <span className={cx('mt-0.5 block text-[12px] leading-[1.35] text-[#FFD7B0]', !open && 'truncate')}><b>Rule watch.</b> {watch}</span>}
         </span>
       </button>
@@ -321,7 +322,7 @@ export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, on
   const rudW = Math.round(portrait ? clamp(w * 0.56, 190, 250) : clamp(w * 0.34, 210, 300));
   const rudZoneH = 84, btnRow = 58;
 
-  const ticker = cue && coach !== 'off' ? <Ticker cue={cue} coach={coach} open={open} onToggle={() => setOpen(v => !v)} onHide={onHideCoach} /> : null;
+  const ticker = cue && coach !== 'off' ? <Ticker cue={cue} coach={coach} open={open} onToggle={() => setOpen(v => !v)} onHide={onHideCoach} long={watching} /> : null;
   const chips = (
     <>
       {hud.penalty && <PenaltyChip {...hud.penalty} />}
@@ -334,7 +335,7 @@ export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, on
     <>
       {/* The sticks and your boat, along the bottom (first, so everything else sits on top of them). */}
       {bottom && portrait && (
-        <div className="pointer-events-none absolute flex flex-col items-center gap-1.5" style={{ left: sticks ? `calc(${SAFE.left} + 54px)` : SAFE.left, right: SAFE.right, bottom: `calc(${SAFE.bottom} + ${sticks ? rudZoneH + btnRow + 20 : watchSticks ? 132 : 0}px)` }}>{chips}</div>
+        <div className="pointer-events-none absolute flex flex-col items-center gap-1.5" style={{ left: sticks ? `calc(${SAFE.left} + 54px)` : SAFE.left, right: SAFE.right, bottom: `calc(${SAFE.bottom} + ${sticks ? rudZoneH + btnRow + 20 : watchSticks ? 176 : 0}px)` }}>{chips}</div>
       )}
       {bottom && (
         <div className="pointer-events-none absolute flex items-end gap-2" style={{ left: SAFE.left, right: SAFE.right, bottom: SAFE.bottom }}>
@@ -349,7 +350,7 @@ export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, on
               <ThumbRudder rudder={hud.rudder} onRudder={sticks.onRudder} onRudderEnd={sticks.onRudderEnd} zoneW={rudW} zoneH={rudZoneH} tip={tips} onTouch={touched} />
             </div>
           )}
-          {!sticks && watchSticks && <div className="shrink-0"><SticksView compact rudder={hud.rudder} sheet={hud.sheet} /></div>}
+          {!sticks && watchSticks && <div className="shrink-0"><SticksView compact rudder={hud.rudder} sheet={hud.sheet} focus={cue && 'stick' in cue ? (cue as DemoCue).stick : null} /></div>}
         </div>
       )}
 
