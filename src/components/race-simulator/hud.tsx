@@ -375,9 +375,11 @@ export function DemoCard({ cue, onHide, compact }: { cue: DemoCue | null; onHide
  * Before Alfie sails a drill for you: what's being asked, how it's done, and what each stick does,
  * so you know what to look for. The demonstration waits behind it until you start it.
  */
-export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, onBack, compact }: {
+export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, onBack, compact, mine, onWatch }: {
   title: string; group: string; brief: string; goal: string; tip: string;
   sticks?: { sail: string; rudder: string } | null; onStart: () => void; onBack: () => void; compact?: boolean;
+  /** You're about to sail it yourself (a First sail step), with the offer to watch it done first. */
+  mine?: boolean; onWatch?: () => void;
 }) {
   // The drill's advice, a step to a line.
   const steps = tip.split(/(?<=[.!?])\s+(?=[A-Z"'])/).map(x => x.trim()).filter(Boolean);
@@ -392,7 +394,7 @@ export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, on
       <div className="flex items-center gap-3">
         <AlfieOrb size={36} />
         <div className="min-w-0">
-          <Cap>{group} · Alfie shows you how</Cap>
+          <Cap>{group} · {mine ? 'your turn' : 'Alfie shows you how'}</Cap>
           <p className={cx('m-0 font-display font-bold leading-tight', compact ? 'text-[20px]' : 'text-[24px]')}>{title}</p>
         </div>
       </div>
@@ -417,10 +419,13 @@ export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, on
           <svg width="18" height="22" viewBox="0 0 18 22" fill="none"><rect x="5" y="1" width="8" height="20" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="9" cy="16" r="3.2" fill="#4DA3FF" /></svg>)}
         {row('Rudder stick', sticks?.rudder ?? 'Left and right to steer. Small, smooth movements: every big one is a brake.',
           <svg width="22" height="18" viewBox="0 0 22 18" fill="none"><rect x="1" y="5" width="20" height="8" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="11" cy="9" r="3.2" fill="#4DA3FF" /></svg>)}
-        <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>As he sails, Alfie's sticks show at the bottom of the screen, each with its position in words, and he says what he's doing and why. The stick he's talking about lights up. Pause at any time to read.</p>
+        <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{mine
+          ? "Take your time: you can try it as often as you like, and pause at any time. If you'd rather see it done first, Alfie will sail it and talk you through his sticks."
+          : "As he sails, Alfie's sticks show at the bottom of the screen, each with its position in words, and he says what he's doing and why. The stick he's talking about lights up. Pause at any time to read."}</p>
       </div>
       <div className="flex flex-wrap gap-2.5 pt-1">
-        <Btn primary onClick={onStart} autoFocus={!compact}>Watch Alfie sail it</Btn>
+        <Btn primary onClick={onStart} autoFocus={!compact}>{mine ? 'Start sailing' : 'Watch Alfie sail it'}</Btn>
+        {mine && onWatch && <Btn onClick={onWatch}>Watch Alfie do it first</Btn>}
         <Btn onClick={onBack}>Back</Btn>
       </div>
     </Hud>

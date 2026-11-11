@@ -23,6 +23,8 @@ export interface SceneSpec {
   tip: string;
   /** What each stick does in this one, when that's the point of it: shown before you watch it done. */
   sticks?: { sail: string; rudder: string };
+  /** Whose job the sail is, whatever you've set: 'auto' trims it for you, 'yours' leaves it on your stick. Unset: as you've set it. */
+  trim?: 'auto' | 'yours';
   scene: (seed: number) => SceneDef;
   goal: Goal;
   /** Sails your boat the right way, for "Watch the right way" (and proves the scene can be won). */

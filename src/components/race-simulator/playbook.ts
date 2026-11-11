@@ -4,6 +4,7 @@
 // established principles of fleet racing (see READING for where to go deeper), written afresh here.
 import { DRILLS, LAB, MODULES } from '@/sim/training';
 import type { Cause } from './ledger';
+import type { PlanFn, SceneDef } from '@/sim/scene';
 import type { TrainLink } from './stats';
 
 export type Chapter = 'plan' | 'start' | 'upwind' | 'marks' | 'downwind' | 'behind' | 'series';
@@ -446,4 +447,22 @@ export function practiceLink(l: PlayLink): TrainLink {
   if (l.kind === 'lab') return { kind: 'lab', id: l.id, label: `Scenario: ${LAB.find(m => m.id === l.id)?.title ?? l.id}` };
   const [mod, sit] = l.id.split('/');
   return { kind: 'lesson', id: l.id, label: `Rules: ${MODULES.find(m => m.id === mod)?.situations.find(s => s.id === sit)?.title ?? l.id}` };
+}
+
+/**
+ * The picture for a play: its first drill or scenario that Alfie can sail, run on the real engine
+ * and drawn from above (see diagram.ts). A start drill is run through its start; a scenario for
+ * its first 45 seconds. Null for a play whose practice is all rules lessons, or has no demo.
+ */
+export function playPicture(p: Play): { scene: SceneDef; plan: PlanFn | 'ai'; seconds: number; seed: number; of: string } | null {
+  for (const l of p.practise) {
+    if (l.kind === 'lesson') continue;
+    const spec = l.kind === 'drill' ? DRILLS.find(d => d.id === l.id) : LAB.find(m => m.id === l.id);
+    if (!spec?.solution) continue;
+    const seed = spec.demoSeeds?.[0] ?? 1;
+    const scene = spec.scene(seed);
+    const seconds = Math.round(Math.min(spec.goal.seconds, scene.preStart !== undefined ? scene.preStart + 8 : 45));
+    return { scene, plan: spec.solution, seconds, seed, of: spec.title };
+  }
+  return null;
 }

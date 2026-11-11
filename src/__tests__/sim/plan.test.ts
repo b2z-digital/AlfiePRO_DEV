@@ -8,7 +8,7 @@ import type { RaceSummary } from '@/components/race-simulator/stats';
 
 const NOW = Date.UTC(2026, 10, 11, 3);
 const DAY = 86400000;
-const led = (by: Partial<Record<Cause, number>>): Ledger => ({ total: 0, parts: CAUSES.map(c => ({ cause: c, lengths: by[c] ?? 0 })), worst: [], speedUp: 0, tacks: 0, tacksMade: 0, gybesMade: 0, minutes: 5 });
+const led = (by: Partial<Record<Cause, number>>): Ledger => ({ total: 0, parts: CAUSES.map(c => ({ cause: c, lengths: by[c] ?? 0 })), worst: [], speedUp: 0, tacks: 0, tacksMade: 0, gybesMade: 0, marks: 3, minutes: 5 });
 const race = (by: Partial<Record<Cause, number>>): RaceSummary => ({ mode: 'race', ledger: led(by) } as RaceSummary);
 const none: TrainingProgress = { drills: {}, lessons: {}, lab: {}, updatedAt: 0 };
 

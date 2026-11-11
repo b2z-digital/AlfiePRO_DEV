@@ -7,7 +7,7 @@ import type { WindCharacter, WindStrength } from '@/sim/wind';
 import type { CourseLength } from '@/sim/course';
 import type { CoachMode } from './coach';
 import type { SeaKind } from '@/sim/sea';
-import { LAB } from '@/sim/training';
+import { LAB, FIRST, nextFirst } from '@/sim/training';
 import { Profile, clearProfile, skills } from './profile';
 import { TrainingProgress, drillStars, licence } from './progress';
 import type { SimView } from './SimRace';
@@ -19,6 +19,9 @@ import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
 import { todaysPlan } from './plan';
+import { focusWords, raceFocus } from './focus';
+import { rehearseWords, type NextRace } from './rehearse';
+import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
 import type { Water } from './waters';
@@ -213,6 +216,49 @@ function Sheet({ title, text, icon, onClose, children }: { title: string; text?:
   );
 }
 
+/** For a newcomer: the five First sail steps, with the next one a tap away. */
+function FirstSailCard({ done, onGo }: { done: (id: string) => boolean; onGo: (id: string) => void }) {
+  const next = nextFirst(done);
+  if (!next) return null;
+  const n = FIRST.findIndex(m => m.id === next.id);
+  return (
+    <section className="flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] p-5 sm:px-6" aria-labelledby="fs-title">
+      <AlfieOrb size={44} />
+      <div className="min-w-[240px] flex-1">
+        <h2 id="fs-title" className="m-0 font-display text-[20px] font-bold leading-tight">{n === 0 ? 'New to this? Take your first sail' : 'Your first sail'}</h2>
+        <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>Five short steps, about ten minutes: steer her, trim the sail, tack, round a mark and cross a start line. Alfie will show you each one if you ask.</p>
+        <ol className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
+          {FIRST.map((m, k) => (
+            <li key={m.id} className={cx('inline-flex h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[12.5px] font-semibold', done(m.id) ? 'border-[rgba(126,226,168,0.4)] bg-[rgba(52,211,153,0.12)] text-[#A7F3D0]' : k === n ? 'border-[rgba(77,163,255,0.55)] bg-[rgba(42,147,255,0.16)]' : 'border-transparent bg-white/[0.06]')} style={done(m.id) || k === n ? undefined : { color: C.mute }}>
+              <span aria-hidden="true" className="tabular-nums">{done(m.id) ? '✓' : k + 1}</span>{m.title}
+            </li>
+          ))}
+        </ol>
+      </div>
+      <Btn primary onClick={() => onGo(next.id)}>{n === 0 ? 'Start: steer her' : `Step ${n + 1}: ${next.title.toLowerCase()}`}</Btn>
+    </section>
+  );
+}
+
+/** The club's next race day, to sail before you get there: the day, the class, the forecast. */
+function RehearseCard({ race, at, onRehearse }: { race: NextRace; at: VenueDef | null; onRehearse: () => void }) {
+  const w = rehearseWords(race, at);
+  return (
+    <section className="flex flex-col gap-3 rounded-[22px] border border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.06)] p-5" aria-labelledby="rh-title">
+      <div className="flex items-center gap-2">
+        <Cap>Your club's next race day</Cap>
+        <Chip tone="good" className="ml-auto">{w.when}{race.startTime ? `, ${race.startTime}` : ''}</Chip>
+      </div>
+      <div>
+        <h2 id="rh-title" className="m-0 font-display text-[18px] font-bold leading-tight">{w.title}</h2>
+        <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{race.venue ? `${race.venue}. ` : ''}{w.wind}</p>
+      </div>
+      <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Sail it now, so the shifts and the laylines aren't new on the day. {w.where}</p>
+      <div><Btn primary onClick={onRehearse}>{w.button}</Btn></div>
+    </section>
+  );
+}
+
 // ───────────────────────── The Sailing Academy ─────────────────────────
 function AcademyCard({ icon, kicker, title, text, progress, progressText, action, actionLabel, tint }: {
   icon: keyof typeof GLYPH; kicker: string; title: string; text: string; progress: number; progressText: string; action: () => void; actionLabel: string; tint: string;
@@ -360,9 +406,9 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
   onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -395,12 +441,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   live?: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void } | null;
   /** Your transmitter: what's plugged in, and the set-up. */
   transmitter?: { pads: PadInfo[]; onSetUp: () => void } | null;
+  /** The club's next race day (signed in, with a club and something on its calendar), and how to rehearse it. */
+  next?: { race: NextRace; at: VenueDef | null; onRehearse: () => void } | null;
 }) {
   const [setting, setSetting] = useState(false);
   const [settingEvent, setSettingEvent] = useState(false);
   const stars = drillStars(training);
   const lic = licence(training);
   const labWon = LAB.filter(m => training.lab[m.id]?.won).length;
+  const firstWon = FIRST.filter(m => training.lab[m.id]?.won).length;
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
@@ -422,6 +471,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   };
   // Today's three: from where the races are going, and what's due.
   const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
+  // The one thing your next race is for: your biggest leak lately.
+  const focus = useMemo(() => raceFocus(profile), [profile]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -493,7 +544,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   // Venue practice is at the venue you've chosen; on the practice pond, at your club's (or the first that comes with the app).
   const practiceAt = venue ?? builtIn ?? VENUES[DEFAULT_VENUE];
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
-  const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
+  const startName = startSeq ? startSeq.name : s.sequenceSeconds % 60 ? `${s.sequenceSeconds} seconds, called` : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
 
   // Alfie's pick: the session that works on what your racing says you need most.
   const advice: { where: 'trainer' | 'academy' | 'lab'; title: string; text: string } = !sk
@@ -521,12 +572,20 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       </section>
 
       <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
+        {onLink && profile.races.length < 3 && <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} />}
+
         {/* ── Race set-up ── */}
         <section className="sim-set-card" aria-labelledby="qr-title">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pb-4 pt-5 sm:px-6">
             <div className="min-w-[220px] flex-1">
               <h2 id="qr-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your race</h2>
               <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>About {minutes(s)} minutes. Sail it with the keyboard, touch or a USB transmitter.</p>
+              {focus && (
+                <p className="m-0 mt-2.5 flex items-start gap-2 text-[13.5px] leading-snug">
+                  <span className="mt-px shrink-0"><AlfieOrb size={18} /></span>
+                  <span><b className="font-semibold">{focusWords(focus).title}.</b> <span style={{ color: C.mute }}>{focusWords(focus).line}</span></span>
+                </p>
+              )}
             </div>
             <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
               <button type="button" onClick={surprise} className="sim-btn-lg flex-1 sm:flex-none">Surprise me</button>
@@ -615,6 +674,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   progress={lic.level / 6} progressText={`Level ${lic.level}/6`} action={() => onOpen('academy')} actionLabel={lic.level ? 'Next module' : 'Begin'} />
                 <AcademyCard icon="flask" tint="#FF9F43" kicker={`${LAB.length} scenarios`} title="Scenario Lab" text="Boat speed upwind and down, tacks, gybes and roundings against the clock, and classic race moments. Replay each until you win it."
                   progress={LAB.length ? labWon / LAB.length : 0} progressText={`${labWon}/${LAB.length} won`} action={() => onOpen('lab')} actionLabel={labWon ? 'Carry on' : 'Begin'} />
+                {onLink && (
+                  <AcademyCard icon="boat" tint="#7DB7FF" kicker="5 steps" title="First sail" text="Never sailed a radio yacht? Steer her, trim the sail, tack, round a mark and cross a start line, a step at a time."
+                    progress={firstWon / FIRST.length} progressText={`${firstWon}/${FIRST.length} done`} action={() => onLink({ kind: 'lab', id: (nextFirst(id => !!training.lab[id]?.won) ?? FIRST[0]).id, label: 'First sail' })} actionLabel={firstWon === 0 ? 'Begin' : firstWon < FIRST.length ? 'Carry on' : 'Sail them again'} />
+                )}
                 <AcademyCard icon="pin" tint="#34D399" kicker="Today's wind" title="Venue practice" text={`${practiceAt.name}'s real water in the wind blowing there today. Rehearse the shifts before you get to the club.`}
                   progress={s.venue === practiceAt.id && s.windDir === 'today' ? 1 : 0} progressText={s.venue === practiceAt.id && s.windDir === 'today' ? 'Set up' : 'Live wind'}
                   action={() => { set({ venue: practiceAt.id, windDir: 'today', todayStrength: true }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' }); }} actionLabel="Use today's wind" />
@@ -624,6 +687,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
 
           {/* ── You ── */}
           <aside className="flex min-w-0 flex-col gap-5">
+            {next && <RehearseCard {...next} race={next.race} />}
             <section className="flex flex-col gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-5" aria-labelledby="pf-title">
               <div className="flex items-center gap-3">
                 <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>
@@ -662,7 +726,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       </div>
                     ))}
                   </div>
-                  <div><Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn></div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
+                    <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>
+                  </div>
                 </>
               )}
             </section>

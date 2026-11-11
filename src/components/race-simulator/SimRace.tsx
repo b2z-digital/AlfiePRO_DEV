@@ -22,6 +22,7 @@ import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './
 import { usePads } from './transmitter';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { focusWords, type Focus } from './focus';
 import { SequencePlayer, SimSequence } from './startbox';
 import type { LiveRace } from './live';
 import { Moment, findMoments } from './moments';
@@ -45,7 +46,7 @@ export interface ActiveScene {
   seed: number;
   /** Your boat is sailed the right way, for you to watch. */
   watch: boolean;
-  group: 'Start Trainer' | 'Rules Academy' | 'Scenario Lab';
+  group: 'Start Trainer' | 'Rules Academy' | 'Scenario Lab' | 'First sail';
   higherIsBetter?: boolean;
   scoreText?: (v: number) => string;
   best?: string | null;
@@ -78,6 +79,8 @@ export interface SimRaceProps {
   liveCode?: string;
   /** The starting signal: a first try at an event race starts here. */
   onGun?: () => void;
+  /** The one thing this race is for: shown and said as it opens. */
+  focus?: Focus | null;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
   onSceneWatch?: () => void;
@@ -114,12 +117,14 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun, focus = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
     // Sail it your way: the sails follow your stick unless you've turned auto-trim on.
     if (!scene.watch && scene.autoTrim !== undefined) b.race.settings.autoTrim = scene.autoTrim;
+    // (A step that's about steering alone trims the sail for you; one that's about the sail never does.)
+    if (!scene.watch && scene.spec.trim) b.race.settings.autoTrim = scene.spec.trim === 'auto';
     return b;
   }, [scene]);
   const race = useMemo(() => {
@@ -211,7 +216,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const [cue, setCue] = useState<Cue | null>(null);
   const [paused, setPaused] = useState(false);
   // Watching a drill sailed for you opens with how it's done; the demonstration waits behind it.
-  const [intro, setIntro] = useState(!!scene?.watch);
+  // A demonstration opens on what's asked and how it's done; so does a First sail step you're about to try.
+  const [intro, setIntro] = useState(!!scene?.watch || scene?.group === 'First sail');
   useEffect(() => { if (!paused) setTookOver(null); }, [paused]);
   const [moment, setMoment] = useState<Incident | null>(null);
   const [banner, setBanner] = useState<Incident | null>(null);
@@ -274,6 +280,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     setToasts(ts => [...ts.slice(-2), { id, text, tone }]);
     window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 3600);
   }, []);
+
+  // The race's focus, as it opens: on screen, and in Alfie's voice when he's coaching.
+  useEffect(() => {
+    if (!focus) return;
+    const w = focusWords(focus);
+    const id = window.setTimeout(() => { toast(`${w.title}. ${w.cue}`, 'good'); if (coach !== 'off') audio.say(w.say, false); }, 1400);
+    return () => window.clearTimeout(id);
+    // (Once, as the race opens: not again when the coaching is switched.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, toast, audio]);
 
   const resultRows = useCallback((): ResultRowView[] => {
     if (mode === 'start') {
@@ -794,7 +810,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const watching = !!scene?.watch;
   const demoCue = watching && cue && 'stick' in cue ? (cue as DemoCue) : null;
   const outRule = sceneOut?.incident?.rule;
-  const backLabel = scene ? `Back to the ${scene.group}` : 'Simulator home';
+  const backLabel = scene ? (scene.group === 'First sail' ? 'Back to the Sailing Academy' : `Back to the ${scene.group}`) : 'Simulator home';
   const openBanner = () => {
     if (!banner) return;
     setMoment(banner); setBanner(null);
@@ -820,7 +836,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   return (
     <div className={cx('flex h-full flex-col text-[14px] text-[#F1F4FA]', !phone && 'min-h-[560px]')} style={{ background: C.bg, fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       {!phone && <header className="flex min-h-[60px] shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-2.5 sm:px-5" style={{ background: C.head }}>
-        <Btn onClick={onHome} aria-label={scene ? `Back to the ${scene.group}` : 'Main Menu'}>
+        <Btn onClick={onHome} aria-label={scene ? backLabel : 'Main Menu'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           <span className="hidden sm:inline">{scene ? scene.group : 'Main Menu'}</span>
         </Btn>
@@ -1023,7 +1039,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         {intro && scene && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[rgba(4,8,18,0.62)] backdrop-blur-[2px]" style={phone ? safePad : { padding: 24 }}>
             <WatchIntro title={scene.spec.title} group={scene.group} brief={scene.spec.brief} goal={scene.spec.goal.text} tip={scene.spec.tip} sticks={scene.spec.sticks}
-              onStart={() => setIntro(false)} onBack={onHome} compact={phone} />
+              onStart={() => setIntro(false)} onBack={onHome} compact={phone} mine={!scene.watch} onWatch={onSceneWatch} />
           </div>
         )}
 

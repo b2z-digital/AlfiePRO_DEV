@@ -2,23 +2,26 @@
 // profile) → race or training scene → debrief. Racing fills the whole window, above the app's
 // navigation; "Main Menu" brings you back. The racing itself runs on the engine in src/sim; this
 // file only moves between the screens and keeps your settings and progress.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Race, RaceLog } from '@/sim/engine';
 import { DT } from '@/sim/physics';
 import type { Moment } from './moments';
 import type { RaceSettings } from '@/sim/types';
 import type { Outcome, SceneSpec } from '@/sim/training';
-import { DRILLS, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
+import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
 import SimTrainer from './SimTrainer';
 import SimAcademy from './SimAcademy';
 import SimPlaybook from './SimPlaybook';
+import SimPassport from './SimPassport';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
+import { focusResult, raceFocus, type Focus } from './focus';
+import { loadNextRace, type NextRace } from './rehearse';
 import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
@@ -104,7 +107,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
@@ -112,7 +115,7 @@ function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boole
 }
 type Group = ActiveScene['group'];
 
-const GROUP_PAGE: Record<Group, Where> = { 'Start Trainer': 'trainer', 'Rules Academy': 'academy', 'Scenario Lab': 'lab' };
+const GROUP_PAGE: Record<Group, Where> = { 'Start Trainer': 'trainer', 'Rules Academy': 'academy', 'Scenario Lab': 'lab', 'First sail': 'home' };
 
 /** The next thing to try after a scene: the next drill, situation you can sail, or lab moment. */
 function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
@@ -120,6 +123,10 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
     const i = DRILLS.findIndex(d => d.id === spec.id);
     const n = DRILLS[i + 1];
     return n ? { spec: n, label: `Next drill: ${n.title}` } : null;
+  }
+  if (spec.kind === 'lab' && FIRST.some(m => m.id === spec.id)) {
+    const n = FIRST[FIRST.findIndex(m => m.id === spec.id) + 1];
+    return n ? { spec: n, label: `Next step: ${n.title}` } : null;
   }
   if (spec.kind === 'lab') {
     // In the order the lab shows them: section by section.
@@ -139,6 +146,10 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const [where, setWhere] = useState<Where>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
   const [run, setRun] = useState<{
+    /** The one thing this race is for (a race you set up yourself, once you have a ledger to pick it from). */
+    focus?: Focus | null;
+    /** A rehearsal of the club's next race day: racing again rehearses it again. */
+    rehearsal?: boolean;
     settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number; resume?: { log: RaceLog; step: number };
     challenge?: Challenge; ghost?: { log: RaceLog; settings: RaceSettings; label: string };
     /** A race of a virtual race event (the challenge is the race), and whether it's only practice
@@ -354,11 +365,39 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
     withSequences(list => {
       const seq = chosenSequence(list, s.startSeq);
-      setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq });
+      setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq, focus: mode === 'race' ? raceFocus(loadProfile()) : null });
       setRunView(s.view);
       setWhere('race');
     });
   }, [todayWind, me, withSequences]);
+
+  // The club's next race day and its forecast, to rehearse (signed in, with a club).
+  const [nextRace, setNextRace] = useState<NextRace | null>(null);
+  // Where it's rehearsed: your club's water, or failing that the venue you've set up (null on the practice pond).
+  const rehearseAt = useMemo(() => venueForClub(clubId) ?? (setup.venue !== 'pond' ? VENUES[setup.venue] ?? null : null), [clubId, setup.venue, waters]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!userId || !clubId) { setNextRace(null); return; }
+    let live = true;
+    void loadNextRace(rehearseAt).then(n => { if (live) setNextRace(n); });
+    return () => { live = false; };
+  }, [userId, clubId, rehearseAt]);
+  /** Sail the next race day: the club's water (or the one set up), the day's class, the forecast wind. */
+  const rehearse = useCallback(() => {
+    if (!nextRace) return;
+    const at = rehearseAt;
+    const w = nextRace.wind;
+    const s: Setup = {
+      ...setup, venue: at ? at.id : setup.venue, classId: nextRace.classId ?? setup.classId, windPick: 0,
+      windDir: w && at ? 'today' : 'usual', todayStrength: true,
+      windStrength: w ? (w.kn < 7 ? 'light' : w.kn <= 12 ? 'medium' : 'fresh') : setup.windStrength,
+    };
+    withSequences(list => {
+      const seq = chosenSequence(list, s.startSeq);
+      setRun({ settings: toSettings(s, 'race', w && at ? { from: w.from, kn: w.kn, at: nextRace.date } : null, me, seq), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), rehearsal: true });
+      setRunView(s.view);
+      setWhere('race');
+    });
+  }, [nextRace, rehearseAt, setup, me, withSequences]);
 
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
@@ -380,6 +419,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [training, setup, startSeq]);
 
   const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
+    if (run?.focus && sum.ledger && sum.status !== 'dnf') sum.focus = focusResult(run.focus, sum.ledger);
     setProfile(saveRace(sum));
     // A live race: done with the room (once your boat has finished, the others don't wait for you).
     if (run?.live) leaveRoom();
@@ -453,8 +493,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     // Again in a first-try event: your try is used, so it's practice.
     else if (run.event && run.challenge) void sailEventRace(run.event, run.challenge as EventRace, { practice: run.practice || run.event.tries === 'first', ghost: null });
     else if (run.challenge) void sailChallenge(run.challenge, null);
+    else if (run.rehearsal) rehearse();
     else start(run.mode === 'start' ? 'start' : 'race', setup);
-  }, [run, setup, start, playScene, sailChallenge, sailEventRace]);
+  }, [run, setup, start, playScene, sailChallenge, sailEventRace, rehearse]);
 
   // Set up an event: every race is the race set up on the home page, with its own shifts (and, for
   // a mix, its own breeze), opening on the schedule chosen.
@@ -506,7 +547,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const openLink = useCallback((l: TrainLink) => {
     if (l.kind === 'lesson') { setAcademyAt(l.id); setWhere('academy'); return; }
     const spec = l.kind === 'drill' ? findDrill(l.id) : findMoment(l.id);
-    if (spec) playScene(spec, l.kind === 'drill' ? 'Start Trainer' : 'Scenario Lab', false);
+    if (spec) playScene(spec, l.kind === 'drill' ? 'Start Trainer' : FIRST.some(m => m.id === l.id) ? 'First sail' : 'Scenario Lab', false);
   }, [playScene]);
 
   const leaveRace = useCallback(() => {
@@ -546,6 +587,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
           resume={run.resume}
           ghost={run.ghost}
           sequence={run.sequence ?? null}
+          focus={run.focus ?? null}
           live={run.live}
           liveCode={run.liveCode}
           onGun={run.event?.tries === 'first' && !run.practice && !run.resume && userId && run.challenge
@@ -559,7 +601,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'debrief' && debrief) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onTakeOver={debrief.race.live ? undefined : takeOver}
           challenge={debrief.event && debrief.challenge
             ? {
@@ -575,7 +617,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'live' && room) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimLive room={room} myId={userId ?? ''} water={roomWater} onLeave={() => { leaveRoom(); setWhere('home'); }} />
       </div>
     );
@@ -584,7 +626,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'event' && openEv) {
     const admin = !!account?.superAdmin || (!!account?.admin && openEv.club_id !== null && openEv.club_id === clubId);
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimEventPage key={openEv.id} event={openEv} me={userId} admin={admin}
           onSail={(race, o) => void sailEventRace(openEv, race, o)}
           onBack={() => { refreshEvents(); setWhere('home'); }}
@@ -596,7 +638,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'challenge' && openCh) {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimChallenge challenge={openCh} me={userId} onSail={e => void sailChallenge(openCh, e)} onBack={() => { refreshChallenges(); setWhere('home'); }} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
@@ -605,7 +647,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'trainer') {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimTrainer progress={training} onPlay={d => playScene(d, 'Start Trainer', false)} onFullStart={() => start('start', setup)} onBack={() => setWhere('home')} />
       </div>
     );
@@ -613,7 +655,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   if (where === 'academy') {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimAcademy progress={training} initial={academyAt}
           onAnswer={(id, ok) => trainingChanged(recordAnswer(id, ok))}
           onPlay={(id, watch) => { const spec = findScene('lesson', id); if (spec) playScene(spec, 'Rules Academy', watch); }}
@@ -623,18 +665,22 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }
 
   if (where === 'playbook') {
-    return <div className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
+    return <div key={where} className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
+  }
+  // The skill passport.
+  if (where === 'passport') {
+    return <div key={where} className="h-full overflow-y-auto"><SimPassport profile={profile} onBack={() => setWhere('home')} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} /></div>;
   }
   if (where === 'lab') {
     return (
-      <div className="h-full overflow-y-auto">
+      <div key={where} className="h-full overflow-y-auto">
         <SimLab progress={training} onPlay={(id, watch) => { const m = findMoment(id); if (m) playScene(m, 'Scenario Lab', watch); }} onBack={() => setWhere('home')} />
       </div>
     );
   }
 
   return (
-    <div className="sim-home h-full overflow-y-auto">
+    <div key="home" className="sim-home h-full overflow-y-auto">
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
@@ -645,7 +691,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
         sequences={sequences} startSeq={startSeq}
         live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null}
-        transmitter={{ pads, onSetUp: () => setPadOpen(true) }} />
+        transmitter={{ pads, onSetUp: () => setPadOpen(true) }}
+        next={nextRace ? { race: nextRace, at: rehearseAt, onRehearse: rehearse } : null} />
     </div>
   );
 }

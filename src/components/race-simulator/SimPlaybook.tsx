@@ -1,12 +1,44 @@
 // The Playbook: race strategy and tactics, a play at a time, each with the practice that goes with it.
-import { useEffect, useRef } from 'react';
-import { CHAPTERS, PLAYS, READING, practiceLink, type Play } from './playbook';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CHAPTERS, PLAYS, READING, playPicture, practiceLink, type Play } from './playbook';
+import { drawDiagram, sceneDiagram } from './diagram';
 import type { TrainLink } from './stats';
 import { AlfieOrb, Btn, C, Cap, Chip, cx } from './ui';
+
+/**
+ * The play, drawn: Alfie sailing the drill that goes with it, run on the real engine and seen from
+ * above. Worked out when the play is opened, not before.
+ */
+function PlayPicture({ p }: { p: Play }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const pic = useMemo(() => playPicture(p), [p]);
+  const data = useMemo(() => { try { return pic ? sceneDiagram(pic.scene, pic.plan, pic.seconds, { player: 'You' }, pic.seed) : null; } catch { return null; } }, [pic]);
+  useEffect(() => {
+    const cv = ref.current; if (!cv || !data) return;
+    const draw = () => {
+      const w = cv.clientWidth || 560, h = cv.clientHeight || 300;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      const ctx = cv.getContext('2d'); if (ctx) drawDiagram(ctx, data, w, h, dpr);
+    };
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(cv);
+    return () => ro.disconnect();
+  }, [data]);
+  if (!pic || !data) return null;
+  return (
+    <figure className="m-0 flex flex-col gap-1.5">
+      <canvas ref={ref} className="block h-[260px] w-full rounded-2xl sm:h-[300px]" role="img" aria-label={`From above: Alfie sailing "${pic.of}", the practice for this play.`} />
+      <figcaption className="text-[12.5px] leading-snug" style={{ color: C.faint }}>Alfie sailing "{pic.of}" ({pic.seconds} seconds of it), from above with the wind coming down the picture: each boat where it begins (solid), its track, and where it ends up (faint).</figcaption>
+    </figure>
+  );
+}
 
 function PlayCard({ p, n, open, onLink }: { p: Play; n: number; open: boolean; onLink: (l: TrainLink) => void }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => { if (open) ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, [open]);
+  const [shown, setShown] = useState(open);
   const part = (label: string, body: React.ReactNode) => (
     <div className="flex flex-col gap-1.5">
       <Cap>{label}</Cap>
@@ -14,7 +46,7 @@ function PlayCard({ p, n, open, onLink }: { p: Play; n: number; open: boolean; o
     </div>
   );
   return (
-    <details ref={ref} open={open || undefined} className="group rounded-[18px] border border-white/[0.08] bg-white/[0.03] open:bg-white/[0.045]" style={{ scrollMarginTop: 16 }}>
+    <details ref={ref} open={open || undefined} onToggle={e => setShown((e.currentTarget as HTMLDetailsElement).open)} className="group rounded-[18px] border border-white/[0.08] bg-white/[0.03] open:bg-white/[0.045]" style={{ scrollMarginTop: 16 }}>
       <summary className="flex cursor-pointer list-none items-start gap-3.5 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <span aria-hidden="true" className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[rgba(77,163,255,0.14)] text-[12.5px] font-bold tabular-nums text-[#A9D2FF]">{n}</span>
         <span className="min-w-0 flex-1">
@@ -24,6 +56,7 @@ function PlayCard({ p, n, open, onLink }: { p: Play; n: number; open: boolean; o
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-1 shrink-0 opacity-60 transition-transform group-open:rotate-180"><path d="M6 9l6 6 6-6" /></svg>
       </summary>
       <div className="flex flex-col gap-4 px-5 pb-5 pt-1">
+        {shown && <PlayPicture p={p} />}
         {part('The play', (
           <ol className="m-0 flex list-none flex-col gap-2 p-0">
             {p.how.map((x, i) => (

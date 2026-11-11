@@ -10,9 +10,9 @@ import { vmgAngles } from '../classes';
 import { dist } from '../math';
 import { dcos } from '../dmath';
 
-export type LabGroup = 'speed' | 'handling' | 'marks' | 'tactics';
+export type LabGroup = 'speed' | 'handling' | 'marks' | 'tactics' | 'first';
 
-/** The lab's sections, in order, with what each is for. */
+/** The lab's sections, in order, with what each is for. (The 'first' group is First sail, in first.ts, with a place of its own.) */
 export const LAB_GROUPS: { id: LabGroup; title: string; text: string }[] = [
   { id: 'speed', title: 'Boat speed', text: 'On your own against the clock: how much of the best she can do are you getting, upwind and down?' },
   { id: 'handling', title: 'Boat handling', text: 'What each tack, gybe and rounding costs you, in hull lengths and seconds.' },
@@ -140,7 +140,7 @@ function paceGoal(text: string, way: 'up' | 'down', leg: number, seconds: number
  * the moment she passes through the wind until five seconds later, against a boat that sailed
  * straight on at her best. `steps`: the average lengths lost for three stars, two and a pass.
  */
-function turnsGoal(text: string, kind: 'tack' | 'gybe', need: number, leg: number, seconds: number, steps: [number, number, number], advice: string): SceneSpec['goal'] {
+export function turnsGoal(text: string, kind: 'tack' | 'gybe', need: number, leg: number, seconds: number, steps: [number, number, number], advice: string): SceneSpec['goal'] {
   const way = kind === 'tack' ? 'up' : 'down';
   const word = kind === 'tack' ? 'tack' : 'gybe';
   const lostNow = (g: GoalCtx) => ((g.memo.best as number) ?? 0) - ((g.memo.made as number) ?? 0);
@@ -180,7 +180,7 @@ function turnsGoal(text: string, kind: 'tack' | 'gybe', need: number, leg: numbe
  * A rounding against the clock: from the moment she enters the zone (four lengths from the mark)
  * until she's `clear` lengths up (or down) the next leg. `steps`: seconds for three stars, two and a pass.
  */
-function roundingGoal(text: string, marks: string[], leg: number, clear: number, seconds: number, steps: [number, number, number], advice: string): SceneSpec['goal'] {
+export function roundingGoal(text: string, marks: string[], leg: number, clear: number, seconds: number, steps: [number, number, number], advice: string): SceneSpec['goal'] {
   return {
     text, seconds,
     check: (g: GoalCtx): Outcome | null => {
@@ -207,7 +207,7 @@ function roundingGoal(text: string, marks: string[], leg: number, clear: number,
 }
 
 /** Tack (or gybe) every `every` seconds, sailing her best angle between: the demo for the handling drills. */
-const zigzag = (kind: 'tack' | 'gybe', every: number): PlanFn => (t, b, race, me) => {
+export const zigzag = (kind: 'tack' | 'gybe', every: number): PlanFn => (t, b, race, me) => {
   const first = b.tack;
   if (me.memo.first === undefined) me.memo.first = first === 'stbd' ? 1 : 0;
   const flip = Math.floor((t + every * 0.45) / every) % 2 === 1;
@@ -219,7 +219,7 @@ const realWind = { flatWind: false, windCharacter: 'oscillating' as const };
 const chop = { flatWind: false, windCharacter: 'oscillating' as const, windStrength: 'medium' as const, seaState: 'chop' as const, length: 'long' as const };
 const blow = { flatWind: false, windCharacter: 'puffy' as const, windStrength: 'fresh' as const, seaState: 'rough' as const, length: 'long' as const };
 const light = { flatWind: false, windCharacter: 'oscillating' as const, windStrength: 'light' as const, seaState: 'flat' as const };
-const alone = (at: [number, number], hdg: number, leg = 0): SceneBoat[] => [{ role: 'You', at, hdg, leg, helm: 'player', persona: 'builder', level: 'world' }];
+export const alone = (at: [number, number], hdg: number, leg = 0): SceneBoat[] => [{ role: 'You', at, hdg, leg, helm: 'player', persona: 'builder', level: 'world' }];
 
 export const LAB: LabMoment[] = [
   // ── Boat speed ──
@@ -503,4 +503,3 @@ export const LAB: LabMoment[] = [
   },
 ];
 
-export function findMoment(id: string): LabMoment | null { return LAB.find(m => m.id === id) ?? null; }
