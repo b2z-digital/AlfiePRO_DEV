@@ -24,7 +24,7 @@ import { SequencePlayer, SimSequence } from './startbox';
 import type { LiveRace } from './live';
 import { Moment, findMoments } from './moments';
 import {
-  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, HudState, LineCard, ReplayBar,
+  BoatStrip, ClockCard, CoachCard, ControlsCard, CourseCard, FleetCard, FleetRow, GoalCard, HintBanner, HudState, LineCard, ReplayBar, SticksView,
   ResultRowView, ResultsOverlay, RuleSheet, RulesMomentPanel, SceneResult, Toast, Toasts, WindCard,
 } from './hud';
 import { CourseSheet, PhoneHud, PhoneMenu } from './phone';
@@ -352,7 +352,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       course: { leg: p.finished ? 'Finished' : legLabel(race, p.started ? p.legIndex : 0), legNo: (p.started ? p.legIndex : 0) + 1, legs, next: nx ? `To ${nx.name}` : '', distL: nx && !p.finished ? Math.round(dist(nx, p) / p.cls.loa) : null, place, of: race.boats.length, status },
       fleet,
       boat: { tack: p.tack === 'stbd' ? 'Starboard' : 'Port', pos: pointOfSail(p), spdPct: p.targetSpd > 0.05 * p.cls.hullSpeed ? Math.min(1.25, p.spd / p.targetSpd) : 0, kn: p.spd / KN, trim: trimAdvice(p) },
-      rudder: ctl.rudder, sheet: ctl.sheet, twa: p.twa,
+      // (Watching a drill sailed the right way: the sticks as the boat is being sailed, not yours.)
+      rudder: scene?.watch ? p.rudder : ctl.rudder, sheet: scene?.watch ? p.sheet : ctl.sheet, twa: p.twa,
       penalty: p.penalty.owed > 0 ? { owed: p.penalty.owed, deg: Math.abs(p.penalty.rot), tack: p.penalty.passedHtw, gybe: p.penalty.passedDdw } : null, finished: p.finished,
       goal,
     };
@@ -850,6 +851,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
               onTack: doTack, onHail: doHail, tackLabel: Math.abs(hud.twa) < 90 ? 'Tack' : 'Gybe',
             }}
             bottom={!replay}
+            watchSticks={watching && !replay && !sceneOut}
             autoTrim={race.settings.autoTrim}
             credit={race.venue ? `Map data ${race.venue.def.credit}` : null}
           />
@@ -912,6 +914,11 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             {!replay && !moment && (
               <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 xl:block">
                 <BoatStrip {...hud.boat} auto={race.settings.autoTrim} finished={hud.finished} />
+              </div>
+            )}
+            {watching && !replay && !sceneOut && (
+              <div className="pointer-events-none absolute bottom-3 right-3 sm:bottom-6 sm:right-6">
+                <SticksView rudder={hud.rudder} sheet={hud.sheet} />
               </div>
             )}
             {!watching && (
