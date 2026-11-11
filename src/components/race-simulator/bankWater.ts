@@ -224,7 +224,7 @@ export function drawRipples(ctx: CanvasRenderingContext2D, V: BankView, race: Ra
     return { x: cam.x + (f.x + rgt.x * c - u.x * k) * tt, y: cam.y + (f.y + rgt.y * c - u.y * k) * tt, d: tt };
   };
   // Strips get thinner towards the horizon, where the distance changes fastest from row to row.
-  const band = detail >= 2 ? 8 : 14;
+  const band = detail >= 2 ? 8 : detail === 1 ? 14 : 22;
   const top = Math.max(0, Math.ceil(hz + 1));
   for (let y1 = V.h; y1 > top;) {
     const y0 = Math.max(top, y1 - Math.max(2, Math.min(band, (y1 - hz) * 0.07)));
@@ -336,7 +336,7 @@ export function drawGusts(ctx: CanvasRenderingContext2D, V: BankView, race: Race
  * off the crests where the two sets of waves pile up. They ride the crests, and come and go as the
  * sets move through each other, so they never pop.
  */
-export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race, cam: BankCam) {
+export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race, cam: BankCam, detail = 2) {
   const sea = race.sea;
   if (!sea) return;
   const t = race.t;
@@ -351,7 +351,8 @@ export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race
   const sCam = cam.x * d.x + cam.y * d.y, qCam = cam.x * q.x + cam.y * q.y;
   const n0 = Math.ceil(((sCam - reach) * w.k - w.omega * t + w.phase - Math.PI / 2) / (2 * Math.PI));
   const n1 = Math.floor(((sCam + reach) * w.k - w.omega * t + w.phase - Math.PI / 2) / (2 * Math.PI));
-  const foam = tex(ctx, 'foam');
+  // (On a slow device: two patches to a cap instead of three, and plain white for the foam.)
+  const foam = detail > 0 ? tex(ctx, 'foam') : null, patches = detail > 0 ? 3 : 2;
   for (let n = n0; n <= n1; n++) {
     const s = (Math.PI / 2 + 2 * Math.PI * n + w.omega * t - w.phase) / w.k;
     for (let qq = Math.floor((qCam - reach) / step) * step; qq < qCam + reach; qq += step) {
@@ -362,7 +363,7 @@ export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race
       const id = Math.round(qq / step);
       const cap = smooth(0.82, 0.98, 0.5 + 0.5 * Math.cos(phO)) * smooth(0.6, 0.9, hash(n, id)) * capsK * (1 - smooth(reach * 0.6, reach, depth));
       if (cap < 0.06) continue;
-      for (let j = 0; j < 3; j++) {
+      for (let j = 0; j < patches; j++) {
         const off = (hash(n + 7 * j, id) - 0.5) * step, back = (hash(n, id + 11 * j) - 0.5) * lam * 0.06;
         const c = { x: mid.x + q.x * off + d.x * back, y: mid.y + q.y * off + d.y * back };
         const r = 0.05 + 0.06 * hash(n + j, id + 3), a = cap * (1 - 0.25 * j);
@@ -374,7 +375,7 @@ export function drawWaves(ctx: CanvasRenderingContext2D, V: BankView, race: Race
         const pts = V.ground(ring);
         if (pts.length < 3) continue;
         ctx.beginPath(); pts.forEach((pt, k) => (k ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y))); ctx.closePath();
-        ctx.fillStyle = `rgba(240,247,255,${(0.22 * a).toFixed(3)})`; ctx.fill();
+        ctx.fillStyle = `rgba(240,247,255,${((foam ? 0.22 : 0.5) * a).toFixed(3)})`; ctx.fill();
         if (foam) {
           mapAt(foam, V, c, q, { x: -q.y, y: q.x }, 0.004, 0);
           ctx.globalAlpha = Math.min(1, a * 1.1); ctx.fillStyle = foam; ctx.fill(); ctx.globalAlpha = 1;

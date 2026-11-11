@@ -31,34 +31,76 @@ export function newBankCam(): BankCam { return { x: 0, y: 0, z: EYE, yaw: 0, pit
 
 
 /**
- * Stand in the control area and watch her, as a skipper does: you stay put (wandering only slowly
- * along the control area towards where she is), she sails across your view, and you turn your head
- * only when she nears the edge of it. As she gets far away the view closes in a little, the way you
- * peer at a distant boat, but never much. Glancing (holding M) turns straight to the mark.
+ * Where on the control area a skipper stands to watch a boat at `target`. They walk the bank to stay
+ * in touch with her, but only so far: never further down the course than a good way above the
+ * leeward gate, nor further up it than short of the windward mark, so both are always looked down
+ * (or up) on from the side, never back at from beyond them. `sight`: stand where the start and
+ * finish line runs into the bank, to look straight down it, as you do for a start or a close finish
+ * (when the bank runs along the line instead, there's no such place, and you stand as near as you can).
  */
-export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, glance: boolean) {
-  const L = race.course.L;
+export function bankStation(race: Race, target: V2, sight: boolean): V2 {
+  const c = race.course, L = c.L;
   const ca = race.controlArea();
   const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
-  const u = Math.max(0, Math.min(1, ((target.x - ca.a.x) * ex + (target.y - ca.a.y) * ey) / el2));
-  const want = { x: ca.a.x + ex * u, y: ca.a.y + ey * u };
+  // How far up the course each end of the control area is, and so the stretch of it you walk.
+  const along = (x: number, y: number) => (x - c.origin.x) * c.up.x + (y - c.origin.y) * c.up.y;
+  const a0 = along(ca.a.x, ca.a.y), da = along(ca.b.x, ca.b.y) - a0;
+  const gate = along(c.byId.GP.p.x, c.byId.GP.p.y), top = along(c.byId.W.p.x, c.byId.W.p.y);
+  const lo = gate + Math.max(6 * L, 0.4 * -gate), hi = top - 4 * L;
+  let u0 = 0, u1 = 1;
+  if (Math.abs(da) > 1e-6) {
+    const ua = (lo - a0) / da, ub = (hi - a0) / da;
+    u0 = Math.max(0, Math.min(ua, ub)); u1 = Math.min(1, Math.max(ua, ub));
+    // None of the control area is in that stretch: the end of it nearest the stretch.
+    if (u0 > u1) u0 = u1 = Math.abs(a0 - (lo + hi) / 2) < Math.abs(a0 + da - (lo + hi) / 2) ? 0 : 1;
+  }
+  let u = Math.max(u0, Math.min(u1, ((target.x - ca.a.x) * ex + (target.y - ca.a.y) * ey) / el2));
+  if (sight) {
+    const P = c.start.pin, S = c.start.stbd, dx = S.x - P.x, dy = S.y - P.y;
+    const den = ex * dy - ey * dx;
+    if (Math.abs(den) > 0.15 * Math.sqrt(el2) * Math.hypot(dx, dy)) u = Math.max(0, Math.min(1, ((P.x - ca.a.x) * dy - (P.y - ca.a.y) * dx) / den));
+  }
+  return { x: ca.a.x + ex * u, y: ca.a.y + ey * u };
+}
+
+/**
+ * Stand in the control area and watch her, as a skipper does: you stay put (wandering only slowly
+ * along the control area towards where she is, see bankStation), she sails across your view, and you
+ * turn your head only when she nears the edge of it. As she gets far away the view closes in a
+ * little, the way you peer at a distant boat, but never much. Glancing (holding M) turns straight to
+ * the mark. `sight`: stand on the start and finish line, looking down it.
+ */
+export function followCam(cam: BankCam, race: Race, target: V2, dt: number, zoom: number, glance: boolean, sight = false) {
+  const L = race.course.L;
+  const want = bankStation(race, target, sight);
   // With your boat right in at the bank, step back up it a little, so you can still see her whole.
   const ox = want.x - target.x, oy = want.y - target.y, od = Math.hypot(ox, oy);
   const stepBack = Math.max(0, 7 * L - od);
   if (stepBack > 0 && od > 0.01) { want.x += (ox / od) * stepBack; want.y += (oy / od) * stepBack; }
   const snap = !cam.ready;
-  const kWalk = snap ? 1 : Math.min(1, dt * 0.15);
+  // A walk along the bank: unhurried, a little brisker to get to the line for a finish.
+  const kWalk = snap ? 1 : Math.min(1, dt * (sight ? 0.3 : 0.15));
   cam.x += (want.x - cam.x) * kWalk; cam.y += (want.y - cam.y) * kWalk;
   cam.z = EYE;
-  const yawTo = Math.atan2(target.x - cam.x, target.y - cam.y) / DEG;
+  let yawTo = Math.atan2(target.x - cam.x, target.y - cam.y) / DEG;
   const d = Math.hypot(target.x - cam.x, target.y - cam.y);
-  const fovAuto = Math.max(30, Math.min(50, 50 * Math.sqrt((20 * L) / Math.max(1, d))));
+  let fovAuto = Math.max(30, Math.min(50, 50 * Math.sqrt((20 * L) / Math.max(1, d))));
+  if (sight && !glance) {
+    // Sighting the line: it runs away from you up the middle of the view, with your boat to one
+    // side of it. Look between the two, wide enough for both; when she's too far off the line for
+    // that, stay with her.
+    const st = race.course.start;
+    const far = Math.hypot(st.pin.x - cam.x, st.pin.y - cam.y) > Math.hypot(st.stbd.x - cam.x, st.stbd.y - cam.y) ? st.pin : st.stbd;
+    const off = n180(yawTo - Math.atan2(far.x - cam.x, far.y - cam.y) / DEG);
+    fovAuto = Math.min(66, Math.max(fovAuto, Math.abs(off) / 0.6 + 8));
+    yawTo = n180(yawTo - Math.sign(off) * Math.min(Math.abs(off) / 2, 0.3 * fovAuto));
+  }
   const fov = Math.max(6, Math.min(75, fovAuto / zoom));
   const pitch = (Math.atan2(cam.z, Math.max(1.5, d)) / DEG) * 0.82 + 0.4;
   if (snap) { cam.yaw = yawTo; cam.pitch = pitch; cam.fov = fov; cam.ready = true; return; }
   // She roams the middle third of the view; past that you turn with her, smoothly.
   const off = n180(yawTo - cam.yaw);
-  const dz = glance ? 0 : cam.fov * 0.16;
+  const dz = glance ? 0 : cam.fov * (sight ? 0.04 : 0.16);
   const excess = Math.abs(off) > dz ? off - Math.sign(off) * dz : 0;
   cam.yaw += excess * Math.min(1, dt * (glance ? 3 : 1.4));
   cam.pitch += (pitch - cam.pitch) * Math.min(1, dt * 1.2);
@@ -277,9 +319,11 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   ctx.save();
   if (waterClip) { waterClip(); ctx.clip('evenodd'); }
   const detail = v.detail ?? 2;
-  if (detail > 0) drawRipples(ctx, V, race, cam, hz, detail);
+  // The wind's ripples and the waves are always there, however slow the device: they're how you
+  // read the wind and the sea. Less detail only makes them coarser.
+  drawRipples(ctx, V, race, cam, hz, detail);
   drawGusts(ctx, V, race, hz, detail);
-  if (detail > 0) drawWaves(ctx, V, race, cam);
+  drawWaves(ctx, V, race, cam, detail);
   // Waves break a boat's reflection up: clear on flat water, a faint shimmer in waves.
   // And a breeze ripples them away even on flat water.
   const reflect = (!race.sea ? 0.3 : race.sea.kind === 'chop' ? 0.08 : 0.035) * (1 - 0.7 * Math.min(1, Math.max(0, (race.wind.meanTws(t) / 0.514444 - 3) / 11)));
