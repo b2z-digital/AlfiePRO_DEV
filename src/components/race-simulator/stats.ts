@@ -3,7 +3,8 @@
 import type { Race } from '@/sim/engine';
 import type { Boat, Incident } from '@/sim/types';
 import { dist, dot, n180, sub } from '@/sim/math';
-import { MODULES } from '@/sim/training';
+import { DRILLS, LAB, MODULES } from '@/sim/training';
+import { LossTally, type Cause, type Ledger } from './ledger';
 
 interface Sample { t: number; leg: number; upwind: boolean; tack: 'port' | 'stbd'; shift: number; spdPct: number; shadow: number; started: boolean }
 
@@ -14,10 +15,13 @@ export class PlayerLog {
   gybes = 0;
   atGun: { spdPct: number } | null = null;
   startAlong: number | null = null;
+  /** Where the race is going: lengths given away, by cause, kept as you sail. */
+  tally = new LossTally();
   private lastTack: 'port' | 'stbd' | null = null;
   private lastT = -1;
 
   sample(race: Race, p: Boat, meanTwd: number) {
+    this.tally.step(race, p);
     if (race.t - this.lastT < 0.5) return;
     this.lastT = race.t;
     const leg = race.course.legs[p.legIndex];
@@ -69,6 +73,25 @@ export interface RaceSummary {
   downwind: { spdPct: number | null; gybes: number; clearAirPct: number | null };
   roundings: { gained: number; count: number };
   takeaways: Takeaway[];
+  /** Where the race went: lengths given away to a perfect race, by cause (races sailed before this was kept have none). */
+  ledger?: Ledger;
+}
+
+/** The practice that fixes each cause of lost lengths. */
+export function causeLink(cause: Cause, led: Ledger): TrainLink {
+  const lab = (id: string): TrainLink => ({ kind: 'lab', id, label: `Practise: ${LAB.find(m => m.id === id)?.title ?? id}` });
+  const drill = (id: string): TrainLink => ({ kind: 'drill', id, label: `Practise: ${DRILLS.find(d => d.id === id)?.title ?? id}` });
+  const speed = led.parts.find(p => p.cause === 'speed')?.lengths ?? 0, turns = led.parts.find(p => p.cause === 'turns')?.lengths ?? 0;
+  switch (cause) {
+    case 'start': return drill('time-distance');
+    case 'speed': return lab(led.speedUp >= speed / 2 ? 'speed-up-chop' : 'speed-down-chop');
+    case 'turns': return lab(led.tacks >= turns / 2 ? 'tacks' : 'gybes');
+    case 'shifts': return lab('last-beat');
+    case 'laylines': return lab('layline');
+    case 'roundings': return lab('gate-exit');
+    case 'air': return lab('dirty-air');
+    case 'penalties': return lab('cross-or-duck');
+  }
 }
 
 const pct = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
@@ -138,6 +161,8 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
     downwind: { spdPct: pct(dn.map(x => x.spdPct)), gybes: log.gybes, clearAirPct: dn.length ? dn.filter(x => x.shadow < 0.05).length / dn.length : null },
     roundings: { gained, count },
     takeaways: [],
+    // (Away from the favoured end of a biased line: that far along it, times the sine of the bias.)
+    ledger: mode === 'race' ? log.tally.result(p, fromFavouredL === null ? 0 : fromFavouredL * Math.sin((Math.abs(bias) * Math.PI) / 180)) : undefined,
   };
   sum.takeaways = takeaways(sum);
   return sum;

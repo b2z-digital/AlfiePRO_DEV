@@ -29,12 +29,16 @@ function heroRace(s: Setup, seed: number): Race {
   return race;
 }
 
-export default function SimHero({ setup, children, className }: { setup: Setup; children?: React.ReactNode; className?: string }) {
+/** `fill`: fill the box it's put in (a backdrop), instead of being a box of its own. */
+export default function SimHero({ setup, children, className, fill }: { setup: Setup; children?: React.ReactNode; className?: string; fill?: boolean }) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   // (A club's own water arrives from the database a moment after the page opens: the window is rebuilt when it does.)
   const key = `${setup.venue}|${VENUES[setup.venue] ? 1 : 0}|${setup.windDir === 'usual' ? setup.windPick ?? 0 : 0}|${(setup.spots?.[setup.venue] ?? []).join(',')}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
   const latest = useRef(setup);
   latest.current = setup;
+  // (As a backdrop the words take more of the left, so the fleet is kept further right.)
+  const fillRef = useRef(!!fill);
+  fillRef.current = !!fill;
 
   useEffect(() => {
     const cv = canvas.current;
@@ -74,7 +78,7 @@ export default function SimHero({ setup, children, className }: { setup: Setup; 
       // On a wide window the words sit on the left, so the fleet is kept to the right of the middle:
       // look at a point a little to the fleet's left.
       const vx = target.x - cam.x, vy = target.y - cam.y, d = Math.hypot(vx, vy) || 1;
-      const off = size.w > 760 && cam.ready ? d * Math.tan(0.2 * cam.fov * (Math.PI / 180)) : 0;
+      const off = size.w > 760 && cam.ready ? d * Math.tan((fillRef.current ? 0.27 : 0.2) * cam.fov * (Math.PI / 180)) : 0;
       followCam(cam, r, { x: target.x - (vy / d) * off, y: target.y + (vx / d) * off }, dt, 1.5, false, r.t < r.gunT + 4);
       // A wide, low window: look out level, with the far shore and some sky across the top of it.
       const F = (size.w / 2) / Math.tan((cam.fov / 2) * (Math.PI / 180));
@@ -117,7 +121,7 @@ export default function SimHero({ setup, children, className }: { setup: Setup; 
   }, [key]);
 
   return (
-    <div className={className} style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, #3F6FA8 0%, #8DB3D6 34%, #1C3558 36%, #0E2240 100%)' }}>
+    <div className={className} style={{ position: fill ? 'absolute' : 'relative', inset: fill ? 0 : undefined, overflow: 'hidden', background: 'linear-gradient(180deg, #3F6FA8 0%, #8DB3D6 34%, #1C3558 36%, #0E2240 100%)' }}>
       <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 block h-full w-full" />
       {children}
     </div>

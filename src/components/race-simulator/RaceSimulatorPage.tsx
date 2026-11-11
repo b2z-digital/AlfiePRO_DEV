@@ -15,6 +15,7 @@ import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
 import SimTrainer from './SimTrainer';
 import SimAcademy from './SimAcademy';
+import SimPlaybook from './SimPlaybook';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
@@ -103,7 +104,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean): RaceSettings {
@@ -500,6 +501,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     trainingChanged(recordScene(run.scene.spec, o, run.scene.higherIsBetter));
   }, [run, trainingChanged]);
 
+  // The Playbook, opened at a play (from the debrief's ledger) or at the top.
+  const [playAt, setPlayAt] = useState<string | null>(null);
   const openLink = useCallback((l: TrainLink) => {
     if (l.kind === 'lesson') { setAcademyAt(l.id); setWhere('academy'); return; }
     const spec = l.kind === 'drill' ? findDrill(l.id) : findMoment(l.id);
@@ -557,7 +560,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'debrief' && debrief) {
     return (
       <div className="h-full overflow-y-auto">
-        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onTakeOver={debrief.race.live ? undefined : takeOver}
+        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onTakeOver={debrief.race.live ? undefined : takeOver}
           challenge={debrief.event && debrief.challenge
             ? {
               title: `${debrief.event.title} · Race ${(debrief.challenge as EventRace).race_no}`, note: chNote, event: true,
@@ -619,6 +622,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     );
   }
 
+  if (where === 'playbook') {
+    return <div className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
+  }
   if (where === 'lab') {
     return (
       <div className="h-full overflow-y-auto">
@@ -628,11 +634,11 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="sim-home h-full overflow-y-auto">
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} onOpen={w => { setPlayAt(null); setWhere(w); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}

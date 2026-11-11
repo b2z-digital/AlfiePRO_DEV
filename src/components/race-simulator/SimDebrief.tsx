@@ -3,13 +3,69 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Race } from '@/sim/engine';
 import type { RaceSummary, TrainLink } from './stats';
-import { fmt } from './stats';
+import { causeLink, fmt } from './stats';
+import { CAUSE_WORDS, type Cause, type Ledger } from './ledger';
+import { playsFor } from './playbook';
 import { ReplayBox, drawReplayMap } from './render';
 import { Moment, frameAt } from './moments';
 import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Seg, cx, ordinal } from './ui';
 
 export type { TrainLink };
+
+const CAUSE_COLOUR: Record<Cause, string> = { start: '#4DA3FF', speed: '#7EE2A8', turns: '#FFCB96', shifts: '#C4A7FF', laylines: '#FF9F9F', roundings: '#FFD86B', air: '#8FD3E8', penalties: '#FF7B7B' };
+
+/**
+ * Where your race went: one bar of the lengths you gave away to a perfect race, split by cause,
+ * then each cause with what it means, its costliest moment and the practice that fixes it.
+ */
+function LedgerCard({ led, onLink, onPlay }: { led: Ledger; onLink?: (l: TrainLink) => void; onPlay?: (playId: string) => void }) {
+  const parts = led.parts.filter(p => p.lengths >= 0.3).sort((a, z) => z.lengths - a.lengths);
+  if (!parts.length || led.total < 1) {
+    return (
+      <div className="flex flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+        <Cap>Where your race went</Cap>
+        <p className="m-0 text-[14px] leading-normal">Next to nothing given away: under a length against a perfect race. Try a stronger fleet.</p>
+      </div>
+    );
+  }
+  const worstOf = (c: Cause) => led.worst.find(w => w.cause === c);
+  return (
+    <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+      <div className="flex flex-col gap-1">
+        <Cap>Where your race went</Cap>
+        <p className="m-0 font-display text-[22px] font-semibold leading-tight"><span className="tabular-nums">{led.total.toFixed(0)}</span> lengths given away</p>
+        <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Against a boat sailing her best in the wind you had, with clean tacks, gybes and roundings. The biggest slice is where to look first.</p>
+      </div>
+      <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-white/[0.06]" role="img" aria-label={parts.map(p => `${CAUSE_WORDS[p.cause].name} ${p.lengths.toFixed(1)} lengths`).join(', ')}>
+        {parts.map(p => <span key={p.cause} style={{ width: `${(100 * p.lengths) / led.total}%`, background: CAUSE_COLOUR[p.cause] }} className="h-full border-r border-[rgba(7,13,27,0.9)] last:border-r-0" />)}
+      </div>
+      <div className="flex flex-col gap-3">
+        {parts.slice(0, 5).map((p, i) => {
+          const w = worstOf(p.cause);
+          const link = causeLink(p.cause, led);
+          const count = p.cause === 'turns' ? ` You made ${led.tacksMade} tack${led.tacksMade === 1 ? '' : 's'} and ${led.gybesMade} gybe${led.gybesMade === 1 ? '' : 's'}.` : '';
+          return (
+            <div key={p.cause} className="grid grid-cols-[12px_minmax(0,1fr)_auto] items-start gap-x-2.5">
+              <span aria-hidden="true" className="mt-[5px] h-3 w-3 rounded-[4px]" style={{ background: CAUSE_COLOUR[p.cause] }} />
+              <div className="min-w-0">
+                <p className="m-0 text-[14px] font-semibold">{CAUSE_WORDS[p.cause].name}</p>
+                <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{CAUSE_WORDS[p.cause].what}{count}{w ? ` Costliest: ${w.lengths.toFixed(1)} lengths at ${fmt(w.t)}.` : ''}</p>
+                {i < 3 && (
+                  <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                    {onLink && <button type="button" onClick={() => onLink(link)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-[#7DBBFF] hover:text-[#A9D2FF]">{link.label}</button>}
+                    {onPlay && playsFor(p.cause)[0] && <button type="button" onClick={() => onPlay(playsFor(p.cause)[0].id)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-[#C4A7FF] hover:text-[#DCCBFF]">The play: {playsFor(p.cause)[0].title}</button>}
+                  </span>
+                )}
+              </div>
+              <span className="font-display text-[16px] font-semibold tabular-nums">{p.lengths.toFixed(1)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -227,7 +283,9 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
   );
 }
 
-export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onTakeOver, challenge = null, onWriteUp }: {
+export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onPlay, onTakeOver, challenge = null, onWriteUp }: {
+  /** Open the Playbook at a play. */
+  onPlay?: (playId: string) => void;
   race: Race; sum: RaceSummary; moments: Moment[]; onHome: () => void; onAgain: () => void; onLink?: (l: TrainLink) => void;
   /** Sail the race again from this race time, taking over your boat there. */
   onTakeOver?: (t: number) => void;
@@ -293,6 +351,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
             <ReplayMap race={race} moments={moments} onTakeOver={onTakeOver} onLink={onLink} />
           </div>
           <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
+            {sum.ledger && sum.status !== 'dnf' && <LedgerCard led={sum.ledger} onLink={onLink} onPlay={onPlay} />}
             <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
               <div className="flex items-center gap-2.5">
                 <AlfieOrb size={34} />

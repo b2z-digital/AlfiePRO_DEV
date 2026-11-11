@@ -3,7 +3,7 @@
 // start. Run with: npm test
 import { describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
-import { CLASSES, rigPower, iomRig } from '@/sim/classes';
+import { rigPower, iomRig } from '@/sim/classes';
 import { KN } from '@/sim/math';
 import { divePress, heelStep, integrate, settleHeel, weatherHelm } from '@/sim/physics';
 import { twaOf } from '@/sim/math';
@@ -228,21 +228,6 @@ describe('Waves', () => {
 });
 
 describe('The start', () => {
-  it('puts your boat nearest the bank, in front of the fleet as you look out', () => {
-    for (const seed of [1, 2, 3, 4]) {
-      const r = new Race({ classId: 'IOM', fleetSize: 8, level: 'state', windStrength: 'medium', windCharacter: 'oscillating', laps: 1, length: 'short', sequenceSeconds: 30, coach: 'off', autoTrim: true, seed, venue: 'lmryc' } as RaceSettings);
-      const ca = r.controlArea();
-      const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey;
-      const toBank = (b: Boat) => {
-        const u = Math.max(0, Math.min(1, ((b.x - ca.a.x) * ex + (b.y - ca.a.y) * ey) / el2));
-        return Math.hypot(b.x - (ca.a.x + ex * u), b.y - (ca.a.y + ey * u));
-      };
-      const me = r.player!;
-      expect(r.boats.every(b => toBank(me) <= toBank(b))).toBe(true);
-      expect(CLASSES[r.settings.classId].loa).toBe(me.cls.loa);
-    }
-  });
-
   /** Sail a 16-boat fleet's start: where along the line each boat crossed (0 pin, 1 starboard end) and when. */
   const startOf = (level: 'club' | 'national', seed: number) => {
     const r = new Race({ classId: 'IOM', fleetSize: 16, level, windStrength: 'medium', windCharacter: 'oscillating', laps: 1, length: 'long', sequenceSeconds: 60, coach: 'off', autoTrim: true, seed, noPlayer: true, venue: 'lmryc' } as RaceSettings);

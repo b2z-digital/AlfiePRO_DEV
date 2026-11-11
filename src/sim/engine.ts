@@ -5,7 +5,7 @@
 import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, sharpStarter } from './ai';
 import { CLASSES, bestSheet, overpowerEase, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
-import { Course, buildCourse, initialProgress, toCourse } from './course';
+import { Course, buildCourse, fromCourse, initialProgress, toCourse } from './course';
 import { KN, Rng, V2, bearing, dir, dist, n180, n360, segIntersect } from './math';
 import { DT, bank, bankAhead, bow, collide, hullGap, integrate, lineSide, localWind, markContacts, settleHeel, stern } from './physics';
 import { Referee, isRacing, keepClear, spellSail } from './referee';
@@ -255,24 +255,55 @@ export class Race implements AiHost {
         this.skippers.push(sk);
       }
     }
-    // In a live race everyone keeps the start the fleet was laid out with: the same on every device.
-    if (this.live) { this.log = this.crew[Math.max(0, this.crew.findIndex(c => c.boat === this.playerIndex))].log; return; }
-    // You start nearest the bank, in front of the fleet as you look out, so you can find your boat.
-    const me = this.player;
-    if (me) {
-      const ca = this.controlArea();
-      const ex = ca.b.x - ca.a.x, ey = ca.b.y - ca.a.y, el2 = ex * ex + ey * ey || 1;
-      const toBank = (b: Boat) => {
-        const u = Math.max(0, Math.min(1, ((b.x - ca.a.x) * ex + (b.y - ca.a.y) * ey) / el2));
-        return dhypot(b.x - (ca.a.x + ex * u), b.y - (ca.a.y + ey * u));
-      };
-      let near = me;
-      for (const b of this.boats) if (toBank(b) < toBank(near)) near = b;
-      if (near !== me) {
-        for (const k of ['x', 'y', 'hdg', 'twa', 'tack'] as const) { const v = me[k]; (me as unknown as Record<string, unknown>)[k] = near[k]; (near as unknown as Record<string, unknown>)[k] = v; }
-        settleHeel(me); settleHeel(near);
+    this.fairStarts();
+    if (this.live) this.log = this.crew[Math.max(0, this.crew.findIndex(c => c.boat === this.playerIndex))].log;
+  }
+
+  /**
+   * Everyone at a helm gets a fair place to start from: below the middle of the line, on starboard,
+   * with either end in reach, however the rest of the fleet is spread. (Laid out along the whole
+   * width of the course, a boat could begin well outside one end of the line and never get back
+   * across for the end she wanted.) The first helm is a little towards the starboard end, the
+   * others either side of her, three lengths apart. Each takes the place of the boat lying nearest
+   * her spot, and that boat's place goes back to the fleet. Worked out from the settings alone, so
+   * a live race is laid out the same on every device.
+   */
+  private fairStarts() {
+    const helms = this.boats.filter(b => b.human);
+    if (!helms.length) return;
+    const c = this.course, L = helms[0].cls.loa;
+    const half = dist(c.start.pin, c.start.stbd) / 2;
+    type Slot = { x: number; y: number; hdg: number };
+    const free: Slot[] = this.boats.map(b => ({ x: b.x, y: b.y, hdg: b.hdg }));
+    const put = (b: Boat, s: Slot) => { b.x = s.x; b.y = s.y; b.hdg = s.hdg; b.twa = n180(c.axis - b.hdg); b.tack = b.twa >= 0 ? 'stbd' : 'port'; settleHeel(b); };
+    const far = (a: Slot, b: Slot) => dhypot(a.x - b.x, a.y - b.y);
+    const mine: Slot[] = [];
+    helms.forEach((_, k) => {
+      const step = k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2);
+      const want = 0.15 * half + step * 3 * L;
+      const hdg = n360(c.axis - 95);
+      const at = (along: number, across: number): Slot => ({ ...fromCourse(c, along * L, Math.max(-0.7 * half, Math.min(0.7 * half, across))), hdg });
+      // She takes the place of the boat laid out nearest her spot, so the fleet stays the same size around her...
+      const spot = at(-4.5, want);
+      let near = 0;
+      for (let j = 1; j < free.length; j++) if (far(free[j], spot) < far(free[near], spot)) near = j;
+      free.splice(near, 1);
+      // ...and sails from the spot itself, or the nearest place to it with clear water round it.
+      const room = (p: Slot) => Math.min(...free.map(f => far(f, p)), ...mine.map(f => far(f, p) - 0.5 * L), 99 * L);
+      let best = spot, bestRoom = room(spot);
+      for (const along of [-4.5, -6.2, -3.2, -7.8]) {
+        for (const off of [0, 1.5, -1.5, 3, -3]) {
+          if (bestRoom > 2 * L) break;
+          const p = at(along, want + off * L), r = room(p);
+          if (r > bestRoom) { best = p; bestRoom = r; }
+        }
       }
-    }
+      mine.push(best);
+    });
+    // The rest of the fleet keeps the places left, in the order it was laid out.
+    let j = 0;
+    for (const b of this.boats) if (!b.human) put(b, free[j++]);
+    helms.forEach((b, k) => put(b, mine[k]));
   }
 
   get player(): Boat | null { return this.playerIndex >= 0 ? this.boats[this.playerIndex] : null; }

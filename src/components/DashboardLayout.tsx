@@ -1097,9 +1097,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         },
         ...(simulatorOn ? [{
           id: 'race-simulator',
-          label: 'Race Simulator',
+          label: 'Sailing Academy',
           icon: Rocket,
-          description: 'Race AI skippers on your club\'s water, with Alfie coaching',
+          description: 'Race, drills, rules and tactics on your club\'s water, with Alfie coaching',
           path: '/race-simulator'
         }] : []),
         ...(trackingOn || isSuperAdmin ? [{
