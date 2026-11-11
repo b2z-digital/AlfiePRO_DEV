@@ -20,6 +20,8 @@ import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
 import { todaysPlan } from './plan';
 import { focusWords, raceFocus } from './focus';
+import { rehearseWords, type NextRace } from './rehearse';
+import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
 import type { Water } from './waters';
@@ -238,6 +240,25 @@ function FirstSailCard({ done, onGo }: { done: (id: string) => boolean; onGo: (i
   );
 }
 
+/** The club's next race day, to sail before you get there: the day, the class, the forecast. */
+function RehearseCard({ race, at, onRehearse }: { race: NextRace; at: VenueDef | null; onRehearse: () => void }) {
+  const w = rehearseWords(race, at);
+  return (
+    <section className="flex flex-col gap-3 rounded-[22px] border border-[rgba(52,211,153,0.3)] bg-[rgba(52,211,153,0.06)] p-5" aria-labelledby="rh-title">
+      <div className="flex items-center gap-2">
+        <Cap>Your club's next race day</Cap>
+        <Chip tone="good" className="ml-auto">{w.when}{race.startTime ? `, ${race.startTime}` : ''}</Chip>
+      </div>
+      <div>
+        <h2 id="rh-title" className="m-0 font-display text-[18px] font-bold leading-tight">{w.title}</h2>
+        <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{race.venue ? `${race.venue}. ` : ''}{w.wind}</p>
+      </div>
+      <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Sail it now, so the shifts and the laylines aren't new on the day. {w.where}</p>
+      <div><Btn primary onClick={onRehearse}>{w.button}</Btn></div>
+    </section>
+  );
+}
+
 // ───────────────────────── The Sailing Academy ─────────────────────────
 function AcademyCard({ icon, kicker, title, text, progress, progressText, action, actionLabel, tint }: {
   icon: keyof typeof GLYPH; kicker: string; title: string; text: string; progress: number; progressText: string; action: () => void; actionLabel: string; tint: string;
@@ -385,7 +406,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -420,6 +441,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   live?: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void } | null;
   /** Your transmitter: what's plugged in, and the set-up. */
   transmitter?: { pads: PadInfo[]; onSetUp: () => void } | null;
+  /** The club's next race day (signed in, with a club and something on its calendar), and how to rehearse it. */
+  next?: { race: NextRace; at: VenueDef | null; onRehearse: () => void } | null;
 }) {
   const [setting, setSetting] = useState(false);
   const [settingEvent, setSettingEvent] = useState(false);
@@ -664,6 +687,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
 
           {/* ── You ── */}
           <aside className="flex min-w-0 flex-col gap-5">
+            {next && <RehearseCard {...next} race={next.race} />}
             <section className="flex flex-col gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-5" aria-labelledby="pf-title">
               <div className="flex items-center gap-3">
                 <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>

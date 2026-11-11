@@ -2,7 +2,7 @@
 // profile) → race or training scene → debrief. Racing fills the whole window, above the app's
 // navigation; "Main Menu" brings you back. The racing itself runs on the engine in src/sim; this
 // file only moves between the screens and keeps your settings and progress.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Race, RaceLog } from '@/sim/engine';
 import { DT } from '@/sim/physics';
@@ -21,6 +21,7 @@ import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
+import { loadNextRace, type NextRace } from './rehearse';
 import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
@@ -147,6 +148,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const [run, setRun] = useState<{
     /** The one thing this race is for (a race you set up yourself, once you have a ledger to pick it from). */
     focus?: Focus | null;
+    /** A rehearsal of the club's next race day: racing again rehearses it again. */
+    rehearsal?: boolean;
     settings?: RaceSettings; scene?: ActiveScene; mode: 'race' | 'start' | 'scene'; key: number; resume?: { log: RaceLog; step: number };
     challenge?: Challenge; ghost?: { log: RaceLog; settings: RaceSettings; label: string };
     /** A race of a virtual race event (the challenge is the race), and whether it's only practice
@@ -368,6 +371,34 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     });
   }, [todayWind, me, withSequences]);
 
+  // The club's next race day and its forecast, to rehearse (signed in, with a club).
+  const [nextRace, setNextRace] = useState<NextRace | null>(null);
+  // Where it's rehearsed: your club's water, or failing that the venue you've set up (null on the practice pond).
+  const rehearseAt = useMemo(() => venueForClub(clubId) ?? (setup.venue !== 'pond' ? VENUES[setup.venue] ?? null : null), [clubId, setup.venue, waters]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!userId || !clubId) { setNextRace(null); return; }
+    let live = true;
+    void loadNextRace(rehearseAt).then(n => { if (live) setNextRace(n); });
+    return () => { live = false; };
+  }, [userId, clubId, rehearseAt]);
+  /** Sail the next race day: the club's water (or the one set up), the day's class, the forecast wind. */
+  const rehearse = useCallback(() => {
+    if (!nextRace) return;
+    const at = rehearseAt;
+    const w = nextRace.wind;
+    const s: Setup = {
+      ...setup, venue: at ? at.id : setup.venue, classId: nextRace.classId ?? setup.classId, windPick: 0,
+      windDir: w && at ? 'today' : 'usual', todayStrength: true,
+      windStrength: w ? (w.kn < 7 ? 'light' : w.kn <= 12 ? 'medium' : 'fresh') : setup.windStrength,
+    };
+    withSequences(list => {
+      const seq = chosenSequence(list, s.startSeq);
+      setRun({ settings: toSettings(s, 'race', w && at ? { from: w.from, kn: w.kn, at: nextRace.date } : null, me, seq), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), rehearsal: true });
+      setRunView(s.view);
+      setWhere('race');
+    });
+  }, [nextRace, rehearseAt, setup, me, withSequences]);
+
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
     const rec = drill ? training.drills[drill.id] : null;
@@ -462,8 +493,9 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     // Again in a first-try event: your try is used, so it's practice.
     else if (run.event && run.challenge) void sailEventRace(run.event, run.challenge as EventRace, { practice: run.practice || run.event.tries === 'first', ghost: null });
     else if (run.challenge) void sailChallenge(run.challenge, null);
+    else if (run.rehearsal) rehearse();
     else start(run.mode === 'start' ? 'start' : 'race', setup);
-  }, [run, setup, start, playScene, sailChallenge, sailEventRace]);
+  }, [run, setup, start, playScene, sailChallenge, sailEventRace, rehearse]);
 
   // Set up an event: every race is the race set up on the home page, with its own shifts (and, for
   // a mix, its own breeze), opening on the schedule chosen.
@@ -659,7 +691,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
         sequences={sequences} startSeq={startSeq}
         live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null}
-        transmitter={{ pads, onSetUp: () => setPadOpen(true) }} />
+        transmitter={{ pads, onSetUp: () => setPadOpen(true) }}
+        next={nextRace ? { race: nextRace, at: rehearseAt, onRehearse: rehearse } : null} />
     </div>
   );
 }
