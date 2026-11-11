@@ -820,7 +820,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const watching = !!scene?.watch;
   const demoCue = watching && cue && 'stick' in cue ? (cue as DemoCue) : null;
   const outRule = sceneOut?.incident?.rule;
-  const backLabel = scene ? (scene.group === 'First sail' ? 'Back to the Sailing Academy' : `Back to the ${scene.group}`) : 'Simulator home';
+  const backLabel = scene ? (scene.group === 'First sail' ? 'Back to the Sailing Academy' : `Back to the ${scene.group}`) : 'Sailing Academy';
   const openBanner = () => {
     if (!banner) return;
     setMoment(banner); setBanner(null);

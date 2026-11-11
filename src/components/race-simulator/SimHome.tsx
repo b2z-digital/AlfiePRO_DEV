@@ -148,7 +148,7 @@ function SetupRow({ icon, label, value, sub, onClick }: { icon: Pick; label: str
       <span aria-hidden="true" className="sim-set-icon flex h-10 w-10 shrink-0 items-center justify-center text-[#9CCBFF]"><Glyph name={icon} size={19} /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-[12px] font-medium leading-tight" style={{ color: C.faint }}>{label}</span>
-        <span className="mt-[3px] block truncate text-[15px] leading-tight">
+        <span className="mt-[3px] block text-[15px] leading-snug">
           <span className="font-semibold">{value}</span>
           {sub && <span style={{ color: C.mute }}> · {sub}</span>}
         </span>
@@ -211,7 +211,7 @@ function Sheet({ title, text, icon, onClose, children }: { title: string; text?:
         <div className="flex items-start gap-3 border-b border-white/[0.07] px-5 pb-4 pt-5">
           <Tile size={40}><Glyph name={icon} /></Tile>
           <div className="min-w-0 flex-1">
-            <h2 className="m-0 font-display text-[21px] font-bold leading-tight">{title}</h2>
+            <h2 className="sim-h2">{title}</h2>
             {text && <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>{text}</p>}
           </div>
           <Btn primary onClick={onClose} autoFocus>Done</Btn>
@@ -231,7 +231,7 @@ function FirstSailCard({ done, onGo }: { done: (id: string) => boolean; onGo: (i
     <section className="flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] p-5 sm:px-6" aria-labelledby="fs-title">
       <AlfieOrb size={44} />
       <div className="min-w-[240px] flex-1">
-        <h2 id="fs-title" className="m-0 font-display text-[20px] font-bold leading-tight">{n === 0 ? 'New to this? Take your first sail' : 'Your first sail'}</h2>
+        <h2 id="fs-title" className="sim-h3">{n === 0 ? 'New to this? Take your first sail' : 'Your first sail'}</h2>
         <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>Five short steps, about ten minutes: steer her, trim the sail, tack, round a mark and cross a start line. Alfie will show you each one if you ask.</p>
         <ol className="m-0 mt-3 flex list-none flex-wrap gap-2 p-0">
           {FIRST.map((m, k) => (
@@ -256,7 +256,7 @@ function RehearseCard({ race, at, onRehearse }: { race: NextRace; at: VenueDef |
         <Chip tone="good" className="ml-auto">{w.when}{race.startTime ? `, ${race.startTime}` : ''}</Chip>
       </div>
       <div>
-        <h2 id="rh-title" className="m-0 font-display text-[18px] font-bold leading-tight">{w.title}</h2>
+        <h2 id="rh-title" className="sim-h3">{w.title}</h2>
         <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{race.venue ? `${race.venue}. ` : ''}{w.wind}</p>
       </div>
       <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Sail it now, so the shifts and the laylines aren't new on the day. {w.where}</p>
@@ -302,7 +302,7 @@ function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean;
   const [err, setErr] = useState<string | null>(null);
   const field = 'w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[14px] text-[#F1F4FA] placeholder:text-[rgba(235,240,255,0.4)] focus:border-[rgba(77,163,255,0.6)] focus:outline-none';
   return (
-    <form className="flex flex-col gap-3 rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-4" onSubmit={async e => {
+    <form className="flex flex-col gap-3 sim-card p-4" onSubmit={async e => {
       e.preventDefault();
       if (title.trim().length < 3) { setErr('Give it a title of at least three letters.'); return; }
       setBusy(true); setErr(null);
@@ -335,13 +335,13 @@ function SetChallenge({ canEveryone, onCreate, onDone }: { canEveryone: boolean;
 function TransmitterCard({ pads, onSetUp }: { pads: PadInfo[]; onSetUp: () => void }) {
   const pad = pads.find(p => p.transmitter) ?? pads[0] ?? null;
   return (
-    <section className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="tx-title">
+    <section className="flex flex-col gap-3 sim-card p-5 sm:p-6" aria-labelledby="tx-title">
       <div className="flex items-center gap-2.5">
         <Tile size={36}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="12" rx="3" /><path d="M8 11v4M6 13h4M15.5 12h.01M18 14h.01M12 7V3" /></svg>
         </Tile>
         <div className="min-w-0 flex-1">
-          <h2 id="tx-title" className="m-0 text-[16px] font-semibold">Your transmitter</h2>
+          <h2 id="tx-title" className="sim-h3">Your transmitter</h2>
           <p className="m-0 truncate text-[12.5px]" style={{ color: C.mute }}>
             {pad ? `${pad.name} · ${pad.setUp ? 'ready to sail' : 'not set up yet'}` : 'Sail with your own sticks'}
           </p>
@@ -360,16 +360,16 @@ function LiveSection({ rooms, onOpen, onJoin }: { rooms: OpenRoom[]; onOpen: () 
   return (
     <section className="flex flex-col gap-3.5" aria-labelledby="live-title">
       <div>
-        <h2 id="live-title" className="m-0 font-display text-[22px] font-bold">Race members live</h2>
+        <h2 id="live-title" className="sim-h2">Race members live</h2>
         <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Race other members in real time. Each of you sails your own boat from your own device, and AI skippers fill the rest of the fleet.</p>
       </div>
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))' }}>
-        <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+        <div className="flex flex-col gap-3 sim-card p-5">
           <p className="m-0 text-[16px] font-semibold">Open a live race</p>
           <p className="m-0 flex-1 text-[13px] leading-snug" style={{ color: C.mute }}>The race you've set up above. You get a code to give the members you're racing, and you start it when everyone's ready.</p>
           <Btn primary onClick={onOpen} className="self-start">Open a room</Btn>
         </div>
-        <form className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5" onSubmit={e => { e.preventDefault(); if (clean.length === 6) onJoin(clean); }}>
+        <form className="flex flex-col gap-3 sim-card p-5" onSubmit={e => { e.preventDefault(); if (clean.length === 6) onJoin(clean); }}>
           <label htmlFor="live-code" className="m-0 text-[16px] font-semibold">Join with a code</label>
           <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>The six-letter code from whoever opened the room.</p>
           <div className="flex gap-2">
@@ -378,7 +378,7 @@ function LiveSection({ rooms, onOpen, onJoin }: { rooms: OpenRoom[]; onOpen: () 
             <Btn type="submit" disabled={clean.length !== 6}>Join</Btn>
           </div>
         </form>
-        <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+        <div className="flex flex-col gap-3 sim-card p-5">
           <p className="m-0 text-[16px] font-semibold">Open races at your club</p>
           {rooms.length === 0 ? (
             <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>None open right now. Rooms show here while they wait to start.</p>
@@ -590,7 +590,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         <section className="sim-set-card" aria-labelledby="qr-title">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pb-4 pt-5 sm:px-6">
             <div className="min-w-[220px] flex-1">
-              <h2 id="qr-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your race</h2>
+              <h2 id="qr-title" className="sim-h2">Your race</h2>
               <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>About {minutes(s)} minutes. Sail it with the keyboard, touch or a USB transmitter.</p>
               {focus && (
                 <p className="m-0 mt-2.5 flex items-start gap-2 text-[13.5px] leading-snug">
@@ -632,7 +632,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <section className="flex flex-col gap-4" aria-labelledby="train-title">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="min-w-0 flex-1">
-                  <h2 id="train-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your training</h2>
+                  <h2 id="train-title" className="sim-h2">Your training</h2>
                   <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Coaching, drills and the Playbook: learn it here, then take it to the pond.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -641,7 +641,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 </div>
               </div>
               {onLink && plan.length > 0 ? (
-                <div className="flex flex-col gap-3 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
+                <div className="flex flex-col gap-3 sim-card p-4 sm:p-5">
                   <div className="flex flex-wrap items-center gap-3">
                     <AlfieOrb size={36} />
                     <div className="min-w-0 flex-1">
@@ -667,7 +667,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   </ol>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
+                <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:p-5">
                   <AlfieOrb size={44} />
                   <div className="min-w-[200px] flex-1">
                     <Cap>Alfie's pick for you</Cap>
@@ -677,7 +677,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <Btn primary onClick={() => onOpen(advice.where)}>Start the session</Btn>
                 </div>
               )}
-              <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-4 sm:px-5">
+              <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:px-5">
                 <span aria-hidden="true" className="sim-set-icon flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B4FF]"><Glyph name="flag" size={21} /></span>
                 <div className="min-w-[200px] flex-1">
                   <Cap>Call of the day</Cap>
@@ -709,11 +709,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           {/* ── You ── */}
           <aside className="flex min-w-0 flex-col gap-5">
             {next && <RehearseCard {...next} race={next.race} />}
-            <section className="flex flex-col gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-5" aria-labelledby="pf-title">
+            <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="pf-title">
               <div className="flex items-center gap-3">
                 <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>
                 <div className="min-w-0">
-                  <h2 id="pf-title" className="m-0 truncate font-display text-[18px] font-bold">{me ? me.name : 'Your skipper profile'}</h2>
+                  <h2 id="pf-title" className="sim-h3 truncate">{me ? me.name : 'Your skipper profile'}</h2>
                   <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
                 </div>
               </div>
@@ -742,7 +742,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     {profile.races.slice(0, 5).map(r => (
                       <div key={r.at} className="flex items-center gap-3 border-t border-white/[0.055] py-2 text-[13px]">
                         <span className="w-12 font-semibold tabular-nums">{r.mode === 'start' ? 'Start' : r.place ? ordinal(r.place) : r.status.toUpperCase()}</span>
-                        <span className="min-w-0 flex-1 truncate" style={{ color: C.mute }}>{r.cls} · {r.level} · {r.wind}</span>
+                        <span className="min-w-0 flex-1 leading-snug" style={{ color: C.mute }}>{r.cls} · {r.level} · {r.wind}</span>
                         <span className="tabular-nums" style={{ color: C.mute }}>{new Date(r.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
                       </div>
                     ))}
@@ -772,7 +772,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           <section className="flex flex-col gap-3.5" aria-labelledby="ev-title">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-0 flex-1">
-                <h2 id="ev-title" className="m-0 font-display text-[22px] font-bold">Events</h2>
+                <h2 id="ev-title" className="sim-h2">Events</h2>
                 <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>A series of races, each open for a while and the same race for everyone, scored like a regatta with drops.</p>
               </div>
               {canSet && !settingEvent && <Btn onClick={() => setSettingEvent(true)}>Set up an event</Btn>}
@@ -786,7 +786,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               {events.slice(0, 6).map(e => {
                 const st = eventState(e);
                 return (
-                  <button key={e.id} type="button" onClick={() => onEvent?.(e)} className="flex cursor-pointer flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 text-left hover:bg-white/[0.05]">
+                  <button key={e.id} type="button" onClick={() => onEvent?.(e)} className="flex cursor-pointer flex-col gap-2 sim-card p-5 text-left hover:bg-white/[0.05]">
                     <div className="flex items-center gap-2">
                       <Cap>{e.club_id ? 'Club event' : 'Open event'}</Cap>
                       <Chip tone={st.open.length ? 'blue' : 'plain'} className="ml-auto">{eventStatusText(e)}</Chip>
@@ -804,7 +804,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
           <section className="flex flex-col gap-3.5" aria-labelledby="ch-title">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-0 flex-1">
-                <h2 id="ch-title" className="m-0 font-display text-[22px] font-bold">Challenges</h2>
+                <h2 id="ch-title" className="sim-h2">Challenges</h2>
                 <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>The same race for everyone, with a leaderboard. Race the leader's ghost to find the time.</p>
               </div>
               {canSet && !setting && <Btn onClick={() => setSetting(true)}>Set a challenge</Btn>}
@@ -813,7 +813,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             {challenges.length === 0 && !setting && <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>No challenges yet. Set the first one from the race you've set up above.</p>}
             <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))' }}>
               {challenges.slice(0, 6).map(c => (
-                <button key={c.id} type="button" onClick={() => onChallenge?.(c)} className="flex cursor-pointer flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 text-left hover:bg-white/[0.05]">
+                <button key={c.id} type="button" onClick={() => onChallenge?.(c)} className="flex cursor-pointer flex-col gap-2 sim-card p-5 text-left hover:bg-white/[0.05]">
                   <div className="flex items-center gap-2">
                     <Cap>{c.club_id ? 'Club challenge' : 'Open challenge'}</Cap>
                     <Chip tone={isOpen(c) ? 'blue' : 'plain'} className="ml-auto">{closesText(c)}</Chip>
@@ -852,7 +852,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               </Opts>
               {windHint && <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{windHint}</p>}
               {venue.traits && venue.traits.notes.length > 0 && (
-                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3.5">
+                <div className="sim-card p-3.5">
                   <Cap>Local knowledge</Cap>
                   <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0 text-[13px] leading-snug" style={{ color: C.mute }}>
                     {venue.traits.notes.map(n => <li key={n} className="flex gap-2"><span aria-hidden="true" className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-[#4DA3FF]" />{n}</li>)}
