@@ -102,7 +102,8 @@ describe('a recorded sequence against the race clock', () => {
 
   it("hands the calls to the simulator when the recording won't sound", () => {
     SlowAudio.seekTakes = 1e6;
-    const { el, calling } = run(60, 9000, 10);
+    // (It's given three seconds to get going before the simulator steps in.)
+    const { el, calling } = run(60, 9000, 20);
     SlowAudio.seekTakes = 0.6;
     expect(el.played).toBe(0);
     expect(calling).toBeLessThan(0.2);

@@ -189,11 +189,26 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [userId, clubId]);
   // The club's StartBox sequences: the race starts with the club's own unless you choose otherwise.
   const [sequences, setSequences] = useState<SimSequence[]>([]);
+  // (Still loading when you press Start? The race waits a moment for them, so it's the club's own
+  // start that calls it and not the simulator's because you were quick.)
+  const seqLoad = useRef<Promise<SimSequence[]> | null>(null);
+  const seqLoaded = useRef(false);
   useEffect(() => {
     let live = true;
-    void loadClubSequences(clubId).then(q => { if (live) setSequences(q); });
+    seqLoaded.current = false;
+    const load = loadClubSequences(clubId);
+    seqLoad.current = load;
+    void load.then(q => { if (live) { seqLoaded.current = true; setSequences(q); } });
     return () => { live = false; };
   }, [clubId]);
+  /** The club's sequences, waiting up to 2½ seconds if they're still on their way. */
+  const withSequences = useCallback((go: (list: SimSequence[]) => void) => {
+    if (seqLoaded.current || !seqLoad.current) { go(sequences); return; }
+    let done = false;
+    const once = (list: SimSequence[]) => { if (!done) { done = true; go(list); } };
+    void seqLoad.current.then(once);
+    window.setTimeout(() => once(sequences), 2500);
+  }, [sequences]);
   const startSeq = chosenSequence(sequences, setup.startSeq);
   // Its recording starts loading now, so it's ready the moment a race opens.
   const startSeqId = startSeq?.id;
@@ -336,11 +351,13 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [run]);
 
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
-    const seq = chosenSequence(sequences, s.startSeq);
-    setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq });
-    setRunView(s.view);
-    setWhere('race');
-  }, [todayWind, me, sequences]);
+    withSequences(list => {
+      const seq = chosenSequence(list, s.startSeq);
+      setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq });
+      setRunView(s.view);
+      setWhere('race');
+    });
+  }, [todayWind, me, withSequences]);
 
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
@@ -355,10 +372,11 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       nextLabel: next?.label, autoTrim: setup.autoTrim,
     };
     if (spec.kind === 'lesson') setAcademyAt(spec.id);
-    setRun({ scene, mode: 'scene', key: Date.now() });
+    // (A drill with a countdown is called by the club's StartBox sequence too, when it's long enough.)
+    setRun({ scene, mode: 'scene', key: Date.now(), sequence: startSeq });
     setRunView(spec.kind === 'lesson' ? 'top' : setup.view);
     setWhere('race');
-  }, [training, setup]);
+  }, [training, setup, startSeq]);
 
   const toDebrief = useCallback((race: Race, sum: RaceSummary, moments: Moment[]) => {
     setProfile(saveRace(sum));
@@ -405,8 +423,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       if (g) ghost = { log: g, settings: g.settings, label: `Ghost · ${ghostOf.display_name}` };
     }
     if (!(await waterFor(c.settings))) return;
-    // The club's sequence plays along if it's the challenge's length; otherwise the simulator calls it.
-    const seq = startSeq && startSeq.seconds === c.settings.sequenceSeconds ? startSeq : null;
+    // The club's sequence calls it if it's long enough for the challenge's countdown (it joins part-way through); otherwise the simulator does.
+    const seq = startSeq && startSeq.seconds >= c.settings.sequenceSeconds ? startSeq : null;
     setRun({ settings: challengeSettings(c, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: c, ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
@@ -421,7 +439,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       if (g) ghost = { log: g, settings: g.settings, label: `Ghost · ${o.ghost.display_name}` };
     }
     if (!(await waterFor(race.settings))) return;
-    const seq = startSeq && startSeq.seconds === race.settings.sequenceSeconds ? startSeq : null;
+    const seq = startSeq && startSeq.seconds >= race.settings.sequenceSeconds ? startSeq : null;
     // A race that has closed can only be sailed for practice.
     setRun({ settings: challengeSettings(race, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race), ghost, sequence: seq });
     setRunView(setup.view);

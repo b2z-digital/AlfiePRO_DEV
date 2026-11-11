@@ -4,6 +4,8 @@
 // breeze brings the wind in, with more of it in the gusts; fresh, it's loud and the rig whistles.
 // Everything fades in and out, and it goes quiet when the race is paused or muted.
 
+import { soundOut } from './soundHub';
+
 export interface AmbienceState {
   /** The wind at your boat, knots. */
   kn: number;
@@ -50,21 +52,20 @@ export class Ambience {
   private nextBird = 0;
   private gust = 0;
   private stopped = false;
+  private loops: AudioBufferSourceNode[] = [];
   private mix = ambienceMix({ kn: 0, fast: 0, sea: 0 });
 
-  /** Call from a tap or key press: browsers only let a page make sound once you've touched it. */
+  /** Start (or start again): on the simulator's shared sound output, as soon as the browser allows
+   *  it. That's once you've touched the page anywhere, not only inside this race. */
   unlock() {
-    if (this.stopped || typeof window === 'undefined') return;
-    try {
-      if (!this.ctx) this.build();
-      if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
-    } catch { /* no sound on this device */ }
+    if (typeof window === 'undefined') return;
+    this.stopped = false;
+    try { if (!this.ctx) this.build(); } catch { /* no sound on this device */ }
   }
 
   private build() {
-    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
+    const ctx = soundOut();
+    if (!ctx) return;
     this.ctx = ctx;
     // Four seconds of soft noise, looped: the raw material for wind and water. (Slightly "pink":
     // more low than high, which sounds like air and water rather than a hiss.)
@@ -91,6 +92,7 @@ export class Ambience {
       const src = ctx.createBufferSource();
       src.buffer = buf; src.loop = true;
       src.start(0, offset);
+      this.loops.push(src);
       return src;
     };
     // The wind: noise through a low band that opens up as it blows.
@@ -126,8 +128,11 @@ export class Ambience {
 
   /** Every frame (or a few times a second): follow the race. */
   update(s: AmbienceState) {
+    // (The output opens with your first touch of the page: pick it up the moment it's there.)
+    if (!this.ctx && !this.stopped) this.unlock();
     const ctx = this.ctx;
     if (!ctx || !this.master || this.stopped) return;
+    if (ctx.state !== 'running') { soundOut(); return; }
     const now = ctx.currentTime;
     const on = s.running && !s.muted;
     this.master.gain.setTargetAtTime(on ? MASTER : 0, now, on ? 0.6 : 0.15);
@@ -231,13 +236,17 @@ export class Ambience {
   /** What's sounding now (for tests and the settings screen). */
   get levels() { return this.mix; }
 
-  /** Leaving the race: fade out and let go of the sound hardware. */
+  /** Leaving the race: fade out and unplug (the output itself stays, for the next race). */
   stop() {
     this.stopped = true;
-    const ctx = this.ctx;
-    if (!ctx) return;
-    try { this.master?.gain.setTargetAtTime(0, ctx.currentTime, 0.08); } catch { /* closing anyway */ }
-    window.setTimeout(() => { void ctx.close().catch(() => undefined); }, 400);
-    this.ctx = null;
+    const ctx = this.ctx, master = this.master;
+    if (!ctx || !master) return;
+    try { master.gain.setTargetAtTime(0, ctx.currentTime, 0.08); } catch { /* going anyway */ }
+    const loops = this.loops;
+    window.setTimeout(() => {
+      for (const l of loops) { try { l.stop(); l.disconnect(); } catch { /* already stopped */ } }
+      try { master.disconnect(); } catch { /* already gone */ }
+    }, 400);
+    this.ctx = null; this.master = null; this.wind = null; this.whistle = null; this.wash = null; this.lapBus = null; this.loops = [];
   }
 }
