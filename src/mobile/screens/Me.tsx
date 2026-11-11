@@ -77,8 +77,8 @@ export const Me: React.FC = () => {
         <button className="m-card" onClick={() => navigate('/race-simulator')} style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' }}>
           <span className="m-tile" style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(138,77,255,.16)', color: '#B89BFF' }}><Icon name="simulator" size={20} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>Race Simulator</div>
-            <div className="m-dim" style={{ fontSize: 12.5 }}>Race AI skippers and members, with Alfie coaching</div>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>Sailing Academy</div>
+            <div className="m-dim" style={{ fontSize: 12.5 }}>Race, drills, rules and tactics, with Alfie coaching</div>
           </div>
           <Icon name="chevron" size={17} className="m-dim" />
         </button>

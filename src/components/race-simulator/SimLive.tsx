@@ -87,7 +87,7 @@ export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
                   <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13.5px]" style={{ color: C.mute }}>
                     {details(s).map(d => <li key={d}>{d}</li>)}
                   </ul>
-                  {host && <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>It's the race you set up on the Race Simulator page. To change it, leave and open a new room.</p>}
+                  {host && <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>It's the race you set up on the Sailing Academy home page. To change it, leave and open a new room.</p>}
                 </>
               ) : (
                 <p className="m-0 text-[13.5px]" style={{ color: C.mute }}>

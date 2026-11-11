@@ -24,7 +24,7 @@ export const RaceSimulatorScreen: React.FC = () => {
   return (
     <div className="m-sim">
       <div className="m-sim-bar">
-        <button className="m-ibtn" aria-label="Close the Race Simulator" onClick={close}><Icon name="close" size={18} /></button>
+        <button className="m-ibtn" aria-label="Close the Sailing Academy" onClick={close}><Icon name="close" size={18} /></button>
       </div>
       <div className="m-sim-body">
         <RaceSimulatorPage

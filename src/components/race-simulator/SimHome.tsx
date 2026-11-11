@@ -17,6 +17,9 @@ import { windAt, windsOf } from '@/sim/venue';
 import type { VenueWind as TodayWind } from './venueWind';
 import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
+import { PLAYS, practiceLink } from './playbook';
+import { todaysPlan } from './plan';
+import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
 import type { Water } from './waters';
 import type { SimIdentity } from './identity';
@@ -346,9 +349,11 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook') => void;
+  /** Start a drill or scenario straight from the home screen (today's ten minutes). */
+  onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
   today: TodayWind | 'loading' | 'failed' | null;
   /** The signed-in member: their name and sail numbers. */
@@ -404,6 +409,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       a.dispose();
     }, 8000);
   };
+  // Today's three: from where the races are going, and what's due.
+  const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -499,7 +506,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <span className="hidden text-[12.5px] sm:inline" style={{ color: 'rgba(241,244,250,.78)' }}>AI skippers racing in the conditions you've set</span>
             </div>
             <div className="max-w-[640px]">
-              <h1 className="m-0 font-display text-[clamp(34px,4.6vw,60px)] font-extrabold leading-[1.02] tracking-[-0.03em]">Race Simulator</h1>
+              <h1 className="m-0 font-display text-[clamp(34px,4.6vw,60px)] font-extrabold leading-[1.02] tracking-[-0.03em]">Sailing Academy</h1>
               <p className="m-0 mt-3 max-w-[520px] text-[clamp(15px,1.25vw,18px)] leading-snug" style={{ color: 'rgba(241,244,250,.86)' }}>
                 Race skippers who sail like real radio sailors, on your own water, with Alfie coaching from the bank.
               </p>
@@ -551,13 +558,40 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[rgba(138,77,255,0.22)] text-[#C9B4FF]"><Glyph name="academy" size={24} /></span>
                 <div className="min-w-0 flex-1">
                   <p className="m-0 text-[11px] font-bold uppercase tracking-[0.12em] text-[#C9B4FF]">Coaching and drills</p>
-                  <h2 id="train-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Sailing Academy</h2>
+                  <h2 id="train-title" className="m-0 font-display text-[24px] font-bold tracking-[-0.01em]">Your training</h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Chip tone={lic.level ? 'blue' : 'plain'}>Rules licence · level {lic.level} of 6</Chip>
                   <Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} start stars</Chip>
                 </div>
               </div>
+              {onLink && plan.length > 0 && (
+                <div className="flex flex-col gap-3 rounded-[20px] border border-white/10 bg-[rgba(6,11,22,0.55)] p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <AlfieOrb size={36} />
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 font-display text-[18px] font-bold leading-tight">Today's ten minutes</p>
+                      <p className="m-0 text-[13px]" style={{ color: C.mute }}>Three things, picked from where your races are going and what's due.</p>
+                    </div>
+                    <Chip tone={plan.every(p => p.done) ? 'good' : 'blue'}>{plan.filter(p => p.done).length} of {plan.length} done</Chip>
+                  </div>
+                  <ol className="m-0 flex list-none flex-col gap-2 p-0">
+                    {plan.map((it, i) => {
+                      const link = practiceLink(it.link);
+                      return (
+                        <li key={`${it.link.kind}:${it.link.id}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5">
+                          <span aria-hidden="true" className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold', it.done ? 'bg-[rgba(126,226,168,0.18)] text-[#7EE2A8]' : 'bg-white/[0.08]')}>{it.done ? '✓' : i + 1}</span>
+                          <span className="min-w-[180px] flex-1">
+                            <span className="block text-[14.5px] font-semibold">{link.label.replace(/^(Start Trainer|Scenario): /, '')}</span>
+                            <span className="block text-[12.5px] leading-snug" style={{ color: C.mute }}>{it.why}</span>
+                          </span>
+                          <Btn small primary={!it.done} onClick={() => onLink(link)}>{it.done ? 'Again' : 'Go'}</Btn>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              )}
               <button type="button" onClick={() => onOpen(advice.where)}
                 className="group flex cursor-pointer flex-wrap items-center gap-4 rounded-[20px] border border-white/10 bg-[rgba(6,11,22,0.55)] p-4 text-left text-[#F1F4FA] transition-colors hover:border-white/25">
                 <AlfieOrb size={44} />
@@ -571,6 +605,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 </span>
               </button>
               <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
+                <AcademyCard icon="book" tint="#34D3C8" kicker={`${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
+                  progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
                 <AcademyCard icon="flag" tint="#4DA3FF" kicker="12 drills" title="Start Trainer" text="Time on distance, the favoured end, port-tack starts, crowded lines, and getting back after a recall."
                   progress={stars.of ? stars.got / stars.of : 0} progressText={`${stars.got}/${stars.of} stars`} action={() => onOpen('trainer')} actionLabel={stars.got ? 'Carry on' : 'Begin'} />
                 <AcademyCard icon="book" tint="#B692FF" kicker="6 modules" title="Rules Academy" text="26 situations from the Racing Rules with Appendix E. Answer each one, then sail it, and earn your licence."
