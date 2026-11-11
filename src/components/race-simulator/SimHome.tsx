@@ -19,6 +19,7 @@ import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
 import { todaysPlan } from './plan';
+import { focusWords, raceFocus } from './focus';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
 import type { Water } from './waters';
@@ -362,7 +363,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
 
 export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
   onLink?: (l: TrainLink) => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -422,6 +423,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   };
   // Today's three: from where the races are going, and what's due.
   const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
+  // The one thing your next race is for: your biggest leak lately.
+  const focus = useMemo(() => raceFocus(profile), [profile]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -527,6 +530,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <div className="min-w-[220px] flex-1">
               <h2 id="qr-title" className="m-0 font-display text-[22px] font-bold tracking-[-0.01em]">Your race</h2>
               <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>About {minutes(s)} minutes. Sail it with the keyboard, touch or a USB transmitter.</p>
+              {focus && (
+                <p className="m-0 mt-2.5 flex items-start gap-2 text-[13.5px] leading-snug">
+                  <span className="mt-px shrink-0"><AlfieOrb size={18} /></span>
+                  <span><b className="font-semibold">{focusWords(focus).title}.</b> <span style={{ color: C.mute }}>{focusWords(focus).line}</span></span>
+                </p>
+              )}
             </div>
             <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
               <button type="button" onClick={surprise} className="sim-btn-lg flex-1 sm:flex-none">Surprise me</button>
@@ -662,7 +671,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       </div>
                     ))}
                   </div>
-                  <div><Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn></div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
+                    <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>
+                  </div>
                 </>
               )}
             </section>

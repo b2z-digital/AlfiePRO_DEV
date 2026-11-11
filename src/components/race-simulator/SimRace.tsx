@@ -22,6 +22,7 @@ import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './
 import { usePads } from './transmitter';
 import { RaceAudio } from './audio';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
+import { focusWords, type Focus } from './focus';
 import { SequencePlayer, SimSequence } from './startbox';
 import type { LiveRace } from './live';
 import { Moment, findMoments } from './moments';
@@ -78,6 +79,8 @@ export interface SimRaceProps {
   liveCode?: string;
   /** The starting signal: a first try at an event race starts here. */
   onGun?: () => void;
+  /** The one thing this race is for: shown and said as it opens. */
+  focus?: Focus | null;
   /** Scenes: a result to record, watch the right way, the next one. */
   onSceneResult?: (o: Outcome) => void;
   onSceneWatch?: () => void;
@@ -114,7 +117,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun, focus = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -274,6 +277,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     setToasts(ts => [...ts.slice(-2), { id, text, tone }]);
     window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 3600);
   }, []);
+
+  // The race's focus, as it opens: on screen, and in Alfie's voice when he's coaching.
+  useEffect(() => {
+    if (!focus) return;
+    const w = focusWords(focus);
+    const id = window.setTimeout(() => { toast(`${w.title}. ${w.cue}`, 'good'); if (coach !== 'off') audio.say(w.say, false); }, 1400);
+    return () => window.clearTimeout(id);
+    // (Once, as the race opens: not again when the coaching is switched.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, toast, audio]);
 
   const resultRows = useCallback((): ResultRowView[] => {
     if (mode === 'start') {

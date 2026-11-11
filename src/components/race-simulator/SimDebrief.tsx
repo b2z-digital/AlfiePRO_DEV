@@ -6,6 +6,7 @@ import type { RaceSummary, TrainLink } from './stats';
 import { causeLink, fmt } from './stats';
 import { CAUSE_WORDS, type Cause, type Ledger } from './ledger';
 import { playsFor } from './playbook';
+import { focusPlay, focusWords, type Focus } from './focus';
 import { ReplayBox, drawReplayMap } from './render';
 import { Moment, frameAt } from './moments';
 import { ruleText } from './rulesText';
@@ -14,6 +15,24 @@ import { AlfieOrb, Btn, C, Cap, Seg, cx, ordinal } from './ui';
 export type { TrainLink };
 
 const CAUSE_COLOUR: Record<Cause, string> = { start: '#4DA3FF', speed: '#7EE2A8', turns: '#FFCB96', shifts: '#C4A7FF', laylines: '#FF9F9F', roundings: '#FFD86B', air: '#8FD3E8', penalties: '#FF7B7B' };
+
+/** The one thing this race was for, and whether you did it. */
+function FocusCard({ focus, onPlay }: { focus: Focus; onPlay?: (playId: string) => void }) {
+  const w = focusWords(focus), play = focusPlay(focus.cause);
+  return (
+    <div className={cx('flex flex-col gap-2 rounded-[20px] border p-5', focus.met ? 'border-[rgba(126,226,168,0.35)] bg-[rgba(52,211,153,0.07)]' : 'border-white/[0.07] bg-white/[0.025]')}>
+      <div className="flex items-center gap-2">
+        <Cap>Your focus</Cap>
+        <span className={cx('ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold', focus.met ? 'bg-[rgba(126,226,168,0.16)] text-[#7EE2A8]' : 'bg-white/[0.07]')} style={focus.met ? undefined : { color: C.mute }}>
+          <span aria-hidden="true">{focus.met ? '✓' : '○'}</span>{focus.met ? 'Target met' : 'Not yet'}
+        </span>
+      </div>
+      <p className="m-0 font-display text-[19px] font-semibold leading-tight">{CAUSE_WORDS[focus.cause].name}</p>
+      <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{w.result}</p>
+      {onPlay && <div><Btn small quiet onClick={() => onPlay(play.id)}>The play: {play.title}</Btn></div>}
+    </div>
+  );
+}
 
 /**
  * Where your race went: one bar of the lengths you gave away to a perfect race, split by cause,
@@ -351,6 +370,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
             <ReplayMap race={race} moments={moments} onTakeOver={onTakeOver} onLink={onLink} />
           </div>
           <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
+            {sum.focus && sum.focus.got !== undefined && <FocusCard focus={sum.focus} onPlay={onPlay} />}
             {sum.ledger && sum.status !== 'dnf' && <LedgerCard led={sum.ledger} onLink={onLink} onPlay={onPlay} />}
             <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
               <div className="flex items-center gap-2.5">

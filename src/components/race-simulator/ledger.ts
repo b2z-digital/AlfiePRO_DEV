@@ -22,8 +22,53 @@ export interface Ledger {
   speedUp: number; tacks: number;
   /** How many tacks and gybes you made. */
   tacksMade: number; gybesMade: number;
+  /** How many marks you rounded (a gate is one; the top mark and its offset are one). */
+  marks: number;
   /** Minutes raced. */
   minutes: number;
+  /** How that stands against the fleet you raced (kept when you and at least three others finished). */
+  vs?: Versus;
+}
+
+/** A cause, or everything together. */
+export type Part = Cause | 'total';
+/**
+ * Your ledger against the other boats in the same race, whose ledgers are kept the same way:
+ * the share of them you gave away less than (0 to 1), and what the middle boat gave away (a rate).
+ */
+export interface Versus { level: string; boats: number; beat: Record<Part, number>; mid: Record<Part, number> }
+
+/**
+ * A ledger as rates, so a short race and a long one (or a boat that has finished and one still
+ * racing) can be compared. Each part in the unit it happens in: the start as it is (there is one a
+ * race), tacks and gybes for each one made, roundings for each mark rounded, and the rest, with
+ * everything together, as boat lengths for every ten minutes raced.
+ */
+export function rate(l: Ledger): Record<Part, number> {
+  const k = 10 / Math.max(2, l.minutes);
+  const each: Partial<Record<Cause, number>> = { start: 1, turns: 1 / Math.max(1, l.tacksMade + l.gybesMade), roundings: 1 / Math.max(1, l.marks ?? 3) };
+  const out = { total: l.total * k } as Record<Part, number>;
+  for (const p of l.parts) out[p.cause] = p.lengths * (each[p.cause] ?? k);
+  return out;
+}
+/** How a part's rate is said: lengths "a start", "a tack or gybe", "a rounding" or "every ten minutes of racing". */
+export const per = (part: Part) => (part === 'start' ? 'a start' : part === 'turns' ? 'a tack or gybe' : part === 'roundings' ? 'a rounding' : 'every ten minutes of racing');
+
+/**
+ * Set one boat's ledger against the others', as rates (the others may have raced a little more or
+ * less of the course). Giving away nothing can't be beaten, so it beats everyone who did no better.
+ */
+export function versus(mine: Ledger, others: Ledger[], level: string): Versus {
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  const me = rate(mine), them = others.map(rate);
+  const beat = {} as Record<Part, number>, mid = {} as Record<Part, number>;
+  for (const c of [...CAUSES, 'total'] as Part[]) {
+    const vs = them.map(o => o[c]).sort((a, z) => a - z);
+    const worse = vs.filter(v => v > me[c] + 0.05).length, same = vs.filter(v => Math.abs(v - me[c]) <= 0.05).length;
+    beat[c] = r2((worse + (me[c] < 0.3 ? same : same / 2)) / Math.max(1, vs.length));
+    mid[c] = r2(vs.length ? (vs[Math.floor((vs.length - 1) / 2)] + vs[Math.ceil((vs.length - 1) / 2)]) / 2 : 0);
+  }
+  return { level, boats: others.length, beat, mid };
 }
 
 const zero = (): Record<Cause, number> => ({ start: 0, speed: 0, turns: 0, shifts: 0, laylines: 0, roundings: 0, air: 0, penalties: 0 });
@@ -184,6 +229,7 @@ export class LossTally {
       total, parts, worst,
       speedUp: r1(Math.max(0, this.speedUpM / L)), tacks: r1(tackM / L),
       tacksMade: this.tacksMade, gybesMade: this.gybesMade,
+      marks: this.rounds.size,
       minutes: r1(this.t0 === null ? 0 : (this.lastT - this.t0) / 60),
     };
   }

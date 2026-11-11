@@ -4,7 +4,8 @@ import type { Race } from '@/sim/engine';
 import type { Boat, Incident } from '@/sim/types';
 import { dist, dot, n180, sub } from '@/sim/math';
 import { DRILLS, LAB, MODULES } from '@/sim/training';
-import { LossTally, type Cause, type Ledger } from './ledger';
+import { LossTally, versus, type Cause, type Ledger } from './ledger';
+import type { Focus } from './focus';
 
 interface Sample { t: number; leg: number; upwind: boolean; tack: 'port' | 'stbd'; shift: number; spdPct: number; shadow: number; started: boolean }
 
@@ -17,11 +18,19 @@ export class PlayerLog {
   startAlong: number | null = null;
   /** Where the race is going: lengths given away, by cause, kept as you sail. */
   tally = new LossTally();
+  /** The same for every other boat, so yours can be set against the fleet you raced. */
+  others = new Map<string, LossTally>();
   private lastTack: 'port' | 'stbd' | null = null;
   private lastT = -1;
 
   sample(race: Race, p: Boat, meanTwd: number) {
     this.tally.step(race, p);
+    for (const b of race.boats) {
+      if (b === p) continue;
+      let t = this.others.get(b.id);
+      if (!t) this.others.set(b.id, (t = new LossTally()));
+      t.step(race, b);
+    }
     if (race.t - this.lastT < 0.5) return;
     this.lastT = race.t;
     const leg = race.course.legs[p.legIndex];
@@ -75,6 +84,8 @@ export interface RaceSummary {
   takeaways: Takeaway[];
   /** Where the race went: lengths given away to a perfect race, by cause (races sailed before this was kept have none). */
   ledger?: Ledger;
+  /** The one thing this race was for, and whether it was met. */
+  focus?: Focus;
 }
 
 /** The practice that fixes each cause of lost lengths. */
@@ -164,6 +175,16 @@ export function summarize(race: Race, log: PlayerLog, mode: 'race' | 'start'): R
     // (Away from the favoured end of a biased line: that far along it, times the sine of the bias.)
     ledger: mode === 'race' ? log.tally.result(p, fromFavouredL === null ? 0 : fromFavouredL * Math.sin((Math.abs(bias) * Math.PI) / 180)) : undefined,
   };
+  // Against the fleet: every other boat that raced most of what you did (like with like, so without
+  // the favoured-end allowance only your own start has).
+  if (sum.ledger && mine.status === 'finished') {
+    const own = log.tally.result(p);
+    const others = race.boats
+      .filter(b => b !== p && b.started && !b.retired && !b.disabled && !b.dsq && log.others.has(b.id))
+      .map(b => log.others.get(b.id)!.result(b))
+      .filter(l => l.minutes >= 0.6 * own.minutes);
+    if (others.length >= 3) sum.ledger.vs = versus(own, others, s.level);
+  }
   sum.takeaways = takeaways(sum);
   return sum;
 }
