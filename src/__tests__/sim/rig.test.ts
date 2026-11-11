@@ -46,7 +46,9 @@ describe('Your rig for the day', () => {
   });
 
   it('too big a rig in a blow heels her hard and is slower than the right one', () => {
-    const c = sail({ windKnots: 21 }), a = sail({ windKnots: 21, rig: 'A' }), b = sail({ windKnots: 21, rig: 'B' });
+    // (Over three races: one race turns on a tack more or less, which is worth more than a rig size.)
+    const over = (rig?: 'A' | 'B') => { const rs = [3, 4, 5].map(seed => sail({ windKnots: 21, rig, seed })); return { time: rs.reduce((s, r) => s + r.time, 0) / 3, heel: rs.reduce((s, r) => s + r.heel, 0) / 3, race: rs[0].race }; };
+    const c = over(), a = over('A'), b = over('B');
     expect(c.race.player!.rig).toBe('C');
     expect(a.heel).toBeGreaterThan(c.heel + 6);
     expect(a.time).toBeGreaterThan(c.time * 1.05);

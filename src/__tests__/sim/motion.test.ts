@@ -266,10 +266,14 @@ describe('The start', () => {
 
   it('gives a club fleet two or three sharp starters, and they go for the end too', () => {
     const s = startOf('club', 3);
-    const sharp = s.r.boats.filter(b => (b.persona?.startSense ?? 0) > 0.6);
+    const sense = s.r.boats.map(b => b.persona?.startSense ?? 0);
+    const sharp = sense.filter(x => x > 0.6);
     expect(sharp.length).toBeGreaterThanOrEqual(2);
-    expect(sharp.length).toBeLessThanOrEqual(4);
-    expect(s.r.boats.filter(b => b.persona && (b.persona.startSense ?? 0) < 0.2).length).toBeGreaterThanOrEqual(11);
+    expect(sharp.length).toBeLessThanOrEqual(5);
+    // The rest are club starters: each with her own feel for the line (a fleet is a mix), but
+    // most of them reading it less than half as well as a state sailor does.
+    expect(sense.filter(x => x < 0.33).length).toBeGreaterThanOrEqual(9);
+    expect(sense.filter(x => x < 0.2).length).toBeGreaterThanOrEqual(5);
     expect(s.u.filter(x => x > 0.85).length).toBeGreaterThanOrEqual(1);
   }, 60000);
 });

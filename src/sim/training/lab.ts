@@ -328,7 +328,7 @@ export const LAB: LabMoment[] = [
       ],
     }),
     goal: topAtMark('Round mark 1 in the top 2', 0, 2, 70, 'mark 1'),
-    solution: 'ai', demoSeeds: [1, 6],
+    solution: 'ai', demoSeeds: [7, 1],
     mistake: hold(CH_P),
     mistakeRule: '',
   },
@@ -347,7 +347,7 @@ export const LAB: LabMoment[] = [
       ],
     }),
     goal: topAtMark('Round mark 1 in the top 3', 0, 3, 50, 'mark 1'),
-    solution: 'ai', demoSeeds: [2, 8],
+    solution: 'ai', demoSeeds: [8, 5],
     mistakeRule: '',
   },
   {
@@ -380,7 +380,7 @@ export const LAB: LabMoment[] = [
       ],
     }),
     goal: beatRival('Round mark 1 ahead of your rival', 0, 90, 'mark 1', 'Rival'),
-    solution: 'ai', demoSeeds: [6, 7],
+    solution: 'ai', demoSeeds: [1, 3],
     mistakeRule: '',
   },
   {
@@ -444,7 +444,7 @@ export const LAB: LabMoment[] = [
       ],
     }),
     goal: topAtMark('Round mark 1 in the top 3', 0, 3, 110, 'mark 1'),
-    solution: 'ai', demoSeeds: [4, 7], mistakeRule: '',
+    solution: 'ai', demoSeeds: [7, 3], mistakeRule: '',
   },
   {
     kind: 'lab', group: 'tactics', id: 'defend-run', title: 'Defend on the run', skill: 'Downwind, leading',
@@ -499,7 +499,7 @@ export const LAB: LabMoment[] = [
         },
       };
     })(),
-    solution: 'ai', demoSeeds: [5, 8], mistakeRule: '',
+    solution: 'ai', demoSeeds: [17, 19], mistakeRule: '',
   },
 ];
 

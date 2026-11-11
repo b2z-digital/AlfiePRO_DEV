@@ -912,7 +912,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         </Sheet>
       )}
       {pick === 'skippers' && (
-        <Sheet icon="skippers" title="Who you race" text="How good the other skippers are." onClose={closePick}>
+        <Sheet icon="skippers" title="Who you race" text="How good the other skippers are. Every fleet is a mix, as at any club: sharp starters, tight rounders, shift readers and quick boats, some on form and some not. Early in the countdown the fleet list says what each is known for." onClose={closePick}>
           <Opts>
             {(['club', 'state', 'national', 'world'] as SkipperLevel[]).map(l => <Opt key={l} on={s.level === l} onClick={() => set({ level: l })} title={LEVEL_NAME[l]} text={LEVEL_TEXT[l]} />)}
           </Opts>
