@@ -22,6 +22,7 @@ import { todaysPlan } from './plan';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
 import { todaysCases } from './judge';
+import { GRADE_NAME, passport } from './passport';
 import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
 import VenueBuilder from './VenueBuilder';
@@ -483,6 +484,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
   // The one thing your next race is for: your biggest leak lately.
   const focus = useMemo(() => raceFocus(profile), [profile]);
+  const pp = useMemo(() => passport(profile), [profile]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
   const vWind = venue ? windAt(venue, s.windPick) : null;
   const windHint = !venue || !vWind ? null
@@ -745,6 +747,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       </div>
                     ))}
                   </div>
+                  {pp && (
+                    <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                      <b className="font-semibold text-[#F1F4FA]">Passport:</b> {pp.total.grade && pp.against
+                        ? `${GRADE_NAME[pp.total.grade]} overall against ${pp.against}, with Gold in ${pp.skills.filter(k => k.grade === 'gold').length} of 8 parts.`
+                        : pp.graded >= 3 ? `No grade overall yet against ${pp.against ?? 'the fleet'}: give away less than a quarter of the fleet for Bronze.`
+                          : `${pp.graded} of the 3 finished races it takes to be graded.`}
+                    </p>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
                     <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>

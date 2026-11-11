@@ -149,12 +149,22 @@ export function drawDiagram(ctx: CanvasRenderingContext2D, d: DiagramData, w: nu
     const p0 = b.pts[0];
     drawBoat(ctx, X(p0.x), Y(p0.y), p0.hdg, p0.twa, b.disabled ? 0 : p0.sheet, Lpx, b.color, b.isPlayer, b.disabled, 1);
   }
-  // Labels at the start positions, nudged off the hull.
-  for (const b of d.boats) {
+  // Labels at the start positions (in a clip, where each boat is now), nudged off the hull, and
+  // spread apart when two boats are close enough for their names to land on each other.
+  const tags = d.boats.map(b => {
     const p0 = opts.live ? b.pts[b.pts.length - 1] : b.pts[0];
     const side = n180(p0.hdg - 90) > 0 ? 1 : -1;
-    const tone = b.isPlayer ? '#A9D2FF' : b.color === '#FB923C' ? '#FFCB96' : 'rgba(235,240,255,0.85)';
-    text(ctx, b.label, X(p0.x) + side * (Lpx * 0.7 + 6), Y(p0.y) + Lpx * 0.55, tone, 12.5, side > 0 ? 'left' : 'right', 700);
+    return { b, side, x: X(p0.x) + side * (Lpx * 0.7 + 6), y: Y(p0.y) + Lpx * 0.55 };
+  });
+  const byY = [...tags].sort((a, z) => a.y - z.y);
+  for (let k = 1; k < byY.length; k++) {
+    const up = byY[k - 1], t = byY[k];
+    if (t.side === up.side && Math.abs(t.x - up.x) < 90 && t.y - up.y < 15) t.y = up.y + 15;
+  }
+  for (const t of tags) {
+    const b = t.b;
+    const tone = b.isPlayer ? '#A9D2FF' : b.color === '#FB923C' ? '#FFCB96' : b.color === '#B48CFF' ? '#D9C7FF' : 'rgba(235,240,255,0.85)';
+    text(ctx, b.label, t.x, t.y, tone, 12.5, t.side > 0 ? 'left' : 'right', 700);
     if (b.hail && (!opts.live || b.pts.length > (b.hail.at ?? 0))) text(ctx, `“${b.hail.text}”`, X(b.hail.x), Y(b.hail.y) - Lpx * 0.9 - 8, '#FFFFFF', 11.5, 'center', 600);
   }
   // Wind arrow.
