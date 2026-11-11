@@ -12,10 +12,12 @@ import { Profile, clearProfile, skills } from './profile';
 import { TrainingProgress, drillStars, licence } from './progress';
 import type { SimView } from './SimRace';
 import { AlfieOrb, Btn, C, Cap, Chip, Seg, Tile, compassName, cx, ordinal } from './ui';
-import { DEFAULT_VENUE, VENUES, venueForClub } from '@/sim/venues';
+import { BUILT_IN, DEFAULT_VENUE, VENUES, venueForClub } from '@/sim/venues';
 import { windAt, windsOf } from '@/sim/venue';
 import type { VenueWind as TodayWind } from './venueWind';
 import VenuePick from './VenuePick';
+import VenueBuilder from './VenueBuilder';
+import type { Water } from './waters';
 import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
@@ -343,7 +345,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
@@ -352,6 +354,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   me?: SimIdentity | null;
   /** Their club, so its own water comes first. */
   clubId?: string | null;
+  /** Clubs' own water from the database (already registered with the engine). */
+  waters?: Water[];
+  /** A club admin, who can set up and change their club's water. */
+  waterAdmin?: boolean;
+  onWaters?: (next: Water[]) => void;
   /** Races and training are being kept in the member's account. */
   synced?: boolean;
   /** Challenges you can see (null when you're not signed in, or they couldn't be loaded). */
@@ -435,8 +442,19 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   // The wind the venue's map lays the course for: the one picked, or today's when it's in.
   const mapWind = !venue || !vWind ? 0 : s.windDir === 'today' && today && today !== 'loading' && today !== 'failed' ? today.from : vWind.from;
   const spot = venue ? s.spots?.[venue.id] ?? null : null;
-  const myVenue = venueForClub(clubId);
-  const venueList = Object.values(VENUES).sort((a, b) => (a === myVenue ? -1 : b === myVenue ? 1 : 0));
+  // The venues to choose from: the ones that come with the app and clubs' own. Once a club has
+  // published its own version of a venue that came with the app, its version stands in for it.
+  const mine = (d: { clubs?: string[] }) => !!clubId && !!d.clubs?.includes(clubId);
+  const venueList = [
+    ...BUILT_IN.filter(d => !waters.some(w => w.published && w.venueId && w.venueId === d.venueId)),
+    ...waters.map(w => w.def),
+  ].sort((a, b) => Number(mine(b)) - Number(mine(a)));
+  const draftIds = new Set(waters.filter(w => !w.published).map(w => w.def.id));
+  const myWaters = waters.filter(w => w.clubId === clubId);
+  // Setting up or changing the club's water (admins): the one being changed, or 'new'.
+  const [building, setBuilding] = useState<Water | 'new' | null>(null);
+  const builtIn = venueForClub(clubId);
+  const startFrom = builtIn && !myWaters.some(w => w.venueId === builtIn.venueId) ? builtIn : null;
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
   const summary = [CLASS_LABEL[s.classId], `${s.fleetSize} boats`, `${LEVEL_NAME[s.level]} skippers`, venue ? venue.short : 'Practice pond', `${strengthName}, ${CHARACTER[s.windCharacter][0].toLowerCase()}`];
@@ -661,7 +679,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       {pick === 'venue' && (
         <Sheet icon="venue" title="Where you're sailing" text="A real club's water, drawn from the map and seen from its bank, or a sheltered practice pond." onClose={closePick}>
           <Opts>
-            {venueList.map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id, windPick: 0 })} title={d.short} badge={d === myVenue ? 'Your club' : undefined} text={`${d.place}.`} />)}
+            {venueList.map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id, windPick: 0 })} title={d.short} badge={draftIds.has(d.id) ? 'Draft' : mine(d) ? 'Your club' : undefined} text={d.place ? `${d.place}.` : d.name} />)}
             <Opt on={s.venue === 'pond'} onClick={() => set({ venue: 'pond' })} title="Practice pond" text="A sheltered pond lined with trees. The wind blows straight up it." />
           </Opts>
           {venue && vWind && (
@@ -690,7 +708,26 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               )}
             </>
           )}
+          {waterAdmin && clubId && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.07)] p-3.5">
+              <Cap>Your club's water · admins</Cap>
+              <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Build your club's water from its venue location and the map, and put its winds and local tips in your own words.</p>
+              {myWaters.map(w => (
+                <div key={w.rowId} className="flex flex-wrap items-center gap-2">
+                  <b className="min-w-0 flex-1 truncate text-[14px]">{w.def.name}</b>
+                  {w.published ? <Chip tone="good">Published</Chip> : <Chip tone="warn">Draft</Chip>}
+                  <Btn small onClick={() => setBuilding(w)}>Change</Btn>
+                </div>
+              ))}
+              <div><Btn small primary={!myWaters.length} onClick={() => setBuilding('new')}>{startFrom ? `Put ${startFrom.short} in your club's words` : myWaters.length ? 'Set up another venue' : "Set up your club's water"}</Btn></div>
+            </div>
+          )}
         </Sheet>
+      )}
+      {building && clubId && (
+        <VenueBuilder clubId={clubId} existing={building === 'new' ? null : building} startFrom={building === 'new' ? startFrom : null} onClose={() => setBuilding(null)}
+          onSaved={w => { onWaters?.([...waters.filter(x => x.rowId !== w.rowId), w]); set({ venue: w.def.id, windDir: 'usual', windPick: 0 }); setBuilding(null); }}
+          onRemoved={id => { const gone = waters.find(x => x.rowId === id); onWaters?.(waters.filter(x => x.rowId !== id)); if (gone && s.venue === gone.def.id) set({ venue: builtIn?.id ?? 'pond', windPick: 0 }); setBuilding(null); }} />
       )}
       {pick === 'boat' && (
         <Sheet icon="boat" title="Your boat" text="The whole fleet sails the same class." onClose={closePick}>

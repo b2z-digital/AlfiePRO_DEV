@@ -31,7 +31,8 @@ function heroRace(s: Setup, seed: number): Race {
 
 export default function SimHero({ setup, children, className }: { setup: Setup; children?: React.ReactNode; className?: string }) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
-  const key = `${setup.venue}|${setup.windDir === 'usual' ? setup.windPick ?? 0 : 0}|${(setup.spots?.[setup.venue] ?? []).join(',')}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
+  // (A club's own water arrives from the database a moment after the page opens: the window is rebuilt when it does.)
+  const key = `${setup.venue}|${VENUES[setup.venue] ? 1 : 0}|${setup.windDir === 'usual' ? setup.windPick ?? 0 : 0}|${(setup.spots?.[setup.venue] ?? []).join(',')}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
   const latest = useRef(setup);
   latest.current = setup;
 

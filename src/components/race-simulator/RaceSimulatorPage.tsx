@@ -24,6 +24,7 @@ import { SimIdentity, loadIdentity } from './identity';
 import { C, ordinal } from './ui';
 import { VENUES, venueForClub } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
+import { currentId, ensureVenue, loadWaters, type Water } from './waters';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
 import SimChallenge from './SimChallenge';
@@ -90,6 +91,16 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     forgetfulSkippers: s.forgetfulSkippers, seaState: s.seaState,
     seed: Math.floor(Math.random() * 1e9),
   };
+}
+
+/** A short notice over the page (a race's water couldn't be loaded). */
+function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
+  return (
+    <div role="alert" className="fixed inset-x-0 bottom-5 z-[9990] mx-auto flex w-[min(560px,calc(100vw-24px))] items-center gap-3 rounded-2xl border border-[rgba(255,159,67,0.45)] bg-[#1B1408] px-4 py-3 text-[13.5px] text-[#FFE1BD] shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
+      <span className="min-w-0 flex-1 leading-snug">{text}</span>
+      <button type="button" onClick={onClose} className="h-8 shrink-0 cursor-pointer rounded-lg border border-white/20 bg-transparent px-3 text-[13px] font-semibold text-[#FFE1BD]">OK</button>
+    </div>
+  );
 }
 
 type Where = 'home' | 'trainer' | 'academy' | 'lab' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
@@ -218,11 +229,21 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     clubRooms?.advertise(null);
     setRoom(null);
   }, [room, clubRooms]);
+  // In the room: the race's water has to be on this device before you can be ready (a club's own
+  // water is fetched when the host's race arrives).
+  const [roomWater, setRoomWater] = useState<'ok' | 'loading' | 'missing'>('ok');
   // In the room: advertise it at the club while it waits (the host), and go to the race together
   // the moment the host starts it.
   useEffect(() => {
     if (!room) return;
+    let asked: string | undefined;
     const sync = () => {
+      const v = room.settings?.venue;
+      if (v !== asked) {
+        asked = v;
+        if (!v || VENUES[v]) setRoomWater('ok');
+        else { setRoomWater('loading'); void ensureVenue(v).then(ok => { if (asked === v) setRoomWater(ok ? 'ok' : 'missing'); }); }
+      }
       if (room.race && where === 'live') {
         clubRooms?.advertise(null);
         const settings = room.race.race.settings;
@@ -260,7 +281,44 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     if (userId) void syncTraining({ userId, clubId }, t);
   }, [userId, clubId]);
 
-  const changeSetup = useCallback((s: Setup) => { setSetup(s); storeSetup(s); }, []);
+  // Was there a saved set-up when the page opened, and has one been chosen since?
+  const startedFresh = useRef(!hasSetup()), touched = useRef(false);
+  const changeSetup = useCallback((s: Setup) => { touched.current = true; setSetup(s); storeSetup(s); }, []);
+  // Clubs' own water, from the database: loaded once you're signed in, and kept in step with the
+  // set-up (a water that has changed has a new id; a club's own version stands in for the one that
+  // came with the app).
+  const [waters, setWaters] = useState<Water[]>([]);
+  const [waterNote, setWaterNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    void loadWaters().then(w => { if (live && w) setWaters(w); });
+    return () => { live = false; };
+  }, [userId]);
+  useEffect(() => {
+    if (!waters.length) return;
+    setSetup(s => {
+      let venue = s.venue;
+      // First time here, and nothing chosen yet: your own club's water.
+      const home = startedFresh.current && !touched.current && clubId ? waters.find(w => w.published && w.clubId === clubId) : null;
+      if (home) venue = home.def.id;
+      if (!VENUES[venue] || venue.startsWith('db-')) venue = currentId(waters, venue) ?? venue;
+      const built = VENUES[venue];
+      const own = built && !venue.startsWith('db-') ? waters.find(w => w.published && w.venueId && w.venueId === built.venueId) : null;
+      if (own) venue = own.def.id;
+      if (venue === s.venue) return s;
+      const n = { ...s, venue };
+      storeSetup(n);
+      return n;
+    });
+  }, [waters, clubId]);
+  /** Before a race that isn't from the home set-up: make sure its water is here. */
+  const waterFor = useCallback(async (settings: RaceSettings): Promise<boolean> => {
+    const ok = await ensureVenue(settings.venue);
+    setWaterNote(ok ? null : "This race's water couldn't be loaded, so it can't be sailed right now. Check your connection and try again.");
+    return ok;
+  }, []);
+
   // First time here: start at your own club's water, when it's one of the venues.
   const fresh = useRef(!hasSetup());
   useEffect(() => {
@@ -344,12 +402,13 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       const g = await entryLog(ghostOf.id);
       if (g) ghost = { log: g, settings: g.settings, label: `Ghost · ${ghostOf.display_name}` };
     }
+    if (!(await waterFor(c.settings))) return;
     // The club's sequence plays along if it's the challenge's length; otherwise the simulator calls it.
     const seq = startSeq && startSeq.seconds === c.settings.sequenceSeconds ? startSeq : null;
     setRun({ settings: challengeSettings(c, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: c, ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
-  }, [me, setup.autoTrim, setup.view, startSeq]);
+  }, [me, setup.autoTrim, setup.view, startSeq, waterFor]);
 
   // Sail a race of an event: for real (your first try starts at the gun) or for practice, against
   // nobody or a ghost (an entry's own race, once the race has closed).
@@ -359,12 +418,13 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       const g = await entryLog(o.ghost.id);
       if (g) ghost = { log: g, settings: g.settings, label: `Ghost · ${o.ghost.display_name}` };
     }
+    if (!(await waterFor(race.settings))) return;
     const seq = startSeq && startSeq.seconds === race.settings.sequenceSeconds ? startSeq : null;
     // A race that has closed can only be sailed for practice.
     setRun({ settings: challengeSettings(race, me, setup.autoTrim), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race), ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
-  }, [me, setup.autoTrim, setup.view, startSeq]);
+  }, [me, setup.autoTrim, setup.view, startSeq, waterFor]);
 
   const again = useCallback(() => {
     if (!run) return;
@@ -493,7 +553,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'live' && room) {
     return (
       <div className="h-full overflow-y-auto">
-        <SimLive room={room} myId={userId ?? ''} onLeave={() => { leaveRoom(); setWhere('home'); }} />
+        <SimLive room={room} myId={userId ?? ''} water={roomWater} onLeave={() => { leaveRoom(); setWhere('home'); }} />
       </div>
     );
   }
@@ -506,6 +566,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
           onSail={(race, o) => void sailEventRace(openEv, race, o)}
           onBack={() => { refreshEvents(); setWhere('home'); }}
           onDelete={admin ? () => { void deleteEvent(openEv.id).then(ok => { if (ok) { setOpenEv(null); refreshEvents(); setWhere('home'); } }); } : undefined} />
+        {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
     );
   }
@@ -514,6 +575,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return (
       <div className="h-full overflow-y-auto">
         <SimChallenge challenge={openCh} me={userId} onSail={e => void sailChallenge(openCh, e)} onBack={() => { refreshChallenges(); setWhere('home'); }} />
+        {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
     );
   }
@@ -551,6 +613,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
         training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}

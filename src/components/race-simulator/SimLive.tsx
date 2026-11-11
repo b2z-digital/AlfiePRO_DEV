@@ -26,13 +26,20 @@ function details(s: RoomSettings): string[] {
   ];
 }
 
-export default function SimLive({ room, myId, onLeave }: { room: LiveRoom; myId: string; onLeave: () => void }) {
+export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
+  room: LiveRoom; myId: string; onLeave: () => void;
+  /** Is the race's water on this device? A club's own water is fetched when the host's race arrives. */
+  water?: 'ok' | 'loading' | 'missing';
+}) {
   const [, bump] = useReducer((x: number) => x + 1, 0);
   useEffect(() => room.subscribe(bump), [room]);
   const [copied, setCopied] = useState(false);
   // Joined with a code nobody's using: say so after a few seconds.
   const [lonely, setLonely] = useState(false);
   useEffect(() => { const id = window.setTimeout(() => setLonely(true), 6000); return () => window.clearTimeout(id); }, []);
+
+  // Without the race's water you can't be ready.
+  useEffect(() => { if (water !== 'ok' && room.ready && !room.isHost) room.setReady(false); }, [water, room, room.ready]);
 
   const s = room.settings;
   const host = room.isHost;
@@ -116,9 +123,13 @@ export default function SimLive({ room, myId, onLeave }: { room: LiveRoom; myId:
               {host ? (
                 <Btn primary disabled={!room.canStart} onClick={() => room.start()} className="!h-11 !px-5 !text-[14.5px]">Start the race</Btn>
               ) : (
-                <Btn primary={!room.ready} onClick={() => room.setReady(!room.ready)} className="!h-11 !px-5 !text-[14.5px]" aria-pressed={room.ready}>{room.ready ? "I'm not ready" : "I'm ready"}</Btn>
+                <Btn primary={!room.ready} disabled={water !== 'ok'} onClick={() => room.setReady(!room.ready)} className="!h-11 !px-5 !text-[14.5px]" aria-pressed={room.ready}>{room.ready ? "I'm not ready" : "I'm ready"}</Btn>
               )}
-              <p className="m-0 min-w-0 flex-1 text-[13px]" style={{ color: C.mute }}>{host ? startHint : room.ready ? 'The host starts the race when everyone is ready.' : 'Tap Ready when you are, then the host starts the race.'}</p>
+              <p className="m-0 min-w-0 flex-1 text-[13px]" style={{ color: water === 'missing' ? '#FFB86B' : C.mute }}>
+                {water === 'loading' ? "Getting this race's water…"
+                  : water === 'missing' ? "This race is on a club's water this device can't load (it may still be a draft). Ask the host to pick another venue."
+                    : host ? startHint : room.ready ? 'The host starts the race when everyone is ready.' : 'Tap Ready when you are, then the host starts the race.'}
+              </p>
             </div>
           </section>
         </div>
