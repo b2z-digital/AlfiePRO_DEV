@@ -290,6 +290,39 @@ export function ControlsCard({ rudder, sheet, onRudder, onRudderEnd, onSheet, on
   );
 }
 
+/**
+ * The sticks as Alfie works them, while you watch a drill sailed the right way: the same sail and
+ * rudder sticks you sail with, to look at and not to touch (taps go through to the water).
+ */
+export function SticksView({ rudder, sheet, compact }: { rudder: number; sheet: number; compact?: boolean }) {
+  const RW = compact ? 88 : 124, SH = compact ? 64 : 112, K = compact ? 22 : 28, T = K + 8;
+  const knob = 'absolute rounded-full bg-[#4DA3FF] shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-[top,left] duration-100 ease-linear';
+  const r = Math.max(-1, Math.min(1, rudder)), sh = Math.max(0, Math.min(1, sheet));
+  return (
+    <Hud className={cx('pointer-events-none flex flex-col', compact ? 'gap-2 px-3 py-2.5' : 'gap-3 px-[18px] py-4')}
+      role="img" aria-label={`Alfie's sticks: sail ${Math.round(sh * 100)}% in, rudder ${Math.abs(r) < 0.05 ? 'centred' : `${Math.round(Math.abs(r) * 100)}% ${r > 0 ? 'right' : 'left'}`}`}>
+      <Cap className="!text-[10px] !text-[#8FC2FF]">Alfie's sticks</Cap>
+      <div className={cx('flex items-end', compact ? 'gap-3' : 'gap-[18px]')}>
+        <div className="flex flex-col items-center gap-1.5">
+          {!compact && <span className="text-[11px]" style={{ color: C.mute }}>OUT</span>}
+          <span className="relative block rounded-[18px] bg-black/35 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" style={{ width: T, height: SH }}>
+            <span className={knob} style={{ left: 4, width: K, height: K, top: 4 + sh * (SH - T) }} />
+          </span>
+          {!compact && <span className="text-[11px]" style={{ color: C.mute }}>IN</span>}
+          <Cap className="!text-[10px]">Sail</Cap>
+        </div>
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="relative block rounded-[18px] bg-black/35 shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)]" style={{ width: RW, height: T }}>
+            <span className="absolute inset-y-1.5 w-0.5 bg-white/[0.14]" style={{ left: RW / 2 - 1 }} />
+            <span className={knob} style={{ top: 4, width: K, height: K, left: RW / 2 - K / 2 + r * (RW / 2 - K / 2 - 4) }} />
+          </span>
+          <Cap className="!text-[10px]">Rudder</Cap>
+        </div>
+      </div>
+    </Hud>
+  );
+}
+
 // ───────────────────────── Rules moment ─────────────────────────
 export function RulesMomentPanel({ inc, mine, otherSail, onContinue, onReplay, onLearn, compact }: {
   inc: Incident; mine: boolean; otherSail: string | null; onContinue: () => void; onReplay?: () => void; onLearn: () => void;

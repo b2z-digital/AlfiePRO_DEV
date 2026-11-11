@@ -7,7 +7,7 @@ import type { Race } from '@/sim/engine';
 import type { BankCam } from './bank';
 import type { CoachMode, Cue } from './coach';
 import CourseMap from './CourseMap';
-import { CourseCard, FleetCard, LineCard, type HudState, type PenaltyProgress } from './hud';
+import { CourseCard, FleetCard, LineCard, SticksView, type HudState, type PenaltyProgress } from './hud';
 import { SAILING_CLEAR } from './coach';
 import { SAFE } from './phoneLayout';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, Seg, clock, cx, ordinal } from './ui';
@@ -282,6 +282,8 @@ export interface PhoneHudProps {
   follow: boolean; onFollow: () => void;
   /** The sticks (none while a scene is sailed for you to watch, or during a replay). */
   sticks: null | { onRudder: (v: number) => void; onRudderEnd: () => void; onSheet: (v: number) => void; onTack: () => void; onHail: () => void; tackLabel: string };
+  /** Watching a drill sailed the right way: show the sticks as Alfie works them. */
+  watchSticks?: boolean;
   /** The bottom row at all (not during a replay, which has its own bar there). */
   bottom: boolean;
   autoTrim: boolean;
@@ -289,7 +291,7 @@ export interface PhoneHudProps {
   credit: string | null;
 }
 
-export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, onHideCoach, notices, live, onMenu, onCourse, view, glance, onGlance, follow, onFollow, sticks, bottom, autoTrim, credit }: PhoneHudProps) {
+export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, onHideCoach, notices, live, onMenu, onCourse, view, glance, onGlance, follow, onFollow, sticks, watchSticks, bottom, autoTrim, credit }: PhoneHudProps) {
   const portrait = h > w;
   const [open, setOpen] = useState(false);
   // Turned upright: suggest turning it sideways, for a while.
@@ -332,7 +334,7 @@ export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, on
     <>
       {/* The sticks and your boat, along the bottom (first, so everything else sits on top of them). */}
       {bottom && portrait && (
-        <div className="pointer-events-none absolute flex flex-col items-center gap-1.5" style={{ left: sticks ? `calc(${SAFE.left} + 54px)` : SAFE.left, right: SAFE.right, bottom: `calc(${SAFE.bottom} + ${sticks ? rudZoneH + btnRow + 20 : 0}px)` }}>{chips}</div>
+        <div className="pointer-events-none absolute flex flex-col items-center gap-1.5" style={{ left: sticks ? `calc(${SAFE.left} + 54px)` : SAFE.left, right: SAFE.right, bottom: `calc(${SAFE.bottom} + ${sticks ? rudZoneH + btnRow + 20 : watchSticks ? 132 : 0}px)` }}>{chips}</div>
       )}
       {bottom && (
         <div className="pointer-events-none absolute flex items-end gap-2" style={{ left: SAFE.left, right: SAFE.right, bottom: SAFE.bottom }}>
@@ -347,6 +349,7 @@ export function PhoneHud({ hud, race, w, h, cam, scene, watching, cue, coach, on
               <ThumbRudder rudder={hud.rudder} onRudder={sticks.onRudder} onRudderEnd={sticks.onRudderEnd} zoneW={rudW} zoneH={rudZoneH} tip={tips} onTouch={touched} />
             </div>
           )}
+          {!sticks && watchSticks && <div className="shrink-0"><SticksView compact rudder={hud.rudder} sheet={hud.sheet} /></div>}
         </div>
       )}
 
