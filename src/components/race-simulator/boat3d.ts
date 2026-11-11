@@ -764,9 +764,11 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
   // The mast, in front of the sails or hidden behind them by depth.
   const mMid = g.w(r.mastX * L - 0.01 * L, 0, deck + r.mastH * 0.45);
   layers.push({ d: o.P(mMid[0], mMid[1], mMid[2]).z, draw: () => {
-    const m0 = o.P(...g.w(r.mastX * L, 0, deck)), m1 = o.P(...g.w(r.mastX * L - 0.02 * L, 0, deck + r.mastH));
-    ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(0.011);
+    // She stops at the head of the mainsail: nothing stands up above the sail.
+    const m0 = o.P(...g.w(r.mastX * L, 0, deck)), m1 = o.P(...sails[0].S(1, 0));
+    ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'butt'; ctx.lineWidth = lw(0.011);
     ctx.beginPath(); ctx.moveTo(m0.x, m0.y); ctx.lineTo(m1.x, m1.y); ctx.stroke();
+    ctx.lineCap = 'round';
   } });
   for (const l of stackOrder(g, sails, o.cam, layers)) l.draw();
   ctx.restore();
