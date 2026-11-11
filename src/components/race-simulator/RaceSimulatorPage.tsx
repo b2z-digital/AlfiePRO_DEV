@@ -730,7 +730,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     // out as nothing at all.)
     return createPortal(
       <div className="fixed inset-0 z-[9990]" style={{ background: '#060B1C' }} role="dialog" aria-modal="true" aria-label="Design your yacht">
-        <SimYacht yard={yard} me={me} classId={setup.classId} signedIn={!!userId} onChange={yardChanged} onBack={() => setWhere('home')}
+        <SimYacht yard={yard} me={me} classId={setup.classId} signedIn={!!userId} onChange={yardChanged} onBack={cls => { if (cls && cls !== setup.classId) changeSetup({ ...setup, classId: cls }); setWhere('home'); }}
           onRace={cls => { if (cls !== setup.classId) changeSetup({ ...setup, classId: cls }); setWhere('home'); }} />
       </div>,
       document.body,

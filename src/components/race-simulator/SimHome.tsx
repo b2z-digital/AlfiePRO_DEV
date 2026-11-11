@@ -647,7 +647,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <SetupRow icon="water" label="Water" value={WATER[s.seaState][0]} sub={s.seaState === 'flat' ? 'Glassy' : s.seaState === 'chop' ? 'Waves 4 cm' : 'Waves 10 cm, whitecaps'} onClick={() => setPick('water')} />
             </SetupGroup>
             <SetupGroup title="Boat and fleet">
-              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={`${me?.sails[s.classId] ? `Sail ${me.sails[s.classId]}` : 'Sail 01'}${s.classId === 'IOM' && s.rig ? `, ${s.rig} rig` : ''}`} onClick={() => setPick('boat')} />
+              <SetupRow icon="boat" label="Your boat" value={CLASS_LABEL[s.classId]} sub={`${yachtFor(yard, s.classId) ? `${yachtFor(yard, s.classId)!.name}, sail` : 'Sail'} ${sailFor(yard, s.classId, me).sail}${s.classId === 'IOM' && s.rig ? `, ${s.rig} rig` : ''}`} onClick={() => setPick('boat')} />
               <SetupRow icon="fleet" label="Fleet" value={`${s.fleetSize} boats`} sub="Including you" onClick={() => setPick('fleet')} />
               <SetupRow icon="skippers" label="Skippers" value={LEVEL_NAME[s.level]} sub={s.level === 'club' ? 'A few sharp starters' : s.level === 'state' ? 'Solid, rarely foul' : s.level === 'national' ? 'Fight for the favoured end' : 'On the line at the gun'} onClick={() => setPick('skippers')} />
             </SetupGroup>
@@ -745,15 +745,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <YachtCard yard={yard} cls={s.classId} me={me} onDesign={() => onOpen('yacht')} />
             <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="pf-title">
               <div className="flex items-center gap-3">
-                <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{me?.sails[s.classId] ?? '01'}</span>
+                <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{sailFor(yard, s.classId, me).sail}</span>
                 <div className="min-w-0">
                   <h2 id="pf-title" className="sim-h3 truncate">{me ? me.name : 'Your skipper profile'}</h2>
                   <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
                 </div>
               </div>
-              {me && !me.sails[s.classId] && (
+              {me && sailFor(yard, s.classId, me).from === 'none' && (
                 <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
-                  Add your {CLASS_LABEL[s.classId]} in My Garage to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.
+                  Add your {CLASS_LABEL[s.classId]} in My Garage, or give her a number in Design your yacht, to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.
                 </p>
               )}
               {!sk ? (
