@@ -52,11 +52,11 @@ function ClockChip({ hud, scene, narrow }: { hud: HudState; scene: boolean; narr
   const pre = hud.preStart;
   const c = hud.course;
   const leg = `Leg ${Math.min(c.legNo, c.legs)}/${c.legs}`;
-  const label = pre ? 'Start in' : hud.finished ? 'Finished' : scene ? 'Racing' : narrow ? `${ordinal(c.place)} · ${leg}` : `${ordinal(c.place)} of ${c.of} · ${leg}`;
+  const label = pre ? 'Seconds' : hud.finished ? 'Finished' : scene ? 'Racing' : narrow ? `${ordinal(c.place)} · ${leg}` : `${ordinal(c.place)} of ${c.of} · ${leg}`;
   return (
     <Hud className={cx('pointer-events-none flex shrink-0 flex-col items-center justify-center !rounded-[14px]', narrow ? 'h-10 px-2' : 'h-[46px] px-3')}>
       <span className="whitespace-nowrap text-[10.5px] font-semibold uppercase tracking-[0.06em]" style={{ color: C.mute }}>{label}</span>
-      <span className={cx('font-display font-bold leading-[1.1] tabular-nums', narrow ? 'text-[18px]' : 'text-[21px]', pre && hud.T <= 10 && 'text-[#FFCB96]')}>{pre ? clock(Math.ceil(hud.T)) : clock(hud.raceT)}</span>
+      <span className={cx('font-display font-bold leading-[1.1] tabular-nums', narrow ? 'text-[18px]' : 'text-[21px]', pre && hud.T <= 10 && 'text-[#FFCB96]')}>{pre ? Math.max(0, Math.ceil(hud.T)) : clock(hud.raceT)}</span>
     </Hud>
   );
 }
