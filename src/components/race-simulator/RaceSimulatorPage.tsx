@@ -38,7 +38,7 @@ import SimEventPage from './SimEvent';
 import type { EventChoice } from './EventForm';
 import { standings } from './series';
 import { raceFacts, writeUp } from './writeup';
-import { SimSequence, chosenSequence, loadClubSequences, warmSequence } from './startbox';
+import { SimSequence, chosenSequence, keepSequences, keptSequences, loadClubSequences, warmSequence } from './startbox';
 import { ChannelTransport, ClubRooms, LiveRace, LiveRoom, OpenRoom, RoomSettings, cleanCode, newCode, roomChannel } from './live';
 import SimLive, { roomTitle } from './SimLive';
 import GamepadModal from './GamepadModal';
@@ -203,28 +203,43 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return () => { live = false; };
   }, [userId, clubId]);
   // The club's StartBox sequences: the race starts with the club's own unless you choose otherwise.
-  const [sequences, setSequences] = useState<SimSequence[]>([]);
-  // (Still loading when you press Start? The race waits a moment for them, so it's the club's own
-  // start that calls it and not the simulator's because you were quick.)
-  const seqLoad = useRef<Promise<SimSequence[]> | null>(null);
+  // They start from the ones found last time on this device, so a race opened before StartBox has
+  // answered (or when it can't be reached) still starts with the club's own sequence.
+  const [sequences, setSequences] = useState<SimSequence[]>(() => keptSequences(clubId));
+  const seqNow = useRef(sequences);
+  seqNow.current = sequences;
+  const seqLoad = useRef<Promise<SimSequence[] | null> | null>(null);
   const seqLoaded = useRef(false);
+  /** StartBox hasn't answered yet (the home screen says so, so it never shows the simulator's own calls by mistake). */
+  const [seqBusy, setSeqBusy] = useState(true);
+  /** Start was pressed before StartBox answered: the race opens as soon as it does. */
+  const [opening, setOpening] = useState(false);
   useEffect(() => {
     let live = true;
     seqLoaded.current = false;
-    const load = loadClubSequences(clubId);
+    setSeqBusy(true);
+    setSequences(keptSequences(clubId));
+    // (Couldn't be read: one more try, then carry on with the ones kept from last time.)
+    const load = (async () => {
+      const first = await loadClubSequences(clubId);
+      if (first || !live) return first;
+      await new Promise(r => window.setTimeout(r, 1500));
+      return live ? loadClubSequences(clubId) : null;
+    })();
     seqLoad.current = load;
-    void load.then(q => { if (live) { seqLoaded.current = true; setSequences(q); } });
+    void load.then(q => { if (!live) return; seqLoaded.current = true; setSeqBusy(false); if (q) { setSequences(q); keepSequences(clubId, q); } });
     return () => { live = false; };
   }, [clubId]);
-  /** The club's sequences, waiting up to 2½ seconds if they're still on their way. */
+  /** The club's sequences. Still on their way with none kept from before? The race waits for them (up to 8 seconds), so it's StartBox that calls the start and not the simulator's own calls because you were quick. */
   const withSequences = useCallback((go: (list: SimSequence[]) => void) => {
-    if (seqLoaded.current || !seqLoad.current) { go(sequences); return; }
+    if (seqLoaded.current || !seqLoad.current || seqNow.current.length) { go(seqNow.current); return; }
     let done = false;
-    const once = (list: SimSequence[]) => { if (!done) { done = true; go(list); } };
+    setOpening(true);
+    const once = (list: SimSequence[] | null) => { if (!done) { done = true; setOpening(false); go(list ?? seqNow.current); } };
     void seqLoad.current.then(once);
-    window.setTimeout(() => once(sequences), 2500);
-  }, [sequences]);
-  const startSeq = chosenSequence(sequences, setup.startSeq);
+    window.setTimeout(() => once(null), 8000);
+  }, []);
+  const startSeq = chosenSequence(sequences, setup.startSeq, setup.sequenceSeconds);
   // Its recording starts loading now, so it's ready the moment a race opens.
   const startSeqId = startSeq?.id;
   useEffect(() => { warmSequence(startSeq); }, [startSeqId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -242,7 +257,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [userId, clubId]);
   const liveMe = useCallback(() => ({ id: userId ?? 'guest', name: me?.short ?? me?.name ?? 'Sailor', sails: me?.sails ?? {}, autoTrim: setup.autoTrim }), [userId, me, setup.autoTrim]);
   const openLive = useCallback(() => {
-    const seq = chosenSequence(sequences, setup.startSeq);
+    const seq = chosenSequence(sequences, setup.startSeq, setup.sequenceSeconds);
     const full = toSettings(setup, 'race', todayWind, null, seq);
     const { seed: _seed, player: _player, ...rs } = full;
     void _seed; void _player;
@@ -367,7 +382,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
 
   const start = useCallback((mode: 'race' | 'start', s: Setup) => {
     withSequences(list => {
-      const seq = chosenSequence(list, s.startSeq);
+      const seq = chosenSequence(list, s.startSeq, s.sequenceSeconds);
       setRun({ settings: toSettings(s, mode, todayWind, me, seq), mode, key: Date.now(), sequence: seq, focus: mode === 'race' ? raceFocus(loadProfile()) : null });
       setRunView(s.view);
       setWhere('race');
@@ -395,7 +410,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       windStrength: w ? (w.kn < 7 ? 'light' : w.kn <= 12 ? 'medium' : 'fresh') : setup.windStrength,
     };
     withSequences(list => {
-      const seq = chosenSequence(list, s.startSeq);
+      const seq = chosenSequence(list, s.startSeq, s.sequenceSeconds);
       setRun({ settings: toSettings(s, 'race', w && at ? { from: w.from, kn: w.kn, at: nextRace.date } : null, me, seq), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), rehearsal: true });
       setRunView(s.view);
       setWhere('race');
@@ -689,6 +704,14 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   return (
     <div key="home" className="sim-home h-full overflow-y-auto">
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
+      {opening && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,12,24,0.55)]">
+          <div role="status" className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#101B2E] px-5 py-3.5 shadow-xl">
+            <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#4DA3FF]" />
+            <p className="m-0 text-[14.5px] font-semibold text-[#F1F4FA]">Getting your club's StartBox sequence…</p>
+          </div>
+        </div>
+      )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
         training={training} onOpen={w => { setPlayAt(null); setWhere(w); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
@@ -696,7 +719,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
-        sequences={sequences} startSeq={startSeq}
+        sequences={sequences} startSeq={startSeq} startFinding={seqBusy && !sequences.length}
         live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null}
         transmitter={{ pads, onSetUp: () => setPadOpen(true) }}
         next={nextRace ? { race: nextRace, at: rehearseAt, onRehearse: rehearse } : null} />

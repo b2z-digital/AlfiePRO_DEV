@@ -144,17 +144,26 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     if (scene && count < 10) return null;
     return sequence.seconds >= count - 0.5 ? new SequencePlayer(sequence) : null;
   }, [sequence, scene, race]);
-  // The race waits a moment at the very start for the club's recording to be ready, so the start is
+  const toastRef = useRef<((text: string, tone?: 'plain' | 'good' | 'warn') => void) | null>(null);
+  // The race waits at the very start until the club's recording is in memory, so the start is
   // called by StartBox from the first second (never part by the simulator, part by the recording).
-  const [seqWait, setSeqWait] = useState<'no' | 'quiet' | 'shown'>(() => (seqPlayer && !live && !resume ? 'quiet' : 'no'));
+  // The recording is fetched when you choose the sequence on the home screen and kept for the
+  // session, so there is normally nothing to wait for; the notice shows only if it takes over half
+  // a second (a first race opened straight after the page, on a slow connection).
+  const [seqWait, setSeqWait] = useState<'no' | 'quiet' | 'shown'>(() => (seqPlayer && !seqPlayer.ready && !live && !resume ? 'quiet' : 'no'));
+  const seqFailNoted = useRef(false);
   useEffect(() => {
-    if (seqWait === 'no' || !seqPlayer) return;
+    if (!seqPlayer) return;
     const t0 = performance.now();
     const id = window.setInterval(() => {
-      seqPlayer.prepare(race.gunT - race.t);
       const waited = performance.now() - t0;
-      if (seqPlayer.ready || !seqPlayer.working || waited > 6000) { window.clearInterval(id); setSeqWait('no'); }
-      else if (waited > 500) setSeqWait('shown');
+      if (seqPlayer.ready || waited > 15000) { window.clearInterval(id); setSeqWait('no'); }
+      else if (waited > 500) setSeqWait(w => (w === 'no' ? w : 'shown'));
+      // Said once, so the simulator's own calls are never a mystery.
+      if (!seqPlayer.working && !seqFailNoted.current) {
+        seqFailNoted.current = true;
+        toastRef.current?.("Your club's StartBox recording couldn't be loaded, so the simulator is calling this start. Check your connection and race again.", 'warn');
+      }
     }, 80);
     return () => window.clearInterval(id);
   }, [seqPlayer, race]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -279,8 +288,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const toast = useCallback((text: string, tone: Toast['tone'] = 'plain') => {
     const id = ++R.current.toastId;
     setToasts(ts => [...ts.slice(-2), { id, text, tone }]);
-    window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), 3600);
+    // (Long enough to read: a line that explains something stays up longer than "Mark 1 done".)
+    window.setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), Math.max(3600, Math.min(9000, text.length * 70)));
   }, []);
+  toastRef.current = toast;
 
   // Your own rig for the day, as the race opens: what you've put on, and what the fleet is carrying.
   useEffect(() => {
@@ -1040,7 +1051,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           <div className="pointer-events-none absolute inset-x-0 top-[38%] flex justify-center">
             <Hud className="flex items-center gap-3 px-5 py-3.5" role="status">
               <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#4DA3FF]" />
-              <p className="m-0 text-[14.5px] font-semibold">Getting your club's start sequence ready…</p>
+              <p className="m-0 text-[14.5px] font-semibold">Loading your club's StartBox recording…</p>
             </Hud>
           </div>
         )}

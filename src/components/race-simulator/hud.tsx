@@ -78,11 +78,13 @@ export function WindCard({ kn, from, spark, swing, off, tack = null, compact }: 
 // ───────────────────────── Clock ─────────────────────────
 export function ClockCard({ preStart, T, seq, raceT, sub, compact }: { preStart: boolean; T: number; seq: number; raceT: number; sub: string; compact?: boolean }) {
   const frac = preStart ? Math.min(1, Math.max(0, 1 - T / seq)) : 1;
-  const marks = seq >= 180 ? ['3:00', '2:00', '1:00', 'Gun'] : seq >= 120 ? ['2:00', '1:00', 'Gun'] : ['1:00', '0:30', 'Gun'];
+  // The countdown is in whole seconds, as StartBox shows it and as the start is called ("90 seconds", "80 seconds").
+  const n = Math.round(seq);
+  const marks = n >= 180 && n % 3 === 0 ? [String(n), String((2 * n) / 3), String(n / 3), 'Gun'] : [String(n), String(Math.round(n / 2)), 'Gun'];
   return (
     <Hud className={cx('text-center', compact ? 'w-[176px] px-3.5 pb-2.5 pt-2' : 'w-[260px] px-5 pb-3.5 pt-3')}>
-      <Cap>{preStart ? 'Start in' : 'Racing'}</Cap>
-      <p className={cx('m-0 mt-1 font-display font-bold leading-none tabular-nums', compact ? 'mb-1.5 text-[34px]' : 'mb-2.5 text-[52px]')} aria-live="off">{preStart ? clock(Math.ceil(T)) : clock(raceT)}</p>
+      <Cap>{preStart ? 'Seconds to the start' : 'Racing'}</Cap>
+      <p className={cx('m-0 mt-1 font-display font-bold leading-none tabular-nums', compact ? 'mb-1.5 text-[34px]' : 'mb-2.5 text-[52px]')} aria-live="off">{preStart ? Math.max(0, Math.ceil(T)) : clock(raceT)}</p>
       {preStart ? (
         <>
           <div className="relative h-1.5 rounded-md bg-white/[0.08]">

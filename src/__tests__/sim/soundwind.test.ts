@@ -51,7 +51,6 @@ describe('Two hulls meeting', () => {
 describe("The club's start recording", () => {
   it("with no recording to wait for, there's nothing to wait for", () => {
     const p = new SequencePlayer({ id: 's', name: 'Sounds', seconds: 60, club: true, sounds: [{ at: 60, url: 'a.mp3', repeat: 1, gapMs: 600 }] });
-    p.prepare(60);
     expect(p.ready).toBe(true);
     expect(p.working).toBe(true);
     p.stop();

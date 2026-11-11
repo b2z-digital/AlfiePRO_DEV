@@ -401,18 +401,20 @@ function LiveSection({ rooms, onOpen, onJoin }: { rooms: OpenRoom[]; onOpen: () 
   );
 }
 
-function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seconds: number): { value: string; label: string }[] {
+/**
+ * The starts to choose from. With StartBox sequences to hand they are the only choices (the club's
+ * own, or StartBox's defaults for a club with none of its own), so the start you practise to is the
+ * one you race to. The simulator's own calls are offered only when there is no sequence at all.
+ */
+function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { value: string; label: string }[] {
+  if (!sequences.length) return [60, 120, 180].map(n => ({ value: `b${n}`, label: `${n / 60} minute${n > 60 ? 's' : ''}` }));
   const own = sequences.filter(q => q.club);
-  let shown = own.length ? own.slice(0, 3) : sequences.slice(0, 2);
+  let shown = own.length ? own.slice(0, 6) : sequences.slice(0, 4);
   if (chosen && !shown.some(q => q.id === chosen.id)) shown = [...shown, chosen];
-  const called = [60, 120, 180].filter(n => !shown.some(q => q.seconds === n) || (!chosen && seconds === n));
-  return [
-    ...shown.map(q => ({ value: q.id, label: q.name })),
-    ...called.map(n => ({ value: `b${n}`, label: sequences.length ? `${n / 60} min` : `${n / 60} minute${n > 60 ? 's' : ''}` })),
-  ];
+  return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge') => void;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -442,6 +444,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onCreateEvent?: (c: EventChoice) => Promise<string | null>;
   /** The club's StartBox sequences, and the one this race will use (null: the simulator calls it). */
   sequences?: SimSequence[];
+  /** StartBox hasn't answered yet, and nothing is kept from before. */
+  startFinding?: boolean;
   startSeq?: SimSequence | null;
   /** Live races with other members (signed in): the club's open rooms, open one, join one. */
   live?: { rooms: OpenRoom[]; onOpen: () => void; onJoin: (code: string) => void } | null;
@@ -620,7 +624,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </SetupGroup>
             <SetupGroup title="The race">
               <SetupRow icon="course" label="Course" value={`${s.laps} lap${s.laps > 1 ? 's' : ''}, ${s.length}`} sub="Windward–leeward, gate" onClick={() => setPick('course')} />
-              <SetupRow icon="start" label="Start" value={startName} sub={startSeq ? (startSeq.club ? "Your club's sequence" : 'StartBox sequence') : 'Called by the simulator'} onClick={() => setPick('start')} />
+              <SetupRow icon="start" label="Start" value={startFinding && !startSeq ? 'StartBox' : startName} sub={startSeq ? (startSeq.club ? "Your club's sequence" : 'StartBox sequence') : startFinding ? "Finding your club's sequence…" : 'Called by the simulator'} onClick={() => setPick('start')} />
               <SetupRow icon="aids" label="Coaching" value={`Alfie: ${s.coach === 'full' ? 'full' : s.coach === 'hints' ? 'hints' : 'off'}`} sub={`${s.autoTrim ? 'Auto-trim' : 'Sails on your stick'}, ${s.view === 'bank' ? 'bank view' : 'from above'}`} onClick={() => setPick('aids')} />
             </SetupGroup>
           </div>
@@ -949,9 +953,9 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       )}
       {pick === 'start' && (
         <Sheet icon="start" title="Start sequence" onClose={closePick}
-          text={startSeq ? `${startSeq.club ? "Your club's" : 'The StartBox'} ${startSeq.name} sequence${startSeq.audio ? ', the recording you hear at the pond' : ''}, in step with the race clock.` : 'Called by the simulator: each minute, every 10 s in the last minute and every second in the last 10 (Appendix E).'}>
+          text={startSeq ? `${startSeq.club ? "Your club's" : 'The StartBox'} ${startSeq.name} sequence${startSeq.audio ? ', the recording you hear at the pond' : ''}, in step with the race clock.` : 'No StartBox sequence was found for your club, so the simulator calls the start: each minute, every 10 s in the last minute and every second in the last 10 (Appendix E).'}>
           <Opts>
-            {startOptions(sequences, startSeq, s.sequenceSeconds).map(o => {
+            {startOptions(sequences, startSeq).map(o => {
               const q = sequences.find(x => x.id === o.value);
               return <Opt key={o.value} on={(startSeq ? startSeq.id : `b${s.sequenceSeconds}`) === o.value} title={o.label} text={q ? (q.club ? "Your club's sequence" : 'A StartBox sequence') : 'Called by the simulator'}
                 onClick={() => set(q ? { startSeq: q.id, sequenceSeconds: q.seconds } : { startSeq: null, sequenceSeconds: Number(String(o.value).slice(1)) })} />;
