@@ -2,7 +2,7 @@
 // profile) → race or training scene → debrief. Racing fills the whole window, above the app's
 // navigation; "Main Menu" brings you back. The racing itself runs on the engine in src/sim; this
 // file only moves between the screens and keeps your settings and progress.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Race, RaceLog } from '@/sim/engine';
 import { DT } from '@/sim/physics';
@@ -22,7 +22,8 @@ import { TrainingProgress, loadTraining, recordAnswer, recordScene, saveTraining
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import { C, ordinal } from './ui';
-import { VENUES } from '@/sim/venues';
+import { VENUES, venueForClub } from '@/sim/venues';
+import { windAt } from '@/sim/venue';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
 import SimChallenge from './SimChallenge';
@@ -50,6 +51,11 @@ interface RaceSimulatorPageProps {
 const SETUP_KEY = 'alfie-race-sim-setup-v2';
 const SETUP_KEY_V1 = 'alfie-race-sim-setup-v1';
 
+/** Has a set-up been saved on this device? (If not, a member starts at their own club's water.) */
+function hasSetup(): boolean {
+  try { return !!(localStorage.getItem(SETUP_KEY) ?? localStorage.getItem(SETUP_KEY_V1)); } catch { return true; }
+}
+
 function loadSetup(): Setup {
   try {
     const s = localStorage.getItem(SETUP_KEY);
@@ -68,11 +74,13 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
   // At a venue: its usual breeze, today's wind there (direction and strength), or any direction.
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const live = def && s.windDir === 'today' && today ? today : null;
-  const windFrom = !def ? undefined : live ? live.from : s.windDir === 'any' ? Math.floor(Math.random() * 360) : def.usualWind;
+  const windFrom = !def ? undefined : live ? live.from : s.windDir === 'any' ? Math.floor(Math.random() * 360) : windAt(def, s.windPick).from;
   // Today's strength too, unless a strength was picked to sail in from today's direction.
   const knots = live && s.todayStrength !== false ? live.kn : undefined;
   return {
     venue: def?.id, windFrom, windKnots: knots,
+    // Where on the venue's water you've chosen to sail (the club's own spot when you haven't).
+    venueSpot: def ? s.spots?.[def.id] : undefined,
     // Your own name, and your sail number when you have a boat in this class.
     player: me ? { name: me.name, sail: me.sails[s.classId] ?? '01' } : undefined,
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
@@ -253,6 +261,14 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [userId, clubId]);
 
   const changeSetup = useCallback((s: Setup) => { setSetup(s); storeSetup(s); }, []);
+  // First time here: start at your own club's water, when it's one of the venues.
+  const fresh = useRef(!hasSetup());
+  useEffect(() => {
+    if (!fresh.current || !clubId) return;
+    fresh.current = false;
+    const mine = venueForClub(clubId);
+    if (mine) setSetup(s => (s.venue === mine.id ? s : { ...s, venue: mine.id, windDir: 'usual', windPick: 0 }));
+  }, [clubId]);
   const changeView = useCallback((v: SimView) => {
     setRunView(v);
     if (run?.scene?.spec.kind === 'lesson') return;
@@ -534,7 +550,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} synced={synced}
+        training={training} onOpen={w => setWhere(w)} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}

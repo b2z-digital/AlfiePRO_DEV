@@ -12,7 +12,7 @@ import { Referee, isRacing, keepClear, spellSail } from './referee';
 import type { Boat, Incident, PlayerInput, RaceSettings, SimEvent } from './types';
 import { WindField } from './wind';
 import { Sea, makeSea } from './sea';
-import { VenueScene, frameAt, layCourse, shoreFor, venueScene } from './venue';
+import { VenueScene, frameAt, shoreFor, siteFor, venueScene, venueWindFor } from './venue';
 import { VENUES } from './venues';
 import { dcos, dhypot, dsin } from './dmath';
 
@@ -143,20 +143,32 @@ export class Race implements AiHost {
     const axis = def ? 0 : settings.windFrom ?? 0;
     const rb = this.rng.range(-3.5, 3.5);
     const bias = settings.lineBias ?? rb;
-    this.course = buildCourse(axis, cls.loa, { laps: settings.laps, length: settings.length, fleetSize: settings.fleetSize, lineBias: bias });
-    const c = this.course;
+    const courseOf = (length: RaceSettings['length']) => buildCourse(axis, cls.loa, { laps: settings.laps, length, fleetSize: settings.fleetSize, lineBias: bias });
+    let c = courseOf(settings.length);
+    let sideBias = 0;
     if (def) {
       const rot = n360(settings.windFrom ?? def.usualWind);
-      const S = layCourse(def, rot, c);
+      // The skippers stand on the bank nearest the spot picked on the map, or at the club's own
+      // control area, and the course is laid in front of them (a shorter one if that's what fits).
+      const spot = settings.venueSpot ? { x: settings.venueSpot[0], y: settings.venueSpot[1] } : null;
+      const lengths: RaceSettings['length'][] = settings.length === 'long' ? ['long', 'medium', 'short'] : settings.length === 'medium' ? ['medium', 'short'] : ['short'];
+      const laid = siteFor(def, rot, spot, lengths.map(len => (len === settings.length ? c : courseOf(len))));
+      const S = laid?.S ?? null, control = laid?.control ?? def.control;
+      if (laid) c = laid.course;
       if (S) {
-        this.venue = venueScene(def, frameAt(rot, S));
+        this.venue = venueScene(def, frameAt(rot, S), control);
         c.rot = rot;
         c.shore = shoreFor(this.venue, c);
+        // What the club knows about this wind: more breeze along the skippers' bank, or out away from it.
+        const pays = venueWindFor(def, rot)?.pays;
+        const bankX = (this.venue.control[0].x + this.venue.control[1].x) / 2;
+        if (pays && Math.abs(bankX) > 0.25 * c.bounds.across) sideBias = (bankX > 0 ? 1 : -1) * (pays === 'bank' ? 1 : -1);
       }
     }
+    this.course = c;
     const mid = (c.bounds.alongMin + c.bounds.alongMax) / 2;
     this.wind = new WindField(
-      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts },
+      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts, sideBias },
       settings.seed,
       { cx: c.origin.x + c.up.x * mid, cy: c.origin.y + c.up.y * mid, halfAlong: (c.bounds.alongMax - c.bounds.alongMin) / 2, halfAcross: c.bounds.across },
     );

@@ -9,10 +9,37 @@
 
 import type { V2 } from './math';
 import type { Course } from './course';
+import type { WindCharacter } from './wind';
 import { dcos, dhypot, dsin } from './dmath';
 
-export type FeatureKind = 'park' | 'wood' | 'pier' | 'road' | 'path' | 'bld' | 'pitch' | 'playground' | 'parking' | 'pond';
+export type FeatureKind = 'park' | 'wood' | 'sand' | 'pier' | 'road' | 'bridge' | 'path' | 'bld' | 'pitch' | 'playground' | 'parking' | 'pond';
 export interface Feature { kind: FeatureKind; name?: string; pts: V2[] }
+
+/** One of the winds a club gets, and what it does on their water. */
+export interface VenueWind {
+  /** Compass degrees it blows from. */
+  from: number;
+  /** "NE sea breeze" */
+  name: string;
+  /** "Summer afternoons" */
+  when?: string;
+  /** How it behaves here: steady, shifty (oscillating), gusty (puffy) or swinging one way (persistent). */
+  character: WindCharacter;
+  /** What it does here, in the club's words. */
+  note?: string;
+  /** Where the better breeze is in this wind: along the bank the skippers stand on, or out away from it. */
+  pays?: 'bank' | 'out';
+}
+
+/** What a club knows about its own water: shown before you race there, and sailed by the wind and by Alfie. */
+export interface VenueTraits {
+  /** A line on the place. */
+  about: string;
+  /** The winds it gets, the usual one first. */
+  winds: VenueWind[];
+  /** Local knowledge: short tips in the club's words. */
+  notes: string[];
+}
 
 export interface VenueDef {
   id: string;
@@ -37,6 +64,46 @@ export interface VenueDef {
   landmarks: { name: string; at: V2 }[];
   /** The map data's licence credit, shown wherever the venue is drawn. */
   credit: string;
+  /** Half the side of the square the water was cut to (venues built from the map): shore edges along it are open water. */
+  cut?: number;
+  /** The clubs whose home water this is, and the venue it was built from (ids in the app's database). */
+  clubs?: string[];
+  venueId?: string;
+  /** What the club knows about its water. */
+  traits?: VenueTraits;
+  /** How the country round the water looks from the bank (all 1 when not given). */
+  look?: VenueLook;
+}
+
+/** The lie of the land round a venue, for the bank view: 0 is none, 1 is the full amount. */
+export interface VenueLook {
+  /** Hills behind the far shores (0 for flat country). */
+  hills: number;
+  /** Trees along the banks. */
+  trees: number;
+  /** Houses on the far shores. */
+  houses: number;
+}
+
+/** The winds a venue gets, the usual one first (just its usual breeze when the club hasn't said more). */
+export function windsOf(def: VenueDef): VenueWind[] {
+  return def.traits?.winds.length ? def.traits.winds : [{ from: def.usualWind, name: def.usualWindName, character: 'oscillating' }];
+}
+
+/** One of a venue's winds by its place in the list (the usual breeze when there's no such place). */
+export function windAt(def: VenueDef, i?: number | null): VenueWind {
+  const all = windsOf(def);
+  return all[i ?? 0] ?? all[0];
+}
+
+/** The venue wind a direction belongs to: the nearest within 30°, or none. */
+export function venueWindFor(def: VenueDef, from: number): VenueWind | null {
+  let best: VenueWind | null = null, bd = 30.0001;
+  for (const w of def.traits?.winds ?? []) {
+    const d = Math.abs(((from - w.from + 540) % 360) - 180);
+    if (d < bd) { bd = d; best = w; }
+  }
+  return best;
 }
 
 /** [x0, y0, x1, y1, …] → points. */
@@ -136,18 +203,103 @@ export function toGeo(f: Frame, p: V2): V2 {
 // ───────────────────────── Laying the course ─────────────────────────
 
 const grids = new Map<string, WaterGrid>();
-/** The venue's water within half a kilometre of the control area, on a 2 m grid (built once). */
-function venueGrid(def: VenueDef): WaterGrid {
-  let g = grids.get(def.id);
+/** The venue's water within half a kilometre of the control area, on a 2 m grid (built once for each). */
+function venueGrid(def: VenueDef, control: [V2, V2]): WaterGrid {
+  const c = mid(control);
+  const key = `${def.id}:${c.x.toFixed(1)}:${c.y.toFixed(1)}`;
+  let g = grids.get(key);
   if (!g) {
-    const c = mid(def.control);
+    if (grids.size > 8) grids.clear();
     g = new WaterGrid([def.water, ...def.islands], c.x - 500, c.y - 500, c.x + 500, c.y + 500, 2);
-    grids.set(def.id, g);
+    grids.set(key, g);
   }
   return g;
 }
 
+/** Is this shore edge where the map was cut, with open water beyond, and not a bank? */
+export function cutEdge(def: VenueDef): (a: V2, b: V2) => boolean {
+  if (def.cut != null) {
+    const h = def.cut;
+    const side = (q: V2) => (Math.abs(q.x - h) < 2 ? 1 : 0) | (Math.abs(q.x + h) < 2 ? 2 : 0) | (Math.abs(q.y - h) < 2 ? 4 : 0) | (Math.abs(q.y + h) < 2 ? 8 : 0);
+    return (a, b) => (side(a) & side(b)) !== 0;
+  }
+  // An older extract: edges along the water's bounding box.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of def.water) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  const onBox = (g: V2) => Math.abs(g.x - x0) < 2 || Math.abs(g.x - x1) < 2 || Math.abs(g.y - y0) < 2 || Math.abs(g.y - y1) < 2;
+  return (a, b) => onBox(a) && onBox(b);
+}
+
+const R1 = (v: number) => Math.round(v * 10) / 10;
+
+/**
+ * Where the skippers would stand to sail near `p`: a 38 m stretch of the nearest bank, a step back
+ * from the water. `rings` have the water on the left of every edge; `isOpen` edges aren't banks.
+ */
+export function controlNear(rings: V2[][], p: V2, isOpen?: (a: V2, b: V2) => boolean): [V2, V2] | null {
+  let best = Infinity, br = -1, bi = -1, bt = 0;
+  rings.forEach((r, k) => {
+    for (let i = 0; i < r.length; i++) {
+      const a = r[i], b = r[(i + 1) % r.length];
+      if (isOpen?.(a, b)) continue;
+      const [d, t] = segD2(p.x, p.y, a.x, a.y, b.x, b.y);
+      if (d < best) { best = d; br = k; bi = i; bt = t; }
+    }
+  });
+  if (br < 0) return null;
+  const r = rings[br], n = r.length;
+  // Walk along the bank each way from the nearest point.
+  const walk = (dirn: 1 | -1, dist: number): { q: V2; nx: number; ny: number } => {
+    let i = bi, t = bt, left = dist;
+    for (let guard = 0; guard < n + 2; guard++) {
+      const a = r[i], b = r[(i + 1) % n];
+      const ex = b.x - a.x, ey = b.y - a.y, L = Math.sqrt(ex * ex + ey * ey) || 1e-6;
+      const room = dirn > 0 ? (1 - t) * L : t * L;
+      // Land is to the right of a shore edge (the water is on its left).
+      const nx = ey / L, ny = -ex / L;
+      if (room >= left) { const tt = t + (dirn * left) / L; return { q: { x: a.x + ex * tt, y: a.y + ey * tt }, nx, ny }; }
+      left -= room;
+      if (dirn > 0) { i = (i + 1) % n; t = 0; } else { i = (i - 1 + n) % n; t = 1; }
+    }
+    const a = r[bi];
+    return { q: { x: a.x, y: a.y }, nx: 0, ny: 0 };
+  };
+  const A = walk(-1, 19), B = walk(1, 19);
+  // One step back from the water, square to the line between the two ends (so a wiggly bank doesn't twist it).
+  const ex = B.q.x - A.q.x, ey = B.q.y - A.q.y, L = Math.sqrt(ex * ex + ey * ey) || 1;
+  let nx = ey / L, ny = -ex / L;
+  if (nx * (A.nx + B.nx) + ny * (A.ny + B.ny) < 0) { nx = -nx; ny = -ny; }
+  return [{ x: R1(A.q.x + nx * 1.5), y: R1(A.q.y + ny * 1.5) }, { x: R1(B.q.x + nx * 1.5), y: R1(B.q.y + ny * 1.5) }];
+}
+
+/**
+ * Where the skippers stand for a race: the club's own control area, or, when a spot has been picked
+ * on the venue's map, the stretch of bank nearest it.
+ */
+export function controlAt(def: VenueDef, spot?: V2 | null): [V2, V2] {
+  if (!spot) return def.control;
+  return controlNear([def.water, ...def.islands], spot, cutEdge(def)) ?? def.control;
+}
+
 const mid = (s: [V2, V2]): V2 => ({ x: (s[0].x + s[1].x) / 2, y: (s[0].y + s[1].y) / 2 });
+
+const pierCache = new WeakMap<VenueDef, V2[]>();
+/** Points every couple of metres along the venue's piers. */
+function pierPoints(def: VenueDef): V2[] {
+  let out = pierCache.get(def);
+  if (out) return out;
+  out = [];
+  for (const f of def.features) {
+    if (f.kind !== 'pier') continue;
+    for (let i = 0; i + 1 < f.pts.length; i++) {
+      const a = f.pts[i], b = f.pts[i + 1];
+      const n = Math.max(1, Math.ceil(dhypot(b.x - a.x, b.y - a.y) / 2.5));
+      for (let k = 0; k <= n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+    }
+  }
+  pierCache.set(def, out);
+  return out;
+}
 
 /** Distance from a point to a rectangle (0 inside). */
 function rectDist(p: V2, x0: number, y0: number, x1: number, y1: number): number {
@@ -170,11 +322,11 @@ function raceArea(c: Course) {
  * is at least four lengths from the shore, the water the fleet races on is all lake, and the
  * control area is close beside it. Null if the venue can't fit this course in this wind.
  */
-export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
-  const grid = venueGrid(def);
+export function layCourse(def: VenueDef, rot: number, c: Course, control: [V2, V2] = def.control): V2 | null {
+  const grid = venueGrid(def, control);
   const L = c.L, B = c.bounds;
   const f0 = frameAt(rot, { x: 0, y: 0 });
-  const ctrl = mid(def.control);
+  const ctrl = mid(control);
   const area = raceArea(c);
 
   // Race-frame points that must be on open water: each mark with a ring four lengths round it,
@@ -190,8 +342,16 @@ export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
   for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) soft.push({ x: -B.across + (2 * B.across * i) / 8, y: B.alongMin + ((B.alongMax - B.alongMin) * j) / 8 });
 
   const geoOf = (S: V2, p: V2) => ({ x: S.x + p.x * f0.r.x + p.y * f0.u.x, y: S.y + p.x * f0.r.y + p.y * f0.u.y });
+  // Piers and jetties near the skippers, as points along them: nothing is raced through those.
+  const piers = pierPoints(def).filter(p => Math.abs(p.x - ctrl.x) < 420 && Math.abs(p.y - ctrl.y) < 420);
+  const pm = 2 * L;
   const score = (S: V2): number => {
     for (const p of must) { const g = geoOf(S, p); if (!grid.wet(g.x, g.y)) return Infinity; }
+    for (const p of piers) {
+      const dx = p.x - S.x, dy = p.y - S.y;
+      const x = dx * f0.r.x + dy * f0.r.y, y = dx * f0.u.x + dy * f0.u.y;
+      if (x > area.x0 - pm && x < area.x1 + pm && y > area.y0 - pm && y < area.y1 + pm) return Infinity;
+    }
     let wet = 0;
     for (const p of soft) { const g = geoOf(S, p); if (grid.wet(g.x, g.y)) wet++; }
     // Where the skippers stand, in the race frame: close beside the racing, not in it, and as far as
@@ -239,6 +399,35 @@ export function layCourse(def: VenueDef, rot: number, c: Course): V2 | null {
   return null;
 }
 
+/** A race laid at a venue: where the skippers stand, the start line centre and the course that fits. */
+export interface Site { control: [V2, V2]; S: V2; course: Course }
+
+/**
+ * Lay a race at a venue for a wind from `rot`. The skippers stand on the bank nearest `spot` (the
+ * place picked on the venue's map) or, with no spot or when no course fits off it in this wind, at
+ * the club's own control area. `courses` are the same course at the length asked for and then each
+ * shorter one: on narrow water a long course across the wind won't fit in front of the skippers,
+ * and like a race officer we set a shorter one there before setting it where they can't see it.
+ */
+export function siteFor(def: VenueDef, rot: number, spot: V2 | null, courses: Course[]): Site | null {
+  const lay = (control: [V2, V2]): Site | null => {
+    let got: Site | null = null;
+    const m = mid(control);
+    for (const c of courses) {
+      const S = layCourse(def, rot, c, control);
+      if (!S) continue;
+      got = got ?? { control, S, course: c };
+      // Near enough to see: every mark within 90 lengths of where they stand.
+      const q = toRace(frameAt(rot, S), m);
+      let far = 0;
+      for (const k of c.marks) far = Math.max(far, dhypot(k.p.x - q.x, k.p.y - q.y));
+      if (far <= 90 * c.L) return { control, S, course: c };
+    }
+    return got;
+  };
+  return (spot ? lay(controlAt(def, spot)) : null) ?? lay(def.control);
+}
+
 // ───────────────────────── The venue in the race frame ─────────────────────────
 
 export interface VenueScene {
@@ -255,20 +444,18 @@ export interface VenueScene {
   open: (a: V2, b: V2) => boolean;
 }
 
-export function venueScene(def: VenueDef, f: Frame): VenueScene {
+export function venueScene(def: VenueDef, f: Frame, control: [V2, V2] = def.control): VenueScene {
   const T = (p: V2) => toRace(f, p);
-  // The extract's bounding box: edges along it are where the map was cut, not the shore.
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const p of def.water) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
-  const onBox = (g: V2) => Math.abs(g.x - x0) < 2 || Math.abs(g.x - x1) < 2 || Math.abs(g.y - y0) < 2 || Math.abs(g.y - y1) < 2;
+  // Edges where the map was cut aren't the shore.
+  const cut = cutEdge(def);
   return {
     def, frame: f,
     water: def.water.map(T),
     islands: def.islands.map(r => r.map(T)),
     features: def.features.map(ft => ({ ...ft, pts: ft.pts.map(T) })),
-    control: [T(def.control[0]), T(def.control[1])],
+    control: [T(control[0]), T(control[1])],
     landmarks: def.landmarks.map(l => ({ name: l.name, at: T(l.at) })),
-    open: (a: V2, b: V2) => onBox(toGeo(f, a)) && onBox(toGeo(f, b)),
+    open: (a: V2, b: V2) => cut(toGeo(f, a), toGeo(f, b)),
   };
 }
 

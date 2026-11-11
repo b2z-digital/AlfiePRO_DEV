@@ -12,8 +12,10 @@ import { Profile, clearProfile, skills } from './profile';
 import { TrainingProgress, drillStars, licence } from './progress';
 import type { SimView } from './SimRace';
 import { AlfieOrb, Btn, C, Cap, Chip, Seg, Tile, compassName, cx, ordinal } from './ui';
-import { DEFAULT_VENUE, VENUES } from '@/sim/venues';
-import type { VenueWind } from './venueWind';
+import { DEFAULT_VENUE, VENUES, venueForClub } from '@/sim/venues';
+import { windAt, windsOf } from '@/sim/venue';
+import type { VenueWind as TodayWind } from './venueWind';
+import VenuePick from './VenuePick';
 import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
@@ -32,8 +34,12 @@ export interface Setup {
   seaState: SeaKind; view: SimView;
   /** A venue id, or 'pond' for the practice pond. */
   venue: string;
-  /** At a venue: its usual breeze, today's wind there, or any direction. */
+  /** At a venue: one of the winds it gets (the usual one unless windPick says another), today's wind there, or any direction. */
   windDir: 'usual' | 'today' | 'any';
+  /** Which of the venue's winds, when windDir is 'usual': its place in the venue's list (0, the usual breeze, when unset). */
+  windPick?: number;
+  /** Where you've chosen to sail at each venue, by venue id: metres east and north of the club's saved location. */
+  spots?: Record<string, [number, number]>;
   /** With today's wind: sail in today's strength too (the default), or in the strength chosen. */
   todayStrength?: boolean;
   /** The StartBox sequence to start with (an id); null for the simulator's own calls; unset, the club's. */
@@ -48,6 +54,8 @@ export const DEFAULT_SETUP: Setup = {
   laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'full', autoTrim: false, forgetfulSkippers: false,
   seaState: 'chop', view: 'bank', venue: DEFAULT_VENUE, windDir: 'usual',
 };
+
+const CHARACTER_WORD: Record<WindCharacter, string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging' };
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
 
@@ -335,13 +343,15 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null, seco
   ];
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, live = null, transmitter = null, clubId = null }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab') => void;
   /** Today's wind at the venue, when you've asked for it: loading, got it, or couldn't get it. */
-  today: VenueWind | 'loading' | 'failed' | null;
+  today: TodayWind | 'loading' | 'failed' | null;
   /** The signed-in member: their name and sail numbers. */
   me?: SimIdentity | null;
+  /** Their club, so its own water comes first. */
+  clubId?: string | null;
   /** Races and training are being kept in the member's account. */
   synced?: boolean;
   /** Challenges you can see (null when you're not signed in, or they couldn't be loaded). */
@@ -371,11 +381,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
   const sk = useMemo(() => skills(profile), [profile]);
   const venue = s.venue !== 'pond' ? VENUES[s.venue] ?? null : null;
-  const windHint = !venue ? null
-    : s.windDir === 'usual' ? `The club's usual breeze, from ${String(venue.usualWind).padStart(3, '0')}°.`
+  const vWind = venue ? windAt(venue, s.windPick) : null;
+  const windHint = !venue || !vWind ? null
+    : s.windDir === 'usual' ? `${vWind.note ?? "One of the club's winds."} From ${String(vWind.from).padStart(3, '0')}°.`
       : s.windDir === 'any' ? 'A different direction every race, so you learn the whole lake.'
         : today === 'loading' ? 'Getting the wind at the club now…'
-          : today === 'failed' || !today ? `Couldn't get today's wind, so it's the ${venue.usualWindName} for now.`
+          : today === 'failed' || !today ? `Couldn't get today's wind, so it's the ${vWind.name} for now.`
             : `Now at the club: ${Math.round(today.kn)} kn from the ${compassName(today.from)} (${String(Math.round(today.from)).padStart(3, '0')}°).`;
   // With today's wind, its strength is one of the choices (and the one used unless you pick another).
   const todayKn = venue && s.windDir === 'today' && today && today !== 'loading' && today !== 'failed' ? today.kn : null;
@@ -420,7 +431,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     '10R': 'The big one: long, powerful and fast in a straight line.',
     M: 'Marblehead: tall rig, slim hull, a thoroughbred.',
   };
-  const windDirName = !venue ? 'Up the pond' : s.windDir === 'usual' ? `${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}` : s.windDir === 'today' ? "Today's wind" : 'Any direction';
+  const windDirName = !venue || !vWind ? 'Up the pond' : s.windDir === 'usual' ? `${vWind.name[0].toUpperCase()}${vWind.name.slice(1)}` : s.windDir === 'today' ? "Today's wind" : 'Any direction';
+  // The wind the venue's map lays the course for: the one picked, or today's when it's in.
+  const mapWind = !venue || !vWind ? 0 : s.windDir === 'today' && today && today !== 'loading' && today !== 'failed' ? today.from : vWind.from;
+  const spot = venue ? s.spots?.[venue.id] ?? null : null;
+  const myVenue = venueForClub(clubId);
+  const venueList = Object.values(VENUES).sort((a, b) => (a === myVenue ? -1 : b === myVenue ? 1 : 0));
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
   const summary = [CLASS_LABEL[s.classId], `${s.fleetSize} boats`, `${LEVEL_NAME[s.level]} skippers`, venue ? venue.short : 'Practice pond', `${strengthName}, ${CHARACTER[s.windCharacter][0].toLowerCase()}`];
@@ -643,19 +659,37 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
 
       {/* ── The sheets ── */}
       {pick === 'venue' && (
-        <Sheet icon="venue" title="Where you're sailing" text="A real club's water, seen from its control area, or a sheltered practice pond." onClose={closePick}>
+        <Sheet icon="venue" title="Where you're sailing" text="A real club's water, drawn from the map and seen from its bank, or a sheltered practice pond." onClose={closePick}>
           <Opts>
-            {Object.values(VENUES).map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id })} title={d.short} text={`${d.place}. The course is laid for the wind, with every mark well off the bank.`} />)}
+            {venueList.map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id, windPick: 0 })} title={d.short} badge={d === myVenue ? 'Your club' : undefined} text={`${d.place}.`} />)}
             <Opt on={s.venue === 'pond'} onClick={() => set({ venue: 'pond' })} title="Practice pond" text="A sheltered pond lined with trees. The wind blows straight up it." />
           </Opts>
-          {venue && (
-            <Opts label="Wind direction" cols={3}>
-              <Opt on={s.windDir === 'usual'} onClick={() => set({ windDir: 'usual' })} title={`${venue.usualWindName[0].toUpperCase()}${venue.usualWindName.slice(1)}`} text={`The club's usual breeze, from ${String(venue.usualWind).padStart(3, '0')}°.`} />
-              <Opt on={s.windDir === 'today'} onClick={() => set({ windDir: 'today' })} title="Today's wind" text="What's blowing at the club right now." />
-              <Opt on={s.windDir === 'any'} onClick={() => set({ windDir: 'any' })} title="Any direction" text="Different every race, so you learn the whole lake." />
-            </Opts>
+          {venue && vWind && (
+            <>
+              {venue.traits && <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{venue.traits.about}</p>}
+              <VenuePick def={venue} spot={spot} onSpot={sp => { const spots = { ...(s.spots ?? {}) }; if (sp) spots[venue.id] = sp; else delete spots[venue.id]; set({ spots }); }}
+                windFrom={mapWind} windName={s.windDir === 'usual' ? vWind.name : s.windDir === 'today' ? "Today's wind" : vWind.name}
+                classId={s.classId} length={s.length} fleetSize={s.fleetSize} laps={s.laps} />
+              <Opts label="The wind" cols={2}>
+                {windsOf(venue).map((w, i) => (
+                  <Opt key={w.name} on={s.windDir === 'usual' && (s.windPick ?? 0) === i} onClick={() => set({ windDir: 'usual', windPick: i, windCharacter: w.character })}
+                    title={`${w.name[0].toUpperCase()}${w.name.slice(1)}`} badge={i === 0 ? 'Usual' : undefined}
+                    text={`${w.when ? `${w.when}. ` : ''}From ${String(w.from).padStart(3, '0')}°, ${CHARACTER_WORD[w.character]}.${w.pays ? (w.pays === 'bank' ? ' More breeze along your bank.' : ' More breeze out from your bank.') : ''}`} />
+                ))}
+                <Opt on={s.windDir === 'today'} onClick={() => set({ windDir: 'today' })} title="Today's wind" text="What's blowing at the club right now." />
+                <Opt on={s.windDir === 'any'} onClick={() => set({ windDir: 'any' })} title="Any direction" text="Different every race, so you learn the whole of the water." />
+              </Opts>
+              {windHint && <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{windHint}</p>}
+              {venue.traits && venue.traits.notes.length > 0 && (
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-3.5">
+                  <Cap>Local knowledge</Cap>
+                  <ul className="m-0 mt-1.5 flex list-none flex-col gap-1 p-0 text-[13px] leading-snug" style={{ color: C.mute }}>
+                    {venue.traits.notes.map(n => <li key={n} className="flex gap-2"><span aria-hidden="true" className="mt-[7px] h-[5px] w-[5px] shrink-0 rounded-full bg-[#4DA3FF]" />{n}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
-          {windHint && <p className="m-0 text-[13px]" style={{ color: C.mute }}>{windHint}{venue ? ` Map data ${venue.credit}.` : ''}</p>}
         </Sheet>
       )}
       {pick === 'boat' && (

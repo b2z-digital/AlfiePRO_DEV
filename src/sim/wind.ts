@@ -20,6 +20,8 @@ export interface WindSettings {
   flat?: boolean;
   /** Scripted shifts on top of the natural ones. */
   shifts?: { t: number; deg: number; over: number }[];
+  /** A venue where one side is known to carry more breeze: +1 the right-hand side looking upwind, -1 the left. */
+  sideBias?: number;
 }
 
 interface Osc { amp: number; period: number; phase: number }
@@ -105,6 +107,8 @@ export class WindField {
     const across = Math.max(10, area.halfAcross);
     this.sidePressure = sideSign * (settings.character === 'steady' ? 0.04 : 0.1) / across;
     this.sideShift = r.range(-1, 1) * 3 / across;
+    // Local knowledge beats chance: the side the club says pays carries clearly more breeze.
+    if (settings.sideBias) this.sidePressure = (settings.sideBias > 0 ? 1 : -1) * 0.15 / across;
     // A fresh breeze is gustier: on a puffy day the puffs come through more often, most of them 30 to
     // 60% up, and every minute or two a big one at up to twice the breeze lays the fleet over.
     const fresh = kn >= 13;

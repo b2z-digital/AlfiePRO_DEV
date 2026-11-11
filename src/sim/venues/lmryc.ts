@@ -84,4 +84,19 @@ export const LMRYC: VenueDef = {
   features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),
   landmarks: [{ name: 'Speers Point Park', at: { x: 565, y: 945 } }],
   credit: '© OpenStreetMap contributors',
+  clubs: ['bafdff76-ebe7-4890-b7fa-20aa9bb37491'], venueId: '23ee6cc8-8da5-4b4b-b148-0ac5640bca76',
+  // What the club knows about its water. A first reading from the map and the local climate, for the
+  // club to put right in its own words.
+  traits: {
+    about: 'The Booragul foreshore at the north-west corner of Lake Macquarie. You stand on the grass in front of the sailing club and race out over open lake.',
+    winds: [
+      { from: 75, name: 'ENE sea breeze', when: 'Summer afternoons', character: 'oscillating', note: 'Comes in across the lake from Speers Point with clear water in front of you. Regular shifts: tack on the headers.' },
+      { from: 180, name: 'Southerly', when: 'After a change', character: 'puffy', pays: 'out', note: 'Off the land behind you. Gusty and shifty near the bank, steadier the further out you go.' },
+      { from: 290, name: 'Westerly', when: 'Winter', character: 'puffy', note: 'Down off the hills behind Booragul and along the foreshore. Hard gusts with holes between them.' },
+    ],
+    notes: [
+      'The lake is open to the north and east, so those winds arrive clean.',
+      'Winds with south or west in them come over the land and are gustier.',
+    ],
+  },
 };
