@@ -10,7 +10,7 @@ import { focusPlay, focusWords, type Focus } from './focus';
 import { ReplayBox, drawReplayMap } from './render';
 import { Moment, frameAt } from './moments';
 import { ruleText } from './rulesText';
-import { AlfieOrb, Btn, C, Cap, Seg, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Cap, Seg, cx, ordinal, Page } from './ui';
 
 export type { TrainLink };
 
@@ -42,7 +42,7 @@ function LedgerCard({ led, onLink, onPlay }: { led: Ledger; onLink?: (l: TrainLi
   const parts = led.parts.filter(p => p.lengths >= 0.3).sort((a, z) => z.lengths - a.lengths);
   if (!parts.length || led.total < 1) {
     return (
-      <div className="flex flex-col gap-2 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+      <div className="flex flex-col gap-2 sim-card p-5">
         <Cap>Where your race went</Cap>
         <p className="m-0 text-[14px] leading-normal">Next to nothing given away: under a length against a perfect race. Try a stronger fleet.</p>
       </div>
@@ -50,7 +50,7 @@ function LedgerCard({ led, onLink, onPlay }: { led: Ledger; onLink?: (l: TrainLi
   }
   const worstOf = (c: Cause) => led.worst.find(w => w.cause === c);
   return (
-    <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+    <div className="flex flex-col gap-4 sim-card p-5">
       <div className="flex flex-col gap-1">
         <Cap>Where your race went</Cap>
         <p className="m-0 font-display text-[22px] font-semibold leading-tight"><span className="tabular-nums">{led.total.toFixed(0)}</span> lengths given away</p>
@@ -254,7 +254,7 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
           <div className="absolute inset-x-3 bottom-3 flex flex-col gap-2 rounded-2xl border border-white/[0.08] bg-[rgba(7,13,27,0.88)] p-3.5 backdrop-blur-[10px] sm:right-auto sm:max-w-[460px]">
             <div className="flex items-center gap-2">
               <AlfieOrb size={24} />
-              <p className="m-0 min-w-0 flex-1 truncate text-[14px] font-semibold">{m.title}</p>
+              <p className="m-0 min-w-0 flex-1 text-[14px] font-semibold">{m.title}</p>
               <span className="text-[12px] tabular-nums" style={{ color: C.mute }}>{clockText(m.t - race.gunT)}</span>
             </div>
             <p className="m-0 text-[13.5px] leading-normal">{m.text}</p>
@@ -292,7 +292,7 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
                 className={cx('flex min-h-[44px] cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2 text-left', active === k ? 'border-[rgba(77,163,255,0.5)] bg-[rgba(42,147,255,0.12)]' : 'border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.06]')}>
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_DOT[mo.tone] }} />
                 <span className="w-10 shrink-0 text-[12px] tabular-nums" style={{ color: C.mute }}>{clockText(mo.t - race.gunT)}</span>
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#F1F4FA]">{mo.title}</span>
+                <span className="min-w-0 flex-1 text-[13px] font-medium text-[#F1F4FA]">{mo.title}</span>
               </button>
             ))}
           </div>
@@ -320,19 +320,8 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
   const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%`);
 
   return (
-    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1360px] flex-col gap-5 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onHome}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Simulator
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">{sum.mode === 'start' ? 'Start report' : 'Race debrief'}</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>{sum.title} · {sum.cls} · {sum.level[0].toUpperCase()}{sum.level.slice(1)} skippers · {sum.wind}</p>
-          </div>
-          <Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? challenge.againLabel ?? 'Sail it again' : 'Race again'}</Btn>
-        </header>
+    <Page onBack={onHome} title={sum.mode === 'start' ? 'Start report' : 'Race debrief'} text={`${sum.title} · ${sum.cls} · ${sum.level[0].toUpperCase()}${sum.level.slice(1)} skippers · ${sum.wind}`}
+      side={<Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? challenge.againLabel ?? 'Sail it again' : 'Race again'}</Btn>}>
 
         {challenge && (
           <section className="flex flex-wrap items-center gap-3 rounded-[20px] border border-[rgba(77,163,255,0.3)] bg-[rgba(42,147,255,0.08)] px-5 py-4">
@@ -342,7 +331,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
           </section>
         )}
 
-        <section className="flex flex-wrap items-center gap-7 rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-6 py-5">
+        <section className="flex flex-wrap items-center gap-7 sim-card px-6 py-5">
           <div className="flex items-baseline gap-2.5">
             <span className="font-display text-[48px] font-bold leading-none tabular-nums">{placeText}</span>
             {sum.mode === 'race' && sum.place && <span className="text-[15px]" style={{ color: C.mute }}>of {sum.of}</span>}
@@ -366,13 +355,13 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
         </section>
 
         <section className="flex flex-wrap items-start gap-5">
-          <div className="min-w-0 flex-[999_1_620px] rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-5">
+          <div className="min-w-0 flex-[999_1_620px] sim-card px-5 py-5">
             <ReplayMap race={race} moments={moments} onTakeOver={onTakeOver} onLink={onLink} />
           </div>
           <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
             {sum.focus && sum.focus.got !== undefined && <FocusCard focus={sum.focus} onPlay={onPlay} />}
             {sum.ledger && sum.status !== 'dnf' && <LedgerCard led={sum.ledger} onLink={onLink} onPlay={onPlay} />}
-            <div className="flex flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+            <div className="flex flex-col gap-4 sim-card p-5">
               <div className="flex items-center gap-2.5">
                 <AlfieOrb size={34} />
                 <p className="m-0 text-[16px] font-semibold">{sum.takeaways.length > 1 ? `Alfie's ${sum.takeaways.length === 2 ? 'two' : 'three'} things to work on` : "Alfie's take"}</p>
@@ -389,7 +378,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
               ))}
               {onWriteUp && <WriteUp onWrite={onWriteUp} />}
             </div>
-            <div className="flex flex-col rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-4">
+            <div className="flex flex-col sim-card px-5 py-4">
               <Cap className="mb-2">Rules incidents</Cap>
               {sum.incidents.length === 0 && <p className="m-0 border-t border-white/[0.055] py-2.5 text-[13.5px]" style={{ color: C.mute }}>None involving you.</p>}
               {sum.incidents.map((i, k) => {
@@ -419,7 +408,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
         </section>
 
         <section className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))' }}>
-          <div className="rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-[18px]">
+          <div className="sim-card px-5 py-[18px]">
             <Cap className="mb-1.5">Start</Cap>
             <Stat label="After the gun" value={sum.ocs ? 'Over early' : sum.late === null ? '–' : `${sum.late.toFixed(1)} s`} />
             <Stat label="Speed at the gun" value={pct(sum.spdAtGun)} />
@@ -427,19 +416,19 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
           </div>
           {sum.mode === 'race' && (
             <>
-              <div className="rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-[18px]">
+              <div className="sim-card px-5 py-[18px]">
                 <Cap className="mb-1.5">Upwind</Cap>
                 <Stat label="Time on the lifted tack" value={pct(sum.upwind.liftedPct)} />
                 <Stat label="Tacks on big headers" value={sum.upwind.headers ? `${sum.upwind.headerTacks} of ${sum.upwind.headers}` : '–'} />
                 <Stat label="Tacks upwind" value={sum.upwind.tacks} />
               </div>
-              <div className="rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-[18px]">
+              <div className="sim-card px-5 py-[18px]">
                 <Cap className="mb-1.5">Mark roundings</Cap>
                 <Stat label="Places gained or lost" value={sum.roundings.gained > 0 ? `+${sum.roundings.gained}` : String(sum.roundings.gained)} />
                 <Stat label="Penalties" value={sum.penalties} />
                 <Stat label="Incidents at marks" value={sum.incidents.filter(i => /^18|^31/.test(i.rule)).length} />
               </div>
-              <div className="rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-[18px]">
+              <div className="sim-card px-5 py-[18px]">
                 <Cap className="mb-1.5">Downwind</Cap>
                 <Stat label="Speed vs target" value={pct(sum.downwind.spdPct)} />
                 <Stat label="Gybes" value={sum.downwind.gybes} />
@@ -448,7 +437,6 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
             </>
           )}
         </section>
-      </div>
-    </div>
+    </Page>
   );
 }

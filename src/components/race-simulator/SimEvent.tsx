@@ -6,7 +6,7 @@ import type { EventRace, SimEvent as VirtualEvent } from './events';
 import { breezeText, eventEntries, eventLine, eventState, eventStatusText, seriesRaces, whenText } from './events';
 import { Score, dropsText, raceResults, scoreText, standings } from './series';
 import { fmt } from './stats';
-import { AlfieOrb, Btn, C, Cap, Chip, compassName, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Chip, compassName, cx, ordinal, Page } from './ui';
 
 export interface SimEventProps {
   event: VirtualEvent;
@@ -23,7 +23,7 @@ export interface SimEventProps {
   now?: number;
 }
 
-const card = 'rounded-[20px] border border-white/[0.07] bg-white/[0.025]';
+const card = 'sim-card';
 const CARD_TINT = 'linear-gradient(rgba(255,255,255,0.025), rgba(255,255,255,0.025))';
 const HIGHLIGHT = 'rgba(42,147,255,0.06)';
 /** A cell that stays put while the races scroll: the card's own colour, so the races pass beneath it. */
@@ -75,20 +75,8 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
   const resultText = (e: ChallengeEntry | null) => !e ? null : e.status === 'started' ? 'Started, not finished' : e.status === 'finished' && e.elapsed_s != null ? `${fmt(e.elapsed_s)}` : e.status.toUpperCase();
 
   return (
-    <div ref={top} className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-6 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Simulator
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <Cap>{ev.club_id ? 'Club event' : 'Open event'}</Cap>
-            <h1 className="m-0 mt-1 font-display text-[30px] font-bold tracking-[-0.02em]">{ev.title}</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>{eventLine(ev)}</p>
-          </div>
-          <Chip tone={st.open.length ? 'blue' : 'plain'}>{eventStatusText(ev, now)}</Chip>
-        </header>
+    <Page rootRef={top} onBack={onBack} kicker={ev.club_id ? 'Club event' : 'Open event'} title={ev.title} text={eventLine(ev)}
+      side={<Chip tone={st.open.length ? 'blue' : 'plain'}>{eventStatusText(ev, now)}</Chip>}>
 
         {ev.description && <p className="m-0 max-w-[720px] text-[15px] leading-normal">{ev.description}</p>}
 
@@ -125,7 +113,7 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
 
         {/* The races. */}
         <section className={cx(card, 'flex flex-col px-5 py-4')} aria-labelledby="races-title">
-          <h2 id="races-title" className="m-0 pb-2 text-[16px] font-semibold">Races</h2>
+          <h2 id="races-title" className="sim-h3 pb-2">Races</h2>
           {races.map(r => {
             const open = st.open.includes(r);
             const closed = r.closes_at != null && Date.parse(r.closes_at) <= now;
@@ -172,7 +160,7 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
         {/* The standings. */}
         <section className={cx(card, 'flex flex-col px-5 py-4')} aria-labelledby="standings-title">
           <div className="flex flex-wrap items-center gap-2 pb-2">
-            <h2 id="standings-title" className="m-0 text-[16px] font-semibold">Standings</h2>
+            <h2 id="standings-title" className="sim-h3">Standings</h2>
             {myRow && <Chip tone="good">You're {ordinal(myRow.rank)}</Chip>}
             {!st.done && opened.length > 0 && <span className="ml-auto text-[12.5px]" style={{ color: C.mute }}>Provisional</span>}
           </div>
@@ -237,7 +225,6 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
               )}
           </div>
         )}
-      </div>
-    </div>
+    </Page>
   );
 }

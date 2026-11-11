@@ -6,7 +6,7 @@ import { RuleSheet } from './hud';
 import { BOAT_COLOR, judgeCases, mark, ruleChoices, runCase, todaysCases, type Clip, type JudgeCase } from './judge';
 import type { TrainingProgress } from './progress';
 import type { TrainLink } from './stats';
-import { AlfieOrb, Btn, C, Cap, Chip, cx } from './ui';
+import { AlfieOrb, Btn, C, Cap, Chip, cx, Page } from './ui';
 
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const sameDay = (at: number) => dayKey(new Date(at)) === dayKey();
@@ -43,7 +43,7 @@ function ClipView({ clip, run }: { clip: Clip; run: number }) {
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [data, clip, run]);
   if (!data) return <p className="m-0 rounded-2xl bg-white/[0.04] p-6 text-[14px]" style={{ color: C.mute }}>This clip couldn't be drawn.</p>;
-  return <canvas ref={ref} className="block h-[300px] w-full rounded-2xl sm:h-[380px]" role="img" aria-label={`From above: ${clip.boats.join(' and ')} in a short incident. Wind from the top of the picture.`} />;
+  return <canvas ref={ref} className="sim-diagram" role="img" aria-label={`From above: ${clip.boats.join(' and ')} in a short incident. Wind from the top of the picture.`} />;
 }
 
 /** A choice: a boat (with her colour beside her name), a rule, or "nobody". Lit when chosen; marked once the call is in. */
@@ -92,22 +92,11 @@ export default function SimJudge({ training, onBack, onLink, onCall }: {
   const ready = who === NOBODY || (who !== null && rule !== null);
 
   return (
-    <div className="sim-page relative min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1080px] flex-col gap-6 px-4 pb-16 pt-8 sm:px-8">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Back
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">You be the judge</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>Watch the incident, then make the call: who broke a rule, and which one? Some clips have no foul in them. The verdict is the simulator's referee's.</p>
-          </div>
-          <Chip tone={todayDone.length >= 5 ? 'good' : 'blue'}>Today: {todayDone.length} of 5 · {todayPoints} point{todayPoints === 1 ? '' : 's'}</Chip>
-        </header>
+    <Page onBack={onBack} title="You be the judge" text="Watch the incident, then make the call: who broke a rule, and which one? Some clips have no foul in them. The verdict is the simulator's referee's."
+      side={<Chip tone={todayDone.length >= 5 ? 'good' : 'blue'}>Today: {todayDone.length} of 5 · {todayPoints} point{todayPoints === 1 ? '' : 's'}</Chip>} after={sheet && <RuleSheet rule={sheet} onClose={() => setSheet(null)} />}>
 
         {!clip || !v ? (
-          <p className="m-0 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-6 text-[14px]">This case couldn't be set up. <Btn small onClick={() => setI(i + 1)}>Next case</Btn></p>
+          <p className="m-0 sim-card p-6 text-[14px]">This case couldn't be set up. <Btn small onClick={() => setI(i + 1)}>Next case</Btn></p>
         ) : (
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
             <div className="flex flex-col gap-3">
@@ -172,8 +161,6 @@ export default function SimJudge({ training, onBack, onLink, onCall }: {
             </div>
           </div>
         )}
-      </div>
-      {sheet && <RuleSheet rule={sheet} onClose={() => setSheet(null)} />}
-    </div>
+    </Page>
   );
 }

@@ -6,7 +6,7 @@ import { focusPlay, focusWords, ledgerRaces, raceFocus } from './focus';
 import { GRADED_MIN, GRADE_AT, GRADE_NAME, passport, trend, type Grade, type Skill } from './passport';
 import type { Profile } from './profile';
 import { causeLink, type TrainLink } from './stats';
-import { AlfieOrb, Btn, C, Cap, Chip } from './ui';
+import { AlfieOrb, Btn, C, Cap, Chip, Page } from './ui';
 
 const n1 = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 const day = (at: number) => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
@@ -82,10 +82,10 @@ function standing(s: Skill, against: string | null): string {
 function SkillCard({ s, against, graded, onLink, onPlay, link }: { s: Skill; against: string | null; graded: boolean; onLink: (l: TrainLink) => void; onPlay: (id: string) => void; link: TrainLink | null }) {
   const cause = s.part as Cause;
   return (
-    <section className="flex flex-col gap-3 rounded-[20px] border border-white/[0.08] bg-white/[0.03] p-5" aria-label={s.name}>
+    <section className="flex flex-col gap-3 sim-card p-5" aria-label={s.name}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="m-0 font-display text-[17px] font-bold leading-tight">{s.name}</h3>
+          <h3 className="sim-h3">{s.name}</h3>
           <p className="m-0 mt-1 text-[12.5px] leading-snug" style={{ color: C.mute }}>{CAUSE_WORDS[cause].what}</p>
         </div>
         <GradeBadge grade={s.grade} graded={graded} />
@@ -112,22 +112,11 @@ export default function SimPassport({ profile, onBack, onLink, onPlay }: { profi
   const focus = raceFocus(profile);
   const medals = pp ? (['gold', 'silver', 'bronze'] as Grade[]).map(g => ({ g, n: pp.skills.filter(s => s.grade === g).length })).filter(m => m.n > 0) : [];
   return (
-    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-7 px-4 pb-16 pt-8 sm:px-8">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Back
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">Skill passport</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>Each part of racing: what you've been giving away, which way it's going, and how you stand against the fleets you race. Fewer lengths is better.</p>
-          </div>
-          {pp && <Chip tone="blue">{pp.races} race{pp.races === 1 ? '' : 's'}</Chip>}
-        </header>
+    <Page onBack={onBack} title="Skill passport" text="Each part of racing: what you've been giving away, which way it's going, and how you stand against the fleets you race. Fewer lengths is better."
+      side={pp ? <Chip tone="blue">{pp.races} race{pp.races === 1 ? '' : 's'}</Chip> : undefined}>
 
         {!pp ? (
-          <div className="flex flex-wrap items-center gap-4 rounded-[22px] border border-white/[0.08] bg-white/[0.03] p-6">
+          <div className="flex flex-wrap items-center gap-4 sim-card p-6">
             <AlfieOrb size={44} />
             <div className="min-w-[220px] flex-1">
               <p className="m-0 font-display text-[19px] font-bold">Sail a race to open your passport</p>
@@ -137,7 +126,7 @@ export default function SimPassport({ profile, onBack, onLink, onPlay }: { profi
           </div>
         ) : (
           <>
-            <section className="grid gap-5 rounded-[24px] border border-white/[0.09] bg-white/[0.035] p-5 sm:p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" aria-label="Everything together">
+            <section className="grid gap-5 sim-card p-5 sm:p-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]" aria-label="Everything together">
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-3">
                   <Cap>Everything together</Cap>
@@ -170,7 +159,7 @@ export default function SimPassport({ profile, onBack, onLink, onPlay }: { profi
               {pp.skills.map(s => <SkillCard key={s.part} s={s} against={pp.against} graded={pp.graded >= GRADED_MIN} onLink={onLink} onPlay={onPlay} link={newest ? causeLink(s.part as Cause, newest) : null} />)}
             </div>
 
-            <details className="rounded-[18px] border border-white/[0.08] bg-white/[0.03]">
+            <details className="sim-card">
               <summary className="cursor-pointer px-5 py-3.5 text-[14px] font-semibold">Race by race, as a table</summary>
               <div className="overflow-x-auto px-5 pb-5">
                 <table className="w-full min-w-[720px] border-collapse text-left text-[13px] tabular-nums">
@@ -206,7 +195,6 @@ export default function SimPassport({ profile, onBack, onLink, onPlay }: { profi
             </section>
           </>
         )}
-      </div>
-    </div>
+    </Page>
   );
 }

@@ -4,7 +4,7 @@ import { useEffect, useReducer, useState } from 'react';
 import { VENUES } from '@/sim/venues';
 import { CLASSES } from '@/sim/classes';
 import type { LiveRoom, RoomSettings } from './live';
-import { Btn, C, Cap, Chip, Tile, cx } from './ui';
+import { Btn, C, Cap, Chip, cx, Page } from './ui';
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
@@ -53,31 +53,17 @@ export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
       : others.length ? "Everyone's ready." : 'Nobody else is in yet. You can race on your own, or wait for others.';
 
   return (
-    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-7 px-4 pb-16 pt-8 sm:px-8">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onLeave} aria-label="Leave the room">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Leave
-          </Btn>
-          <Tile size={44}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M14.5 14.4A5 5 0 0121 19" /></svg>
-          </Tile>
-          <div className="min-w-0 flex-1">
-            <h1 className="m-0 font-display text-[28px] font-bold tracking-[-0.02em]">Live race</h1>
-            <p className="m-0 mt-1 text-[14.5px]" style={{ color: C.mute }}>Each of you sails your own boat from your own device. AI skippers fill the rest of the fleet.</p>
-          </div>
-        </header>
+    <Page onBack={onLeave} backLabel="Leave" backAria="Leave the room" title="Live race" text="Each of you sails your own boat from your own device. AI skippers fill the rest of the fleet.">
 
         <div className="flex flex-wrap items-start gap-5">
-          <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-5 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="room-code">
+          <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-5 sim-card p-5 sm:p-6" aria-labelledby="room-code">
             <div className="flex flex-col gap-2">
               <Cap>Room code</Cap>
               <div className="flex flex-wrap items-center gap-3">
                 <p id="room-code" className="m-0 font-display text-[40px] font-bold tracking-[0.18em] tabular-nums">{room.code}</p>
                 <Btn small onClick={() => void copy()}>{copied ? 'Copied' : 'Copy'}</Btn>
               </div>
-              <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>Give this code to the members you're racing. They join from Race Simulator, under Race members live.{host ? " The room also shows in your club's open races until you start." : ''}</p>
+              <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>Give this code to the members you're racing. They join from the Sailing Academy, under Race members live.{host ? " The room also shows in your club's open races until you start." : ''}</p>
             </div>
             <div className="flex flex-col gap-2.5">
               <Cap>The race</Cap>
@@ -97,9 +83,9 @@ export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
             </div>
           </section>
 
-          <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5 sm:p-6" aria-labelledby="crew-title">
+          <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-4 sim-card p-5 sm:p-6" aria-labelledby="crew-title">
             <div className="flex items-center gap-2">
-              <h2 id="crew-title" className="m-0 text-[17px] font-semibold">Who's racing</h2>
+              <h2 id="crew-title" className="sim-h3">Who's racing</h2>
               <Chip className="ml-auto">{room.people.length} {room.people.length === 1 ? 'person' : 'people'}</Chip>
             </div>
             <ul className="m-0 flex list-none flex-col gap-2 p-0">
@@ -133,7 +119,6 @@ export default function SimLive({ room, myId, onLeave, water = 'ok' }: {
             </div>
           </section>
         </div>
-      </div>
-    </div>
+    </Page>
   );
 }

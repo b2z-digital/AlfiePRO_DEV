@@ -43,7 +43,7 @@ export default function EventForm({ line, canEveryone, onCreate, onDone }: {
   const [err, setErr] = useState<string | null>(null);
 
   return (
-    <form className="flex flex-col gap-4 rounded-[18px] border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5" onSubmit={async e => {
+    <form className="flex flex-col gap-4 sim-card p-4 sm:p-5" onSubmit={async e => {
       e.preventDefault();
       if (title.trim().length < 3) { setErr('Give it a title of at least three letters.'); return; }
       const [y, m, d] = start.split('-').map(Number);

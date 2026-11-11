@@ -5,7 +5,7 @@ import { CLASSES } from '@/sim/classes';
 import { VENUES } from '@/sim/venues';
 import { Challenge, ChallengeEntry, closesText, isOpen, leaderboard } from './challenges';
 import { fmt } from './stats';
-import { AlfieOrb, Btn, C, Cap, Chip, compassName, cx, ordinal } from './ui';
+import { AlfieOrb, Btn, C, Chip, compassName, cx, ordinal, Page } from './ui';
 
 /** "IOM · 8 boats · State skippers · LMRYC · Booragul · ENE breeze". */
 export function challengeLine(c: Challenge): string {
@@ -40,24 +40,12 @@ export default function SimChallenge({ challenge, me, onSail, onBack, load = lea
   const mine = rows.findIndex(e => e.user_id === me);
 
   return (
-    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1100px] flex-col gap-6 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Simulator
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <Cap>{challenge.club_id ? 'Club challenge' : 'Open challenge'}</Cap>
-            <h1 className="m-0 mt-1 font-display text-[30px] font-bold tracking-[-0.02em]">{challenge.title}</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>{challengeLine(challenge)}</p>
-          </div>
-          <Chip tone={open ? 'blue' : 'plain'}>{closesText(challenge)}</Chip>
-        </header>
+    <Page onBack={onBack} kicker={challenge.club_id ? 'Club challenge' : 'Open challenge'} title={challenge.title} text={challengeLine(challenge)}
+      side={<Chip tone={open ? 'blue' : 'plain'}>{closesText(challenge)}</Chip>}>
 
         {challenge.description && <p className="m-0 max-w-[720px] text-[15px] leading-normal">{challenge.description}</p>}
 
-        <section className="flex flex-wrap items-center gap-3 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+        <section className="flex flex-wrap items-center gap-3 sim-card p-5">
           <AlfieOrb size={30} />
           <p className="m-0 min-w-0 flex-[1_1_300px] text-[14px] leading-normal">
             Everyone sails exactly the same race: the same fleet, the same wind and the same shifts. {leader ? <>Race <b>{leader.user_id === me ? 'your own best' : `${leader.display_name}'s`}</b> ghost to see where the time is.</> : 'Be the first on the board.'}
@@ -68,9 +56,9 @@ export default function SimChallenge({ challenge, me, onSail, onBack, load = lea
           </div>
         </section>
 
-        <section className="flex flex-col rounded-[20px] border border-white/[0.07] bg-white/[0.025] px-5 py-4" aria-labelledby="lb-title">
+        <section className="flex flex-col sim-card px-5 py-4" aria-labelledby="lb-title">
           <div className="flex items-center gap-2 pb-2">
-            <h2 id="lb-title" className="m-0 text-[16px] font-semibold">Leaderboard</h2>
+            <h2 id="lb-title" className="sim-h3">Leaderboard</h2>
             {mine >= 0 && <Chip tone="good">You're {ordinal(mine + 1)}</Chip>}
             <span className="ml-auto text-[12.5px]" style={{ color: C.mute }}>{rows.length ? `${rows.length} ${rows.length === 1 ? 'skipper' : 'skippers'}` : ''}</span>
           </div>
@@ -89,7 +77,6 @@ export default function SimChallenge({ challenge, me, onSail, onBack, load = lea
             </div>
           ))}
         </section>
-      </div>
-    </div>
+    </Page>
   );
 }

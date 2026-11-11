@@ -3,7 +3,7 @@
 import { DRILLS, Drill, DrillGroup } from '@/sim/training';
 import type { TrainingProgress } from './progress';
 import { drillStars } from './progress';
-import { Btn, C, Cap, Chip, Tile } from './ui';
+import { Btn, C, Chip, Tile, Page } from './ui';
 
 const GROUPS: { id: DrillGroup; text: string }[] = [
   { id: 'Timing', text: 'Time on distance: when to go, and how to arrive at full speed.' },
@@ -27,7 +27,7 @@ function StarRow({ n }: { n: number }) {
 function DrillCard({ d, progress, onPlay }: { d: Drill; progress: TrainingProgress; onPlay: (d: Drill) => void }) {
   const r = progress.drills[d.id];
   return (
-    <div className="flex flex-col gap-3 rounded-[18px] border border-white/[0.07] bg-white/[0.025] p-4">
+    <div className="flex flex-col gap-3 sim-card p-4">
       <div className="flex items-start gap-2">
         <p className="m-0 flex-1 text-[15px] font-semibold leading-snug">{d.title}</p>
         <StarRow n={r?.stars ?? 0} />
@@ -47,21 +47,10 @@ export default function SimTrainer({ progress, onPlay, onFullStart, onBack }: {
 }) {
   const stars = drillStars(progress);
   return (
-    <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      <div className="mx-auto flex max-w-[1360px] flex-col gap-6 px-4 pb-16 pt-8 sm:px-8 lg:px-10">
-        <header className="flex flex-wrap items-center gap-4">
-          <Btn onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            Simulator
-          </Btn>
-          <div className="min-w-0 flex-[1_1_320px]">
-            <h1 className="m-0 font-display text-[30px] font-bold tracking-[-0.02em]">Start Trainer</h1>
-            <p className="m-0 mt-1 text-[14px]" style={{ color: C.mute }}>Twelve short drills on the real engine. Each one changes a little every time, so a good score means you've got it.</p>
-          </div>
-          <Chip>{stars.got} of {stars.of} stars</Chip>
-        </header>
+    <Page onBack={onBack} title="Start Trainer" text="Twelve short drills on the real engine. Each one changes a little every time, so a good score means you've got it."
+      side={<Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} stars</Chip>}>
 
-        <section className="flex flex-wrap items-center gap-4 rounded-[20px] border border-white/[0.07] bg-white/[0.025] p-5">
+        <section className="flex flex-wrap items-center gap-4 sim-card p-5">
           <Tile size={40}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>
           </Tile>
@@ -74,16 +63,15 @@ export default function SimTrainer({ progress, onPlay, onFullStart, onBack }: {
 
         {GROUPS.map(g => (
           <section key={g.id} className="flex flex-col gap-3" aria-labelledby={`grp-${g.id}`}>
-            <div>
-              <Cap>{g.id}</Cap>
-              <p id={`grp-${g.id}`} className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>{g.text}</p>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 id={`grp-${g.id}`} className="sim-h2">{g.id}</h2>
+              <p className="m-0 min-w-0 flex-1 basis-[260px] text-[13.5px]" style={{ color: C.mute }}>{g.text}</p>
             </div>
             <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))' }}>
               {DRILLS.filter(d => d.group === g.id).map(d => <DrillCard key={d.id} d={d} progress={progress} onPlay={onPlay} />)}
             </div>
           </section>
         ))}
-      </div>
-    </div>
+    </Page>
   );
 }

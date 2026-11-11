@@ -161,3 +161,44 @@ export function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
+
+/**
+ * The frame every Sailing Academy screen shares, so they all sit the same way at every width: the
+ * home screen's margins (16 px on a phone up to 64 px on a wide screen, and the full width between
+ * them, like the rest of AlfiePRO), one header (back, a title, a line about it, and anything for
+ * the right-hand side, which drops below on a narrow screen), and the same space between sections.
+ * `after` is for anything laid over the whole screen (a rule sheet).
+ */
+export function Page({ onBack, backLabel = 'Sailing Academy', backAria, lead, kicker, title, text, side, after, rootRef, children }: {
+  onBack: () => void; backLabel?: string; backAria?: string;
+  /** Something before the title (an icon tile). */
+  lead?: React.ReactNode;
+  kicker?: React.ReactNode; title: React.ReactNode; text?: React.ReactNode;
+  /** Chips or a button, on the right of the header. */
+  side?: React.ReactNode;
+  after?: React.ReactNode;
+  rootRef?: React.Ref<HTMLDivElement>;
+  children: React.ReactNode;
+}) {
+  return (
+    <div ref={rootRef} className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
+      <div className="flex flex-col gap-6 px-4 pb-16 pt-5 sm:px-6 sm:pt-7 lg:px-10 xl:px-16">
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <Btn onClick={onBack} aria-label={backAria ?? `Back to the ${backLabel}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+            {backLabel}
+          </Btn>
+          {lead}
+          <div className="min-w-0 flex-[1_1_300px]">
+            {kicker && <Cap className="mb-1">{kicker}</Cap>}
+            <h1 className="m-0 font-display text-[clamp(24px,2.3vw,32px)] font-bold leading-[1.12] tracking-[-0.02em]">{title}</h1>
+            {text && <p className="m-0 mt-1 max-w-[80ch] text-[14px] leading-snug" style={{ color: C.mute }}>{text}</p>}
+          </div>
+          {side && <div className="flex flex-wrap items-center gap-2">{side}</div>}
+        </header>
+        {children}
+      </div>
+      {after}
+    </div>
+  );
+}

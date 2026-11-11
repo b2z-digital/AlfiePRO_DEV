@@ -615,7 +615,7 @@ export function ResultsOverlay({ rows, title, onDebrief, onAgain, onHome, live }
       <div className="flex flex-wrap gap-2.5">
         <Btn primary onClick={onDebrief}>See the debrief</Btn>
         <Btn onClick={onAgain}>Race again</Btn>
-        <Btn quiet onClick={onHome}>Simulator home</Btn>
+        <Btn quiet onClick={onHome}>Sailing Academy</Btn>
       </div>
     </Hud>
   );
