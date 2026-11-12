@@ -55,6 +55,11 @@ export interface VenueDef {
   usualWind: number; usualWindName: string;
   /** The control area: the stretch of bank the skippers stand on. */
   control: [V2, V2];
+  /**
+   * Other places the club sails from when a course won't fit in sight of the control area (on narrow
+   * water, a big fleet in a wind across it): points on the water, each sailed from the bank nearest it.
+   */
+  alsoFrom?: V2[];
   /** The water's edge: the outer shore runs anticlockwise (water on its left), islands clockwise. */
   water: V2[];
   islands: V2[][];
@@ -68,6 +73,8 @@ export interface VenueDef {
   invented?: boolean;
   /** Half the side of the square the water was cut to (venues built from the map): shore edges along it are open water. */
   cut?: number;
+  /** Where it is, for the Circuit's Regional seasons: an Australian state or territory, or New Zealand. */
+  region?: Region;
   /** The clubs whose home water this is, and the venue it was built from (ids in the app's database). */
   clubs?: string[];
   venueId?: string;
@@ -86,6 +93,9 @@ export interface VenueLook {
   /** Houses on the far shores. */
   houses: number;
 }
+
+/** Where a real water is. */
+export type Region = 'NSW' | 'VIC' | 'QLD' | 'SA' | 'WA' | 'TAS' | 'NZ';
 
 /** The line shown wherever a venue is drawn: its map credit, or that it's invented. */
 export const creditLine = (def: VenueDef): string => (def.invented ? 'An invented water of the AlfiePRO Circuit' : `Map data ${def.credit}`);
@@ -412,10 +422,12 @@ export interface Site { control: [V2, V2]; S: V2; course: Course }
  * place picked on the venue's map) or, with no spot or when no course fits off it in this wind, at
  * the club's own control area. `courses` are the same course at the length asked for and then each
  * shorter one: on narrow water a long course across the wind won't fit in front of the skippers,
- * and like a race officer we set a shorter one there before setting it where they can't see it.
+ * and like a race officer we set a shorter one there before setting it where they can't see it. If
+ * even the shortest won't fit in sight, the fleet moves to the club's other places (`alsoFrom`).
  */
 export function siteFor(def: VenueDef, rot: number, spot: V2 | null, courses: Course[]): Site | null {
-  const lay = (control: [V2, V2]): Site | null => {
+  // The longest course that fits off a stretch of bank, and whether it's near enough to see.
+  const lay = (control: [V2, V2]): { site: Site; seen: boolean } | null => {
     let got: Site | null = null;
     const m = mid(control);
     for (const c of courses) {
@@ -426,11 +438,19 @@ export function siteFor(def: VenueDef, rot: number, spot: V2 | null, courses: Co
       const q = toRace(frameAt(rot, S), m);
       let far = 0;
       for (const k of c.marks) far = Math.max(far, dhypot(k.p.x - q.x, k.p.y - q.y));
-      if (far <= 90 * c.L) return { control, S, course: c };
+      if (far <= 90 * c.L) return { site: { control, S, course: c }, seen: true };
     }
-    return got;
+    return got ? { site: got, seen: false } : null;
   };
-  return (spot ? lay(controlAt(def, spot)) : null) ?? lay(def.control);
+  if (spot) { const s = lay(controlAt(def, spot)); if (s) return s.site; }
+  const home = lay(def.control);
+  if (home?.seen) return home.site;
+  // The club's other places to sail from, when nothing fits in sight of its usual one.
+  for (const p of def.alsoFrom ?? []) {
+    const s = lay(controlAt(def, p));
+    if (s?.seen) return s.site;
+  }
+  return home?.site ?? null;
 }
 
 // ───────────────────────── The venue in the race frame ─────────────────────────

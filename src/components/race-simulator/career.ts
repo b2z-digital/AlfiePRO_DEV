@@ -1,8 +1,9 @@
 // The AlfiePRO Circuit: a club season (a pointscore of race days on your home water, then the Club
 // Championship) and, for those who qualify and hold the licence, a Regional season (three ranking
-// regattas on the Circuit's own waters, then the two-day Regional Championship), a National season
-// (two ranking regattas, then three days of Nationals in heats under HMS) and a World season (a
-// lead-up regatta, then four days of the World Championship in heats under SHRS), against a cast of
+// regattas in your home state, then the two-day State Championship on its main water), a National
+// season (two ranking regattas, then three days of the Australian Championship in heats under HMS)
+// and a World season (the Oceania Championship in New Zealand, then four days of the World
+// Championship in heats under SHRS), on the clubs' real waters (see circuitWaters.ts), against a cast of
 // invented skippers. Heat events are run by AlfiePRO's own heat systems (see heats.ts). A day is several races; you sail at least three and the rest can be simulated
 // from how those went. Every day is scored by AlfiePRO's own
 // results engine (see series.ts), and a podium earns a medal. The season is kept with your
@@ -15,7 +16,8 @@ import type { RaceSettings, SkipperLevel } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
 import { Rng } from '@/sim/math';
 import { VENUES } from '@/sim/venues';
-import { windAt } from '@/sim/venue';
+import { windAt, type Region } from '@/sim/venue';
+import { NATIONAL_POOL, NATIONAL_ROTATION, OCEANIA_WATER, REGION_TITLE, REGION_WATERS, REAL_WATERS, WORLD_ROTATION, regionalPool, waterName } from './circuitWaters';
 import { STANDARD_DROPS, standings, type SeriesRace, type StandingRow } from './series';
 import { WON_COLOURS } from './yacht';
 import { SPREAD, heatOf, heatStandings, heatState, simulateUntil, type HeatLog, type HeatSpec } from './heats';
@@ -198,6 +200,12 @@ export interface Career {
   money?: number; owned?: string[]; sponsor?: Deal; ledger?: Entry[];
   /** Seasons sailed in this tier before this one: each redraws the calendar (see calendarOf). Not given: the first. */
   calendar?: number;
+  /**
+   * Sailed on the clubs' real waters (every season begun since they came; one already under way keeps
+   * the invented waters until it ends), and your home state for the Regional season, worked out from
+   * your club's water when the season began (New South Wales when there was none to go on).
+   */
+  real?: boolean; home?: Region;
   /** Seasons finished: where you came in the pointscore and the Championship. */
   history: { season: number; pointscore: number; championship: number; of: number; tier?: Tier }[];
   at: number;
@@ -223,13 +231,38 @@ const WATER_NAME: Record<string, string> = {
 };
 const BREEZES: CareerEvent['wind'][] = ['medium', 'light', 'fresh'];
 
+/** Where a season on the real waters is: your home state, and whether it is (a season begun before them has neither). */
+export interface Where { real?: boolean; home?: Region }
+
+/** A tier's season on the clubs' real waters, in its nth season there (see calendarOf). */
+function realCalendar(tier: Tier, redraw: number, home: Region): CareerEvent[] {
+  const base = SEASONS[tier];
+  const breeze = (i: number) => (redraw > 0 ? BREEZES[(i + redraw) % BREEZES.length] : base[i].wind);
+  const regatta = (e: CareerEvent, i: number, water: string, name = `${waterName(water)} Regatta`): CareerEvent => ({ ...e, water, name, wind: breeze(i) });
+  if (tier === 'state') {
+    const pool = regionalPool(home), main = REGION_WATERS[home][0];
+    return base.map((e, i) => (e.kind === 'regatta' ? regatta(e, i, pool[(i + 3 * redraw) % pool.length]) : { ...e, water: main, name: REGION_TITLE[home] }));
+  }
+  if (tier === 'national') {
+    const champ = NATIONAL_ROTATION[redraw % NATIONAL_ROTATION.length];
+    const pool = NATIONAL_POOL.filter(w => w !== champ);
+    return base.map((e, i) => (e.kind === 'regatta' ? regatta(e, i, pool[(i + 2 * redraw) % pool.length]) : { ...e, water: champ, name: 'Australian Championship' }));
+  }
+  const worlds = WORLD_ROTATION[redraw % WORLD_ROTATION.length];
+  return base.map((e, i) => (e.kind === 'regatta' ? regatta(e, i, OCEANIA_WATER, 'Oceania Championship') : { ...e, water: worlds, name: 'World Championship' }));
+}
+
 /**
  * A tier's calendar in its nth season there (0: the first). Each new season redraws it: the lead-up
  * regattas move round the Circuit's waters with new breezes, and the club's race days swap theirs,
- * so a second season isn't the first again. The Championship stays where it is, with its title to defend.
+ * so a second season isn't the first again. On the real waters the Regional season is sailed in your
+ * home state and ends with its State Championship on the state's main water; the Australian
+ * Championship and the World Championship move round the main waters a season at a time. On the
+ * invented waters the Championship stays where it is, with its title to defend.
  */
-export function calendarOf(tier: Tier, redraw = 0): CareerEvent[] {
+export function calendarOf(tier: Tier, redraw = 0, where: Where = {}): CareerEvent[] {
   const base = SEASONS[tier];
+  if (where.real && tier !== 'club') return realCalendar(tier, Math.max(0, redraw), where.home ?? 'NSW');
   if (redraw <= 0) return base;
   if (tier === 'club') {
     const days = base.filter(e => e.kind === 'raceday');
@@ -246,16 +279,19 @@ export function calendarOf(tier: Tier, redraw = 0): CareerEvent[] {
     return { ...e, water, name: `${WATER_NAME[water]} ${tier === 'world' ? 'Pre-Worlds' : 'Regatta'}`, wind: BREEZES[(i + redraw) % BREEZES.length] };
   });
 }
-export const seasonOf = (career: Career): CareerEvent[] => calendarOf(tierOf(career), career.calendar ?? 0);
+export const seasonOf = (career: Career): CareerEvent[] => calendarOf(tierOf(career), career.calendar ?? 0, career);
 /** Won this tier's Championship last season, and racing it again: the title to defend. */
 export const defending = (career: Career): boolean => {
   const last = career.history[career.history.length - 1];
   return !!last && (last.tier ?? 'club') === tierOf(career) && last.championship === 1;
 };
 
-export function newCareer(cls: ClassId, now: number): Career {
-  return { cls, season: 1, fleet: draw(1), day: null, done: [], medals: [], history: [], at: now, money: START_MONEY, owned: [], sponsor: deal('club', 1), ledger: [] };
+/** A new career, in the club season: on the real waters, with your home state when your club's water says it. */
+export function newCareer(cls: ClassId, now: number, home?: Region | null): Career {
+  return { cls, season: 1, fleet: draw(1), day: null, done: [], medals: [], history: [], at: now, money: START_MONEY, owned: [], sponsor: deal('club', 1), ledger: [], real: true, ...(home ? { home } : {}) };
 }
+/** A season beginning: on the real waters from now on, with your home state worked out again (kept when there's nothing to go on). */
+const begin = (c: Career, home: Region | null | undefined): Pick<Career, 'real' | 'home'> => ({ real: true, ...(home ?? c.home ? { home: (home ?? c.home)! } : {}) });
 
 export const fleetOf = (career: Career): CastMember[] => career.fleet.map(castOf).filter((m): m is CastMember => !!m);
 /** The event that's next (or under way), and its place in the season. */
@@ -270,7 +306,7 @@ export function eventWind(event: CareerEvent, day: number): { from: number; name
   const def = event.water ? VENUES[event.water] : undefined;
   if (!def) return null;
   const w = windAt(def, event.picks?.[Math.min(day, (event.picks?.length ?? 1) - 1)] ?? 0);
-  return { from: w.from, name: w.name, character: w.character, note: w.note, water: def.name, place: def.place };
+  return { from: w.from, name: w.name, character: w.character, note: w.note, water: REAL_WATERS[def.id] ? waterName(def.id) : def.name, place: def.place };
 }
 
 /** How good a skipper of the cast is, on the heat systems' scale: her level (Club 0 to World 3), and a little of her own. */
@@ -553,7 +589,7 @@ function wonARace(career: Career, event: CareerEvent): boolean {
 }
 
 /** Close a race day that's complete: its result goes in the season, a podium earns a medal and prize money, the sponsor pays for any goal met, and after the Championship a new season begins. */
-export function finishDay(career: Career, me: Me, now: number): { career: Career; result: DayResult; medal: Medal | null; earned: Earned } | null {
+export function finishDay(career: Career, me: Me, now: number, home?: Region | null): { career: Career; result: DayResult; medal: Medal | null; earned: Earned } | null {
   if (!career.day || !dayState(career).complete) return null;
   const rows = dayStandings(career, me);
   const mine = rows.find(r => r.userId === ME);
@@ -586,20 +622,20 @@ export function finishDay(career: Career, me: Me, now: number): { career: Career
     // A finish this good in the Championship is a place in the season above (taken up with the licence: see moveUp).
     const up = tierAbove(tier);
     const ticket: Tier | undefined = up && mine.rank <= QUALIFY[tier] && TIERS.indexOf(up) > TIERS.indexOf(career.ticket ?? tier) ? up : career.ticket;
-    next = { ...next, season: career.season + 1, calendar: (career.calendar ?? 0) + 1, fleet: draw(career.season + 1, tier), done: [], sponsor: deal(tier, career.season + 1), ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
+    next = { ...next, ...begin(career, home), season: career.season + 1, calendar: (career.calendar ?? 0) + 1, fleet: draw(career.season + 1, tier), done: [], sponsor: deal(tier, career.season + 1), ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
   }
   return { career: next, result, medal, earned: { prize, goals: metNow, unlocked } };
 }
 const ordinalWord = (n: number) => (n === 1 ? 'First' : n === 2 ? 'Second' : 'Third');
 
 /** Take up a place in the tier above (between events only): a new season there, against its fleet. */
-export function moveUp(career: Career, now: number): Career {
+export function moveUp(career: Career, now: number, home?: Region | null): Career {
   if (!career.ticket || career.day) return career;
   const tier = career.ticket;
   const { ticket: _used, ...rest } = career;
   void _used;
   const season = career.season + (career.done.length ? 1 : 0);
-  const up: Career = { ...rest, tier, season, calendar: 0, fleet: draw(season, tier), done: [], at: now, sponsor: deal(tier, season) };
+  const up: Career = { ...rest, ...begin(career, home), tier, season, calendar: 0, fleet: draw(season, tier), done: [], at: now, sponsor: deal(tier, season) };
   return GRANT[tier] ? book(up, `Travel grant: the ${TIER_NAME[tier]} season`, GRANT[tier], now) : up;
 }
 

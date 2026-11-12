@@ -86,7 +86,12 @@ META = {
                    'The course is narrow. Across-the-river winds mean short legs and a lot of tacks.'],
         ),
     ),
-}[VID]
+}
+import importlib.util, os
+_spec = importlib.util.spec_from_file_location('real_waters', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'real_waters.py'))
+_mod = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(_mod)
+REAL = _mod.REAL
+META = {**META, **REAL}[VID]
 
 PT = re.compile(r'-?\d+(\.\d+)?,-?\d+(\.\d+)?')
 items, control, landmarks = [], None, None
@@ -169,6 +174,9 @@ L.append(f"  lat: {META['lat']}, lon: {META['lon']},")
 L.append(f"  usualWind: {META['usual'][0]}, usualWindName: {q(META['usual'][1])},")
 L.append(META['control_note'])
 L.append('  control: [' + ', '.join(f'{{ x: {x:.1f}, y: {y:.1f} }}' for x, y in control) + '],')
+if META.get('also_from'):
+    L.append(META['also_note'])
+    L.append('  alsoFrom: [' + ', '.join(f'{{ x: {x:.1f}, y: {y:.1f} }}' for x, y in META['also_from']) + '],')
 L.append('  water: pts(LAKE),')
 L.append(f"  islands: [{', '.join(f'pts(ISLAND{i})' for i in range(len(islands)))}],")
 L.append('  features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),')
@@ -176,7 +184,11 @@ L.append('  landmarks: [' + ', '.join(f'{{ name: {q(n)}, at: {{ x: {num(x)}, y: 
 L.append("  credit: '© OpenStreetMap contributors',")
 if META.get('cut'):
     L.append(f"  cut: {META['cut']},")
-L.append(f"  clubs: [{', '.join(q(c) for c in META['clubs'])}], venueId: {q(META['venue_id'])},")
+if META.get('clubs'):
+    L.append(f"  clubs: [{', '.join(q(c) for c in META['clubs'])}], venueId: {q(META['venue_id'])},")
+if META.get('region'):
+    L.append(f"  // Where it is, for the Circuit's seasons: {META['region_name']}.")
+    L.append(f"  region: '{META['region']}',")
 if META.get('look'):
     h, t, o = META['look']
     L.append('  // The country round the water, for the bank view.')

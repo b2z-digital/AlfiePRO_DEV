@@ -16,13 +16,10 @@ import SimHero from './SimHero';
 import type { Setup } from './SimHome';
 import { fmt } from './stats';
 import { C, Cap, cx, ordinal } from './ui';
+import { waterName } from './circuitWaters';
 import { BEST_OF, KIND_NAME, nameProblem, nextMajor, worldNow, type Appear, type Skipper, type TableRow, type WorldEvent, type WorldResult } from './world';
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
-const WATER: Record<string, string> = {
-  'circuit-lantern-quay': 'Lantern Quay', 'circuit-heron-reach': 'Heron Reach', 'circuit-kestrelwater': 'Kestrelwater', 'circuit-aurel-lake': 'Aurel Lake',
-  'circuit-skerry-sound': 'Skerry Sound', 'circuit-tamarind-lagoon': 'Tamarind Lagoon', 'circuit-port-meridian': 'Port Meridian',
-};
 const COUNTRIES = Object.entries(COUNTRY_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 
 export interface SimWorldProps {
@@ -128,7 +125,7 @@ function AppearForm({ skipper, ownName, club, country, onSave, onCancel, onStop 
 function EventCard({ ev, label, flags, entries, me, onOpen, now }: {
   ev: WorldEvent; label: string; flags: Map<string, Skipper>; entries: ChallengeEntry[] | null; me: string | null; onOpen: () => void; now: number;
 }) {
-  const water = WATER[ev.races[0]?.settings.venue ?? ''] ?? '';
+  const water = (ev.races[0]?.settings.venue ? waterName(ev.races[0].settings.venue) : '');
   const closes = ev.races.reduce((m, r) => Math.max(m, r.closes_at ? Date.parse(r.closes_at) : 0), 0);
   const board = useMemo(() => {
     if (!entries) return null;
@@ -250,7 +247,7 @@ export default function SimWorld(p: SimWorldProps) {
             <section className="sim-card flex flex-col gap-2 p-5" aria-label="The next Major">
               <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.16em]" style={{ color: '#FCD34D' }}>The next Major</p>
               <h3 className="sim-h3">{major.name}</h3>
-              <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Opens {new Date(major.opens).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}: twelve races at {WATER[major.water]}, two a day, against the world's best skippers. No coaching; two drops.</p>
+              <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Opens {new Date(major.opens).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}: twelve races at {waterName(major.water)}, two a day, against the world's best skippers. No coaching; two drops.</p>
               <p className="m-0 text-[13px] font-semibold" style={{ color: regattaThisYear ? '#7EE2A8' : C.mute }}>{regattaThisYear ? `You're in: you have a World Regatta result in ${CLASS_LABEL[p.cls]} this year.` : `Entry: a World Regatta result in ${CLASS_LABEL[p.cls]} in the year before it.`}</p>
             </section>
           )}

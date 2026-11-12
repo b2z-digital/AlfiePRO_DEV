@@ -51,7 +51,7 @@ describe('The cast for the National and World seasons', () => {
 describe('The Nationals, under HMS', () => {
   it('opens with 32 boats seeded into three heats; the heats below yours are sailed first', () => {
     const c = prepareRace(atChampionship('national'), NOW);
-    expect(eventAt(c).event.name).toBe('National Championship');
+    expect(eventAt(c).event.name).toBe('Australian Championship');
     const log = c.day!.heat!;
     expect(log.ids.length).toBe(32);
     expect(new Set(log.ids).size).toBe(32);
@@ -64,7 +64,7 @@ describe('The Nationals, under HMS', () => {
     expect(s.fleetSize).toBe(hn.ids.length);
     expect(s.fleetSize).toBeLessThanOrEqual(16);
     expect(s.cast!.every(x => x.id && hn.ids.includes(x.id))).toBe(true);
-    expect(s).toMatchObject({ venue: 'circuit-tamarind-lagoon', level: 'national' });
+    expect(s).toMatchObject({ venue: 'paradise', level: 'national' });
     const race = new Race(s);
     expect(race.boats.length).toBe(hn.ids.length);
   });
@@ -110,7 +110,7 @@ describe('The Nationals, under HMS', () => {
     // Winning every heat you sail at the Nationals: on the podium, and top five takes you to the Worlds.
     expect(fin.result.rank).toBeLessThanOrEqual(5);
     expect(fin.career.ticket).toBe('world');
-    if (fin.medal?.kind === 'gold') expect(fin.medal).toMatchObject({ trophy: true, event: 'National Championship' });
+    if (fin.medal?.kind === 'gold') expect(fin.medal).toMatchObject({ trophy: true, event: 'Australian Championship' });
     expect(Date.now() - t0).toBeLessThan(20000);
   }, 60000);
 
@@ -125,7 +125,7 @@ describe('The Worlds, under SHRS', () => {
   it('48 boats in four heats of twelve; twelve rounds of qualifying, then finals in four fleets that stay together', () => {
     const c = sailEvent(atChampionship('world'), 2);
     const ev = eventAt(c).event;
-    expect(ev).toMatchObject({ name: 'AlfiePRO World Championship', heat: { system: 'shrs', heats: 4, qualifying: 12 } });
+    expect(ev).toMatchObject({ name: 'World Championship', heat: { system: 'shrs', heats: 4, qualifying: 12 } });
     const hm = replay(ev.heat!, c.day!.heat!);
     expect(hm.rounds.filter(r => r.completed).length).toBe(24);
     const sizes = (r: number) => hm.rounds.find(x => x.round === r)!.heatAssignments.map(a => a.skipperIndices.length);
