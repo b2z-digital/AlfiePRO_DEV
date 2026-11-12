@@ -695,7 +695,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : s.sequenceSeconds % 60 ? `${s.sequenceSeconds} seconds, called` : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
 
-  // The layered home: your level, this week's programme, the licence above you, and what's next.
+  // The layered home: your level, this week's program, the licence above you, and what's next.
   const way: Way = training.way?.mode ?? 'simple';
   const simple = way === 'simple';
   // Said they're new to RC sailing: their level is known (Club), and the learn-to-sail path comes first.
@@ -808,8 +808,9 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                         </section>
                       )}
                       <button type="button" className="sim-cell sim-door" onClick={() => go('train')}>
-                        <span className="flex items-center gap-3"><span className="sim-cell-title">Your programme and the library</span><ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto shrink-0" /></span>
+                        <span className="flex items-center gap-3"><span className="sim-cell-title">Your training</span><ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto shrink-0" /></span>
                         <span className="sim-cell-status">{learn && !learn.done ? `Learning the basics: ${learn.progress.done} of ${learn.progress.of} steps` : `${week.done} of ${week.sessions.length} sessions done this week`}</span>
+                        <span className="sim-cell-note">This week's sessions, picked from how you race, plus starts, rules and tactics to practise any time.</span>
                       </button>
                       <button type="button" className="sim-cell sim-door" onClick={() => go('you')}>
                         <span className="flex items-center gap-3"><span className="sim-cell-title">You and your yacht</span><ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto shrink-0" /></span>
@@ -821,7 +822,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       <DoorCard title="Race" status={`${CLASS_LABEL[s.classId]} · ${s.fleetSize} boats · ${LEVEL_NAME[s.level]} skippers`} onOpen={() => go('race')}
                         lines={[cs ? `The Circuit: ${cs.event.name}${career?.day ? `, race ${Math.min(cs.raced + 1, cs.event.races)} of ${cs.event.races}` : ' is next'}` : 'The Circuit: your club season', 'Practice: your own race, as you set it', live && live.rooms.length ? `${live.rooms.length} live room${live.rooms.length > 1 ? 's' : ''} open now` : mateLine]} />
                       <DoorCard title="Train" status={`${week.done} of ${week.sessions.length} sessions done this week`} onOpen={() => go('train')}
-                        lines={[`${LEVEL_NAME[st.level]} programme: ${SYLLABUS[st.level].aim.toLowerCase()}`, grad ? `${LEVEL_NAME[grad.to]} licence: ${grad.met} of ${grad.reqs.length}` : 'World level: nothing above it', 'The library: tactics, rules, starts, race moments']} />
+                        lines={[`${LEVEL_NAME[st.level]} program: ${SYLLABUS[st.level].aim.toLowerCase()}`, grad ? `${LEVEL_NAME[grad.to]} licence: ${grad.met} of ${grad.reqs.length}` : 'World level: nothing above it', 'The library: tactics, rules, starts, race moments']} />
                       <DoorCard title="You" status={st.placed ? `${LEVEL_NAME[st.level]} skipper · ${st.rating.toLocaleString()}` : `${st.races} of 3 placement races sailed`} onOpen={() => go('you')}
                         lines={[`${yachtFor(yard, s.classId)?.name ?? CLASS_LABEL[s.classId]} · sail ${sailFor(yard, s.classId, me).sail}`, pp?.total.grade ? `Passport: ${GRADE_NAME[pp.total.grade]} overall` : 'Your skill passport and race history', 'Design your yacht']}>
                         <YachtStage still className="block h-full w-full" cls={s.classId} look={lookFor(yard, s.classId)} sail={sailFor(yard, s.classId, me).sail} inset={{ bottom: 4 }} />
@@ -836,7 +837,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <>
               <DoorBack onHome={() => go('home')} />
               <h1 className="sim-home-title">{DOOR_NAME[door]}</h1>
-              <p className="sim-home-sub">{door === 'race' ? 'Your own race as you set it, live rooms with your mates, and club challenges and events.' : door === 'train' ? 'Your programme first: three sessions a week, picked from how you race. Then the library.' : 'Your level, your yacht, and how your racing is going.'}</p>
+              <p className="sim-home-sub">{door === 'race' ? 'Your own race as you set it, live rooms with your mates, and club challenges and events.' : door === 'train' ? 'Three sessions a week, picked from how you race. Then starts, rules, tactics and race moments to practise any time.' : 'Your level, your yacht, and how your racing is going.'}</p>
             </>
           )}
         </div>

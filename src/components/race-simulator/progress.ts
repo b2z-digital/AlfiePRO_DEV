@@ -12,7 +12,7 @@ export interface DrillRecord { best: number | null; stars: number; tries: number
 export interface LessonRecord { answered: boolean; correct: boolean; played: boolean; at: number }
 export interface LabRecord { won: boolean; tries: number; at: number }
 
-/** The two ways of using the Academy: the programmes on their own, or racing as well. */
+/** The two ways of using the Academy: the programs on their own, or racing as well. */
 export type Way = 'simple' | 'full';
 
 export interface TrainingProgress {
@@ -103,7 +103,7 @@ export function chooseWay(mode: Way, newcomer?: boolean): TrainingProgress {
 }
 
 /**
- * Start again: your training, programme, licences, Circuit season and medals cleared, and the
+ * Start again: your training, program, licences, Circuit season and medals cleared, and the
  * question of how you'd like to use the Academy asked again. The time is kept, so anything older
  * that comes back from your account (or another device) is left behind. Your yachts are kept unless
  * you say otherwise.

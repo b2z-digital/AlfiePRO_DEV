@@ -1,6 +1,6 @@
 // The pieces of the layered home screen: the AlfiePRO lockup, the "Next up" card, the three doors
 // (Race, Train, You), the question that's asked once about how you want to use the Academy, this
-// week's programme, the licence to the next level, and your level. They sit as glass panels over
+// week's program, the licence to the next level, and your level. They sit as glass panels over
 // the live render of the fleet, the way Design your yacht sits over its stage.
 import React from 'react';
 import { ArrowRight, Check, ChevronDown, ChevronLeft } from 'lucide-react';
@@ -151,7 +151,7 @@ export function WeekCard({ week, level, onGo, onPlay }: { week: Week; level: Ski
       <div className="flex flex-wrap items-center gap-3">
         <AlfieOrb size={36} />
         <div className="min-w-[200px] flex-1">
-          <Cap>Your {LEVEL_NAME[level]} programme</Cap>
+          <Cap>Your {LEVEL_NAME[level]} program</Cap>
           <h2 id="week-title" className="sim-h3 mt-0.5">{syl.aim}</h2>
           <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{syl.text} {syl.stars === 1 ? 'One star passes a drill at this level.' : `${syl.stars === 2 ? 'Two' : 'Three'} stars pass a drill at this level.`}</p>
         </div>
@@ -260,7 +260,7 @@ export function LearnCard({ path, onGo, bare }: { path: LearnPath; onGo: () => v
         <div className="min-w-[240px] flex-1">
           <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>Learning to sail · stage {path.stage + 1} of {path.stages.length}: {st.title}</p>
           <h2 id="learn-title" className="sim-next-title">{path.next ? path.next.title : 'You can sail'}</h2>
-          <p className="sim-next-text">{path.next ? st.text : 'All four stages done. From here your programme follows how you race, starting at Club level.'}</p>
+          <p className="sim-next-text">{path.next ? st.text : 'All four stages done. From here your program follows how you race, starting at Club level.'}</p>
         </div>
         {path.next && <button type="button" onClick={onGo} className="sim-btn-lg sim-btn-go sim-next-go">{path.next.link ? 'Start' : 'Start your first race'}<ArrowRight size={18} aria-hidden="true" /></button>}
       </div>
@@ -288,7 +288,7 @@ export function StartAgain({ onReset, hasYachts, synced }: { onReset: (keepYacht
       <div>
         <h2 id="again-title" className="sim-h3">Start again</h2>
         <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>
-          Clears your races, level, training and programme, licences, Circuit season and medals{synced ? ', on this device and in your account' : ' on this device'}. You'll be asked again how you'd like to use the Academy. Your set-up (boat, fleet, water) stays as it is.
+          Clears your races, level, training and program, licences, Circuit season and medals{synced ? ', on this device and in your account' : ' on this device'}. You'll be asked again how you'd like to use the Academy. Your set-up (boat, fleet, water) stays as it is.
         </p>
       </div>
       {hasYachts && (
@@ -316,7 +316,7 @@ export function WaySwitch({ way, newcomer, onChoose }: { way: Way; newcomer?: bo
     <section className="flex flex-col gap-3 sim-card p-5" aria-labelledby="wayset-title">
       <div>
         <h2 id="wayset-title" className="sim-h3">How you use the Academy</h2>
-        <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{way === 'simple' ? 'Kept simple: your programme, a practice race and how you\'re going. Ratings and licences are out of sight.' : 'Everything: your rating, the licence to the next level, races with mates and events.'}</p>
+        <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{way === 'simple' ? 'Kept simple: your program, a practice race and how you\'re going. Ratings and licences are out of sight.' : 'Everything: your rating, the licence to the next level, races with mates and events.'}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Btn small primary={!!newcomer} aria-pressed={!!newcomer} onClick={() => onChoose(way, !newcomer)}>{newcomer ? "I'm learning the basics" : "I'm new to RC sailing"}</Btn>
