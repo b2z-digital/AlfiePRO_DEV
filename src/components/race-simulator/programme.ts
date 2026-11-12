@@ -1,4 +1,4 @@
-// Your training programme: a syllabus for the level you sail at, the licence that takes you to the
+// Your training program: a syllabus for the level you sail at, the licence that takes you to the
 // next one, and this week's three sessions. Two of the three work on the part of a race where you
 // give away most against the fleets you race; the third keeps something you've passed from going
 // stale. The bar rises with your level: one star passes a drill at Club, two at Regional, three at

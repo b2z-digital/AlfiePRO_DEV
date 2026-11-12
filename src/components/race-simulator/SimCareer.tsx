@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { Region } from '@/sim/venue';
-import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
+import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
+import { regattaReport } from './report';
+import type { TrainLink } from './stats';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
 import Flag from './Flag';
@@ -14,7 +16,7 @@ import { scoreText, type StandingRow } from './series';
 import { Brand, DoorBack } from './SimDoors';
 import SimHero from './SimHero';
 import type { Setup } from './SimHome';
-import { C, Cap, Chip, cx, ordinal } from './ui';
+import { AlfieOrb, C, Cap, Chip, cx, ordinal } from './ui';
 
 const SEASON_CLASSES: ClassId[] = ['IOM', 'DF95', 'DF65', '10R', 'M'];
 /** What the season above holds, in a line. */
@@ -128,9 +130,38 @@ function Sheet({ rows, me, races, sailed, heats }: { rows: StandingRow[]; me: Me
   );
 }
 
-interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null; earned: Earned }
+interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null; earned: Earned; report: Report }
+
+/** What you and your rival remember: your record, and the last time you met. */
+function RivalMemory({ name, record, season }: { name: string; record: HeadToHead; season: number }) {
+  const n = name.split(' ')[0], m = record.w + record.l;
+  const line = record.w === record.l ? `Level at ${record.w}–${record.l}` : record.w > record.l ? `You lead ${record.w}–${record.l}` : `${n} leads ${record.l}–${record.w}`;
+  const last = record.last;
+  return (
+    <div className="mt-1.5 flex flex-col gap-1 border-t border-white/[0.07] pt-2.5 text-[13.5px] leading-snug">
+      <span><b className="font-semibold">{line}</b> <span style={{ color: C.mute }}>over {m} meeting{m === 1 ? '' : 's'}.</span></span>
+      {last && <span style={{ color: C.mute }}>Last time, at {last.event}{last.season !== season ? ` (season ${last.season})` : ''}: you {ordinal(last.me)}, {n} {ordinal(last.them)}.</span>}
+    </div>
+  );
+}
+
+/** Alfie's report on an event: what happened, in a few short paragraphs, and what to work on. */
+function ReportBody({ report, onLink, compact }: { report: Report; onLink?: (l: TrainLink) => void; compact?: boolean }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {(compact ? report.paras.slice(0, 2) : report.paras).map(p => <p key={p} className="m-0 text-[14.5px] leading-relaxed" style={{ color: '#D7E1F0' }}>{p}</p>)}
+      {report.work && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] px-4 py-3">
+          <span className="min-w-0 flex-1 text-[13.5px] leading-snug"><b className="font-semibold">To work on.</b> <span style={{ color: C.mute }}>{report.work.text}</span></span>
+          {onLink && <button type="button" className="sim-chip-btn" onClick={() => onLink(report.work!.link)}>Practise it<ArrowRight size={15} aria-hidden="true" /></button>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** The end of a race day: on a podium, the medal comes down on its ribbon; either way, where you came. */
+// The report's practice link is on the Circuit screen behind the podium, so here it only reads.
 function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === 'Enter') onDone(); };
@@ -163,6 +194,10 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
         <ol className="sim-podium-top">
           {end.rows.slice(0, 3).map(r => <li key={r.userId}><b className="tabular-nums">{r.rank}</b><Who id={r.userId} me={me} name={r.name} sail={r.sail} /><span className="ml-auto tabular-nums">{r.net}</span></li>)}
         </ol>
+        <section className="sim-podium-report" aria-label="Alfie's report">
+          <p className="m-0 mb-2 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: C.blueSoft }}><AlfieOrb size={18} />Alfie's report</p>
+          <ReportBody report={end.report} />
+        </section>
         <button type="button" className="sim-btn-lg sim-btn-go" autoFocus onClick={onDone}>On to {end.nextName}<ArrowRight size={18} aria-hidden="true" /></button>
       </div>
     </div>
@@ -230,12 +265,14 @@ function Budget({ career, classLabel, onBuy }: { career: Career; classLabel: (c:
   );
 }
 
-export default function SimCareer({ career, me, home, setup, classLabel, licence, onLicence, onChange, onSail, onBack }: {
+export default function SimCareer({ career, me, home, setup, classLabel, licence, onLicence, onLink, onChange, onSail, onBack }: {
   career: Career | null; me: Me; setup: Setup; classLabel: (c: ClassId) => string;
   /** Your home state, from your club's water: where a new Regional season is sailed (null: nothing to go on). */
   home?: Region | null;
   /** The licence that takes a Club skipper up to the Regional season, and the way to work on one of its requirements. */
   licence: LevelLicence | null; onLicence: (go: Requirement['go']) => void;
+  /** Open a practice (from Alfie's report). */
+  onLink?: (l: TrainLink) => void;
   onChange: (c: Career) => void;
   /** Sail the next race of the day. */
   onSail: () => void;
@@ -250,6 +287,7 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
   const hn = useMemo(() => (career ? heatNow(career) : null), [career]);
   const standing = useMemo(() => (career ? seasonStandings(career, me) : []), [career, me]);
   const rv = useMemo(() => (career ? rival(career, me) : null), [career, me]);
+  const [showReport, setShowReport] = useState(false);
   // The window on the water: the fleet racing where the next event is.
   const heroSetup = useMemo((): Setup => {
     if (!career || !st) return setup;
@@ -268,8 +306,9 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
     const event = seasonOf(c)[fin.result.event];
     const newSeason = fin.career.season !== c.season;
     const season = seasonOf(fin.career);
-    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, earned: fin.earned, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name });
-    onChange(fin.career);
+    const report = regattaReport(full, fin.career, rows, fin.result, fin.medal);
+    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, earned: fin.earned, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name, report });
+    onChange(keepReport(fin.career, report));
   };
 
   const season = career ? seasonOf(career) : [], tier = career ? tierOf(career) : 'club';
@@ -379,6 +418,15 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                     <Cap>Your rival</Cap>
                     <h2 id="rv-title" className="sim-h3 flex items-center gap-2.5"><span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-white/30" style={{ background: rv.skipper.hull }} />{rv.skipper.name}</h2>
                     <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{rv.gap === 0 ? 'Level with you' : `${rv.gap} point${rv.gap === 1 ? '' : 's'} ${rv.ahead ? 'ahead of' : 'behind'} you`} in the {tier === 'club' ? 'pointscore' : 'ranking'}. {countryName(alpha2(rv.skipper.country)) || rv.skipper.country}, sail {rv.skipper.sail}.</p>
+                    {rv.record && (rv.record.w + rv.record.l) > 0 && <RivalMemory name={rv.skipper.name} record={rv.record} season={career.season} />}
+                  </section>
+                )}
+                {career.reports?.[0] && (
+                  <section className="sim-card flex flex-col gap-2.5 p-5" aria-labelledby="rep-title">
+                    <p className="m-0 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: C.blueSoft }}><AlfieOrb size={18} />Alfie's report</p>
+                    <h2 id="rep-title" className="sim-h3">{career.reports[0].headline}</h2>
+                    <ReportBody report={career.reports[0]} onLink={onLink} compact={!showReport} />
+                    {career.reports[0].paras.length > 2 && <button type="button" className="sim-link self-start text-[13.5px]" onClick={() => setShowReport(v => !v)}>{showReport ? 'Less' : 'Read it all'}</button>}
                   </section>
                 )}
                 <Budget career={career} classLabel={classLabel} onBuy={id => onChange(buy(career, id, Date.now()))} />

@@ -19,6 +19,8 @@ import { VENUES } from '@/sim/venues';
 import { windAt, type Region } from '@/sim/venue';
 import { NATIONAL_POOL, NATIONAL_ROTATION, OCEANIA_WATER, REGION_TITLE, REGION_WATERS, REAL_WATERS, WORLD_ROTATION, regionalPool, waterName } from './circuitWaters';
 import { STANDARD_DROPS, standings, type SeriesRace, type StandingRow } from './series';
+import type { Cause } from './ledger';
+import type { TrainLink } from './stats';
 import { WON_COLOURS } from './yacht';
 import { SPREAD, heatOf, heatStandings, heatState, simulateUntil, type HeatLog, type HeatSpec } from './heats';
 
@@ -180,8 +182,26 @@ export const ME = 'me';
 
 export interface RowResult { id: string; place: number | null; code: 'DNF' | 'OCS' | 'DSQ' | null }
 export interface DayRace { no: number; sailed: boolean; rows: RowResult[] }
-/** A race day under way: the event it's for and the races sailed or simulated so far (a heat event keeps its heats instead). */
-export interface CareerDay { event: number; races: DayRace[]; startedAt: number; heat?: HeatLog }
+/**
+ * One race of the day as you sailed it, for Alfie's report: where you came, your start, and the
+ * lengths you gave away by cause (from the race's ledger, when it has one).
+ */
+export interface RaceNote {
+  place: number | null; of: number; status: 'finished' | 'dsq' | 'ocs' | 'dnf' | 'racing';
+  late: number | null; ocs: boolean; penalties: number;
+  parts?: { cause: Cause; lengths: number }[]; speedUp?: number; tacks?: number;
+}
+/** A race day under way: the event it's for and the races sailed or simulated so far (a heat event keeps its heats instead), and notes on the races you sailed. */
+export interface CareerDay { event: number; races: DayRace[]; startedAt: number; heat?: HeatLog; notes?: RaceNote[] }
+/** You against one of the cast, over every event you've both finished: days you finished ahead and behind, and the last time. */
+export interface HeadToHead { w: number; l: number; last?: { event: string; season: number; me: number; them: number } }
+/** Alfie's report on an event, written when it ends. */
+export interface Report {
+  season: number; tier: Tier; event: string; at: number; rank: number; of: number;
+  headline: string; paras: string[];
+  /** What to work on, and the practice for it. */
+  work?: { cause: Cause; text: string; link: TrainLink };
+}
 /** A race day finished: everyone in the order they finished it. */
 export interface DayResult { event: number; order: string[]; rank: number; net: number; at: number }
 
@@ -206,6 +226,12 @@ export interface Career {
    * your club's water when the season began (New South Wales when there was none to go on).
    */
   real?: boolean; home?: Region;
+  /** Every meeting with each of the cast (by id), across seasons and tiers: who finished ahead. */
+  h2h?: Record<string, HeadToHead>;
+  /** Your rival, once there's history to choose one: kept until someone else is clearly closer. */
+  rivalId?: string;
+  /** Alfie's reports on your events, newest first (the last dozen). */
+  reports?: Report[];
   /** Seasons finished: where you came in the pointscore and the Championship. */
   history: { season: number; pointscore: number; championship: number; of: number; tier?: Tier }[];
   at: number;
@@ -601,6 +627,9 @@ export function finishDay(career: Career, me: Me, now: number, home?: Region | n
     : null;
   // Money: the prize, then the sponsor's goals met at this event.
   let next: Career = { ...career, day: null, done: [...career.done, result], medals: medal ? [...career.medals, medal] : career.medals, at: now };
+  // Who finished ahead of whom, remembered for every meeting; and your rival from it.
+  next = { ...next, h2h: meet(career.h2h, result.order, event.name, career.season) };
+  next = { ...next, rivalId: pickRival(next, me) ?? career.rivalId };
   const prize = mine.rank <= 3 ? event.prize?.[mine.rank - 1] ?? 0 : 0;
   if (prize) next = book(next, `${ordinalWord(mine.rank)}, ${event.name}`, prize, now);
   const d = dealOf(career), sp = SPONSORS[d.tier];
@@ -639,15 +668,70 @@ export function moveUp(career: Career, now: number, home?: Region | null): Caree
   return GRANT[tier] ? book(up, `Travel grant: the ${TIER_NAME[tier]} season`, GRANT[tier], now) : up;
 }
 
-/** Your rival: the skipper next to you in the pointscore (the one above, or below when you lead). Null before a race day is done. */
-export function rival(career: Career, me: Me): { skipper: CastMember; ahead: boolean; gap: number } | null {
+/** You against each of the cast after an event: one more meeting with everyone in its order. */
+export function meet(h2h: Record<string, HeadToHead> | undefined, order: string[], event: string, season: number): Record<string, HeadToHead> {
+  const out = { ...(h2h ?? {}) };
+  const mine = order.indexOf(ME);
+  if (mine < 0) return out;
+  order.forEach((id, k) => {
+    if (id === ME) return;
+    const was = out[id] ?? { w: 0, l: 0 };
+    out[id] = { w: was.w + (mine < k ? 1 : 0), l: was.l + (mine < k ? 0 : 1), last: { event, season, me: mine + 1, them: k + 1 } };
+  });
+  return out;
+}
+
+/**
+ * Your rival in this season's fleet: the one you've met most often with the closest record, with a
+ * little weight to whoever is next to you in the standings. The one you have stays until someone else
+ * is clearly closer, so a rivalry carries over from event to event and season to season. Null with no
+ * history yet.
+ */
+export function pickRival(career: Career, me: Me): string | null {
+  const h = career.h2h ?? {};
   const rows = seasonStandings(career, me);
   const i = rows.findIndex(r => r.userId === ME);
+  const next = new Set(i >= 0 ? [rows[i - 1]?.userId, rows[i + 1]?.userId].filter(Boolean) as string[] : []);
+  const score = (id: string): number => {
+    const r = h[id];
+    if (!r) return -1;
+    const m = r.w + r.l;
+    return (1 - Math.abs(r.w - r.l) / m) * Math.min(m, 10) + (next.has(id) ? 1.5 : 0);
+  };
+  let best: string | null = null;
+  for (const id of career.fleet) if (h[id] && (best === null || score(id) > score(best))) best = id;
+  const kept = career.rivalId && career.fleet.includes(career.rivalId) ? career.rivalId : null;
+  if (kept && best && score(kept) >= score(best) - 1.5) return kept;
+  return best;
+}
+
+/**
+ * Your rival: the one you've built a rivalry with (see pickRival), or before there's any history the
+ * skipper next to you in the pointscore; where they stand against you, and your record together.
+ */
+export function rival(career: Career, me: Me): { skipper: CastMember; ahead: boolean; gap: number; record: HeadToHead | null } | null {
+  const rows = seasonStandings(career, me);
+  const i = rows.findIndex(r => r.userId === ME);
+  const kept = career.rivalId && career.fleet.includes(career.rivalId) ? career.rivalId : null;
+  if (kept) {
+    const skipper = castOf(kept);
+    const j = rows.findIndex(r => r.userId === kept);
+    if (skipper) return { skipper, ahead: i >= 0 && j >= 0 ? j < i : false, gap: i >= 0 && j >= 0 ? Math.abs(rows[j].net - rows[i].net) : 0, record: career.h2h?.[kept] ?? null };
+  }
   if (i < 0 || rows.length < 2) return null;
   const other = rows[i === 0 ? 1 : i - 1];
   const skipper = castOf(other.userId);
-  return skipper ? { skipper, ahead: i !== 0, gap: Math.abs(other.net - rows[i].net) } : null;
+  return skipper ? { skipper, ahead: i !== 0, gap: Math.abs(other.net - rows[i].net), record: career.h2h?.[other.userId] ?? null } : null;
 }
+
+/** A note on a race of today you've just sailed (from its summary), for Alfie's report. */
+export function noteRace(career: Career, note: RaceNote): Career {
+  if (!career.day) return career;
+  return { ...career, day: { ...career.day, notes: [...(career.day.notes ?? []), note] } };
+}
+
+/** Keep Alfie's report on an event (the last dozen). */
+export const keepReport = (career: Career, report: Report): Career => ({ ...career, reports: [report, ...(career.reports ?? [])].slice(0, 12) });
 
 export const medalCount = (medals: Medal[]): Record<MedalKind, number> => ({ gold: medals.filter(m => m.kind === 'gold').length, silver: medals.filter(m => m.kind === 'silver').length, bronze: medals.filter(m => m.kind === 'bronze').length });
 
