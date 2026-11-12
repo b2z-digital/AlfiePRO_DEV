@@ -24,6 +24,8 @@ import { SYLLABUS, levelLicence, weekPlan } from './programme';
 import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
 import { Brand, DOOR_NAME, DoorBack, DoorCard, LevelCard, LicenceCard, NextUpCard, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
 import { CAUSE_WORDS } from './ledger';
+import { dayState, type Career } from './career';
+import { MedalShelf } from './SimCareer';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
 import { todaysCases } from './judge';
@@ -443,7 +445,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onPlay, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onPlay, career = null, onCareer, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -454,6 +456,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onWay?: (w: Way) => void;
   /** Open a play in the Playbook. */
   onPlay?: (id: string) => void;
+  /** Your season on the Circuit (null: not begun), and the way to its screen. */
+  career?: Career | null; onCareer?: () => void;
   /** The boats you've designed (Design your yacht). */
   yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -609,11 +613,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const grad = useMemo(() => levelLicence(st.level, profile, training), [st.level, profile, training]);
   const newcomer = offerFirstSail(profile, training);
   // (In the simple way of using it, licences and challenges stay out of sight.)
-  const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], now: Date.now() }),
-    [profile, training, st, week, simple, grad, next, challenges]);
+  const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], career: simple || !onCareer ? undefined : career, now: Date.now() }),
+    [profile, training, st, week, simple, grad, next, challenges, career, onCareer]);
+  const cs = career ? dayState(career) : null;
   const go = (d: Door) => { onDoor?.(d); window.scrollTo({ top: 0 }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0 }); };
   const upView: { kicker: string; title: string; text: string; button: string; onGo: () => void } =
-    up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. About ${minutes(s)} minutes each, in the boat and fleet below.`, button: 'Start race', onGo: () => onStart('race', s) }
+    up.kind === 'career-day' ? { kicker: `Next up · your race day is under way`, title: `${up.event}: race ${up.race} of ${up.of}`, text: up.canSimulate ? 'Sail the next race, or simulate the rest of the day from the ones you\'ve sailed.' : 'Sail at least three races; after that the rest of the day can be simulated.', button: 'Open the race day', onGo: () => onCareer?.() }
+      : up.kind === 'career-next' ? { kicker: up.started ? `Next up · the Circuit, season ${up.season}` : 'Next up · the AlfiePRO Circuit', title: up.started ? up.event : 'Start your club season', text: up.started ? 'Your next race day: six races against your club mates, scored by AlfiePRO. Sail at least three.' : 'Six race days against nine club mates with names, numbers and form of their own, then the Club Championship. A podium earns a medal.', button: up.started ? 'Open the race day' : 'See the season', onGo: () => onCareer?.() }
+      : up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. About ${minutes(s)} minutes each, in the boat and fleet below.`, button: 'Start race', onGo: () => onStart('race', s) }
       : up.kind === 'rehearse' && next ? { kicker: `Next up · your club races ${rehearseWords(up.race, next.at).when.toLowerCase()}`, title: rehearseWords(up.race, next.at).title, text: `${rehearseWords(up.race, next.at).wind} Sail it now, so the shifts and the laylines aren't new on the day.`, button: rehearseWords(up.race, next.at).button, onGo: next.onRehearse }
         : up.kind === 'licence' ? { kicker: `Next up · one step from your ${LEVEL_NAME[up.to]} licence`, title: `${up.req.label}: ${up.req.need}`, text: `You have: ${up.req.have.toLowerCase()}. It's the last thing between you and your ${LEVEL_NAME[up.to]} licence.`, button: up.req.go === 'race' ? 'Start race' : 'Work on it', onGo: () => { const g = up.req.go; if (g === 'race') onStart('race', s); else onOpen(g); } }
           : up.kind === 'challenge' ? { kicker: `Next up · closes in ${up.hours < 24 ? `${up.hours} hour${up.hours === 1 ? '' : 's'}` : 'a day or so'}`, title: up.challenge.title, text: `Your club's challenge: the same race for everyone, with a leaderboard. ${challengeLine(up.challenge)}`, button: 'Open the challenge', onGo: () => onChallenge?.(up.challenge) }
@@ -635,7 +642,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     ...(lastRace ? [`Your last race: ${lastRace.place ? `${ordinal(lastRace.place)} of ${lastRace.of}` : 'not finished'}.`] : []),
   ];
   const openCh = (challenges ?? []).filter(c => isOpen(c) && !c.event_id).length, openEv = (events ?? []).filter(e => eventState(e).open.length).length;
-  const mateLine = openCh || openEv ? [openCh ? `${openCh} challenge${openCh > 1 ? 's' : ''}` : '', openEv ? `${openEv} event${openEv > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ') + ' open' : 'Challenges and events: the same race for everyone';
+  const mateLine = openCh || openEv ? [openCh ? `${openCh} challenge${openCh > 1 ? 's' : ''}` : '', openEv ? `${openEv} event${openEv > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ') + ' open' : 'With mates: live rooms, challenges and events';
 
   return (
     <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
@@ -682,7 +689,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 ) : (
                   <div className="sim-doors">
                     <DoorCard title="Race" status={`${CLASS_LABEL[s.classId]} · ${s.fleetSize} boats · ${LEVEL_NAME[s.level]} skippers`} onOpen={() => go('race')}
-                      lines={['Practice: your own race, as you set it', live && live.rooms.length ? `${live.rooms.length} live room${live.rooms.length > 1 ? 's' : ''} open now` : 'Live: race your mates, each on your own screen', mateLine]} />
+                      lines={[cs ? `The Circuit: ${cs.event.name}${career?.day ? `, race ${Math.min(cs.raced + 1, cs.event.races)} of ${cs.event.races}` : ' is next'}` : 'The Circuit: your club season', 'Practice: your own race, as you set it', live && live.rooms.length ? `${live.rooms.length} live room${live.rooms.length > 1 ? 's' : ''} open now` : mateLine]} />
                     <DoorCard title="Train" status={`${week.done} of ${week.sessions.length} sessions done this week`} onOpen={() => go('train')}
                       lines={[`${LEVEL_NAME[st.level]} programme: ${SYLLABUS[st.level].aim.toLowerCase()}`, grad ? `${LEVEL_NAME[grad.to]} licence: ${grad.met} of ${grad.reqs.length}` : 'World level: nothing above it', 'The library: tactics, rules, starts, race moments']} />
                     <DoorCard title="You" status={st.placed ? `${LEVEL_NAME[st.level]} skipper · ${st.rating.toLocaleString()}` : `${st.races} of 3 placement races sailed`} onOpen={() => go('you')}
@@ -706,6 +713,16 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
         {door === 'race' && (
           <>
+            {onCareer && (
+              <section className="sim-glass flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:p-6" aria-labelledby="circuit-title">
+                <div className="min-w-[240px] flex-1">
+                  <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>The AlfiePRO Circuit{career ? ` · season ${career.season}` : ''}</p>
+                  <h2 id="circuit-title" className="m-0 mt-1 font-display text-[24px] font-bold leading-tight tracking-tight">{cs ? `${cs.event.name}${career?.day ? `: race ${Math.min(cs.raced + 1, cs.event.races)} of ${cs.event.races}` : ''}` : 'Your club season'}</h2>
+                  <p className="m-0 mt-1.5 text-[14px] leading-snug" style={{ color: C.mute }}>{career ? `${career.done.length} of 7 events sailed this season. ${career.medals.length ? `${career.medals.length} medal${career.medals.length > 1 ? 's' : ''} so far.` : 'A podium earns a medal.'}` : 'Six race days against nine club mates, then the Club Championship. Scored by AlfiePRO; a podium earns a medal.'}</p>
+                </div>
+                <button type="button" className="sim-btn-lg sim-btn-go" onClick={onCareer}>{career?.day ? 'Carry on' : career ? 'Open the race day' : 'See the season'}</button>
+              </section>
+            )}
             {next && <RehearseCard {...next} race={next.race} />}
         {/* ── Race set-up ── */}
         <section className="sim-set-card" aria-labelledby="qr-title">
@@ -908,6 +925,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </div>
             <div className="flex min-w-0 flex-col gap-5">
               <YachtCard yard={yard} cls={s.classId} me={me} onDesign={() => onOpen('yacht')} />
+              {career && (!simple || career.medals.length > 0) && (
+                <section className="flex flex-col gap-3 sim-card p-5" aria-labelledby="medals-title">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h2 id="medals-title" className="sim-h3 min-w-0 flex-1">Medals and titles</h2>
+                    {onCareer && <Btn small onClick={onCareer}>The Circuit</Btn>}
+                  </div>
+                  <MedalShelf medals={career.medals} />
+                </section>
+              )}
               {onWay && <WaySwitch way={way} onChoose={onWay} />}
               {transmitter && <TransmitterCard {...transmitter} />}
             </div>

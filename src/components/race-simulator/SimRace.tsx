@@ -86,6 +86,8 @@ export interface SimRaceProps {
   live?: LiveRace;
   /** The live race's room code, shown in the top bar. */
   liveCode?: string;
+  /** What this race is called at the top (a race of a race day on the Circuit); not given: "Quick race". */
+  raceTitle?: string;
   /** The starting signal: a first try at an event race starts here. */
   onGun?: () => void;
   /** The one thing this race is for: shown and said as it opens. */
@@ -126,7 +128,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, onGun, focus = null }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, raceTitle, onGun, focus = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -353,10 +355,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         const s = starts.find(x => x.boat === b.id);
         return { b, late: s ? s.late : null };
       }).sort((a, z) => (a.late ?? 999) - (z.late ?? 999));
-      return rows.map((r, i) => ({ id: r.b.id, place: i + 1, sail: r.b.sail, name: r.b.isPlayer ? 'You' : r.b.persona?.name ?? '', color: r.b.color, isPlayer: r.b.isPlayer, time: r.late === null ? (r.b.ocs ? 'OCS' : 'not started') : `+${r.late.toFixed(1)} s` }));
+      return rows.map((r, i) => ({ id: r.b.id, place: i + 1, sail: r.b.sail, name: r.b.isPlayer ? 'You' : settings?.cast ? r.b.name : r.b.persona?.name ?? '', color: r.b.color, isPlayer: r.b.isPlayer, time: r.late === null ? (r.b.ocs ? 'OCS' : 'not started') : `+${r.late.toFixed(1)} s` }));
     }
     return race.results().map(r => ({
-      id: r.boat.id, place: r.place, sail: r.boat.sail, name: r.boat.isPlayer ? 'You' : r.boat.persona?.name ?? '', color: r.boat.color, isPlayer: r.boat.isPlayer,
+      id: r.boat.id, place: r.place, sail: r.boat.sail, name: r.boat.isPlayer ? 'You' : settings?.cast ? r.boat.name : r.boat.persona?.name ?? '', color: r.boat.color, isPlayer: r.boat.isPlayer,
       time: r.status === 'finished' ? clock(r.time ?? 0) : r.status === 'racing' ? 'racing' : r.status.toUpperCase(),
     }));
   }, [race, mode]);
@@ -436,7 +438,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     const status = p.ocs && !p.started && race.t >= race.gunT ? 'Recall' : p.penalty.owed > 0 ? 'Penalty' : null;
     const fleet: FleetRow[] = race.boats.map((b, i) => ({
       id: b.id, sail: b.sail, color: b.color, isPlayer: b.isPlayer,
-      name: b.isPlayer ? 'You' : scene ? b.name : b.human ? (race.skippers[i] ? `${b.name} · AI skipper` : b.name) : b.persona?.name ?? '',
+      name: b.isPlayer ? 'You' : scene ? b.name : b.human ? (race.skippers[i] ? `${b.name} · AI skipper` : b.name) : settings?.cast ? b.name : b.persona?.name ?? '',
       intent: b.isPlayer || (b.human && !race.skippers[i]) ? (pre ? (b.isPlayer ? 'Your start' : 'Racing') : b.finished ? 'Finished' : legLabel(race, b.legIndex)) : b.disabled ? 'Out of control' : race.skippers[i]?.intent ?? '',
       place: race.livePlace(b),
       flag: b.ocs && !b.started && race.t >= race.gunT ? 'OCS' : b.penalty.owed > 0 ? 'P' : b.finished ? '✓' : null,
@@ -859,7 +861,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
     : race.venue
       ? `${race.venue.def.short} · ${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText} from the ${compassName(race.course.rot)}, ${s.windCharacter}`
       : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText}, ${s.windCharacter}`;
-  const title = scene ? scene.spec.title : live ? 'Live race' : mode === 'start' ? 'Start practice' : 'Quick race';
+  const title = scene ? scene.spec.title : live ? 'Live race' : mode === 'start' ? 'Start practice' : raceTitle ?? 'Quick race';
   const p = race.player;
   const otherSail = moment ? (() => { const id = moment.offender === p?.id ? moment.victim : moment.offender; return id ? race.boatById(id).sail : null; })() : null;
   const showCoach = (coach !== 'off' || !!scene?.watch) && !coachHidden && !moment && !results && !sceneOut && !intro;

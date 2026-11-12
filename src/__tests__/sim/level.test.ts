@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FLEET_RATING, LEVEL_NAME, START_RATING, cleanSailing, expected, levelOf, standing } from '@/components/race-simulator/rating';
 import { SYLLABUS, levelLicence, weekPlan, weekStart, weakest } from '@/components/race-simulator/programme';
 import { nextUp } from '@/components/race-simulator/nextup';
+import { newCareer, recordRace } from '@/components/race-simulator/career';
 import { mergeTraining } from '@/components/race-simulator/progress';
 import { DRILLS, FIRST, LAB, MODULES } from '@/sim/training';
 import { CAUSES, type Cause, type Ledger } from '@/components/race-simulator/ledger';
@@ -157,6 +158,23 @@ describe('Next up', () => {
     // Rules and clean sailing met, the stars not: one requirement short.
     const lessons = Object.fromEntries(MODULES.slice(0, 2).flatMap(m => m.situations.map(s => [`${m.id}/${s.id}`, { answered: true, correct: true, played: false, at: 1 }])));
     expect(nextUp(args(three, { ...sailor, lessons }))).toMatchObject({ kind: 'licence', to: 'state', req: { id: 'starts' } });
+  });
+
+  it('the Circuit: a race day under way comes first; the next one is offered once you have trained this week', () => {
+    const fresh = newCareer('IOM', NOW);
+    // Out of sight in the simple way of using it (no career passed).
+    expect(nextUp(args(three, sailor)).kind).toBe('session');
+    // Not trained yet this week: the session first.
+    expect(nextUp(args(three, sailor, { career: null })).kind).toBe('session');
+    const first = weekPlan(three, sailor, NOW, { level: 'club' }).sessions[0];
+    const trained: TrainingProgress = first.link.kind === 'drill'
+      ? { ...sailor, drills: { [first.link.id]: { best: 1, stars: 1, tries: 1, at: NOW - 3600000 } } }
+      : { ...sailor, lab: { ...sailor.lab, [first.link.id]: { won: true, tries: 1, at: NOW - 3600000 } } };
+    expect(nextUp(args(three, trained, { career: null }))).toEqual({ kind: 'career-next', event: 'Pointscore 1', season: 1, started: false });
+    expect(nextUp(args(three, trained, { career: fresh }))).toMatchObject({ kind: 'career-next', started: true });
+    const row = [{ id: 'me', place: 1, code: null }, ...fresh.fleet.map((id, k) => ({ id, place: k + 2, code: null }))];
+    const under = recordRace(fresh, row, NOW);
+    expect(nextUp(args(three, sailor, { career: under, next: day }))).toEqual({ kind: 'career-day', event: 'Pointscore 1', race: 2, of: 6, canSimulate: false });
   });
 
   it("with the week's sessions done, a race", () => {
