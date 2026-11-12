@@ -30,7 +30,7 @@ function heroRace(s: Setup, seed: number): Race {
 }
 
 /** `fill`: fill the box it's put in (a backdrop), instead of being a box of its own. */
-export default function SimHero({ setup, children, className, fill }: { setup: Setup; children?: React.ReactNode; className?: string; fill?: boolean }) {
+export default function SimHero({ setup, children, className, fill, foot = 0 }: { setup: Setup; children?: React.ReactNode; className?: string; fill?: boolean; /** How much of its height is covered at the foot (0 to 1), by panels laid over it: the fleet is framed above them. */ foot?: number }) {
   const canvas = useRef<HTMLCanvasElement | null>(null);
   // (A club's own water arrives from the database a moment after the page opens: the window is rebuilt when it does.)
   const key = `${setup.venue}|${VENUES[setup.venue] ? 1 : 0}|${setup.windDir === 'usual' ? setup.windPick ?? 0 : 0}|${(setup.spots?.[setup.venue] ?? []).join(',')}|${setup.classId}|${setup.fleetSize}|${setup.level}|${setup.windStrength}|${setup.windCharacter}|${setup.seaState}`;
@@ -39,6 +39,8 @@ export default function SimHero({ setup, children, className, fill }: { setup: S
   // (As a backdrop the words take more of the left, so the fleet is kept further right.)
   const fillRef = useRef(!!fill);
   fillRef.current = !!fill;
+  const footRef = useRef(foot);
+  footRef.current = foot;
 
   useEffect(() => {
     const cv = canvas.current;
@@ -82,7 +84,8 @@ export default function SimHero({ setup, children, className, fill }: { setup: S
       followCam(cam, r, { x: target.x - (vy / d) * off, y: target.y + (vx / d) * off }, dt, 1.5, false, r.t < r.gunT + 4);
       // A wide, low window: look out level, with the far shore and some sky across the top of it.
       const F = (size.w / 2) / Math.tan((cam.fov / 2) * (Math.PI / 180));
-      cam.pitch = Math.atan((0.27 * size.h) / F) * (180 / Math.PI);
+      // (With panels over its foot, it looks down a little more, which lifts the fleet clear of them.)
+      cam.pitch = Math.atan(((0.27 + Math.min(0.16, Math.max(0, footRef.current - 0.3) * 0.5)) * size.h) / F) * (180 / Math.PI);
       drawBank(ctx, r, { w: size.w, h: size.h, dpr: size.dpr, cam, next: null, showZones: false, preStart: r.t < r.gunT, flashes: [], back: 0, detail, credit: false });
     };
 
