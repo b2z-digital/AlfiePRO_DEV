@@ -5,6 +5,7 @@ import type { ChallengeEntry } from './challenges';
 import type { EventRace, SimEvent as VirtualEvent } from './events';
 import { breezeText, eventEntries, eventLine, eventState, eventStatusText, seriesRaces, whenText } from './events';
 import { Score, dropsText, raceResults, scoreText, standings } from './series';
+import Flag from './Flag';
 import { fmt } from './stats';
 import { AlfieOrb, Btn, C, Chip, compassName, cx, ordinal, Page } from './ui';
 
@@ -21,6 +22,8 @@ export interface SimEventProps {
   /** Where the results come from (the database, unless a test says otherwise). */
   load?: (ev: VirtualEvent) => Promise<ChallengeEntry[] | null>;
   now?: number;
+  /** A skipper's flag (the world's events): their country code, by user id. */
+  countryOf?: (userId: string) => string | null;
 }
 
 const card = 'sim-card';
@@ -36,7 +39,7 @@ function cellTone(s: Score | null): string {
   return '';
 }
 
-export default function SimEvent({ event: ev, me, admin = false, onSail, onBack, onDelete, load = eventEntries, now: nowProp }: SimEventProps) {
+export default function SimEvent({ event: ev, me, admin = false, onSail, onBack, onDelete, load = eventEntries, now: nowProp, countryOf }: SimEventProps) {
   const [entries, setEntries] = useState<ChallengeEntry[] | null | 'loading'>('loading');
   const [shown, setShown] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -143,7 +146,7 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
                     {res.map(({ entry: e, place }) => (
                       <div key={e.userId} className={cx('grid grid-cols-[34px_minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-white/[0.055] py-2 first:border-t-0', e.userId === me && 'bg-[rgba(42,147,255,0.06)]')}>
                         <span className="font-display text-[14px] font-bold tabular-nums">{place ?? '–'}</span>
-                        <span className="min-w-0 truncate text-[14px]">{e.name}{e.userId === me ? ' (you)' : ''}{e.sail ? <span style={{ color: C.mute }}> · {e.sail}</span> : null}</span>
+                        <span className="min-w-0 truncate text-[14px]">{countryOf?.(e.userId) && <><Flag code={countryOf(e.userId)} size={16} />{' '}</>}{e.name}{e.userId === me ? ' (you)' : ''}{e.sail ? <span style={{ color: C.mute }}> · {e.sail}</span> : null}</span>
                         <span className="font-display text-[14px] tabular-nums">{e.status === 'finished' && e.elapsed != null ? fmt(e.elapsed) : e.status === 'started' ? (open ? 'Racing' : 'DNF') : e.status.toUpperCase()}</span>
                         {(closed || e.userId === me) && e.status === 'finished'
                           ? <Btn small quiet onClick={() => onSail(r, { practice: !open || firstTry, ghost: all.find(x => x.challenge_id === r.id && x.user_id === e.userId) ?? null })}>Race ghost</Btn>
@@ -187,7 +190,7 @@ export default function SimEvent({ event: ev, me, admin = false, onSail, onBack,
                           <span className="flex items-baseline gap-2.5">
                             <span className="w-5 shrink-0 font-display font-bold tabular-nums">{row.rank}</span>
                             <span className="min-w-0">
-                              <span className="block truncate font-semibold">{row.name}{mine ? ' (you)' : ''}</span>
+                              <span className="block truncate font-semibold">{countryOf?.(row.userId) && <><Flag code={countryOf(row.userId)} size={16} />{' '}</>}{row.name}{mine ? ' (you)' : ''}</span>
                               {row.sail && <span className="block text-[12px]" style={{ color: C.mute }}>Sail {row.sail}</span>}
                             </span>
                           </span>

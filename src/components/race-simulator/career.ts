@@ -196,6 +196,8 @@ export interface Career {
   medals: Medal[];
   /** Game money (it can go below nothing: an entry you couldn't cover is paid from your next winnings), what you've bought or won, this season's sponsor, and the latest comings and goings. */
   money?: number; owned?: string[]; sponsor?: Deal; ledger?: Entry[];
+  /** Seasons sailed in this tier before this one: each redraws the calendar (see calendarOf). Not given: the first. */
+  calendar?: number;
   /** Seasons finished: where you came in the pointscore and the Championship. */
   history: { season: number; pointscore: number; championship: number; of: number; tier?: Tier }[];
   at: number;
@@ -208,7 +210,48 @@ function draw(season: number, tier: Tier = 'club'): string[] {
   return POOL[tier].flatMap(shuffle).slice(0, entriesOf(tier) - 1);
 }
 export const tierOf = (career: Career): Tier => career.tier ?? 'club';
-export const seasonOf = (career: Career): CareerEvent[] => SEASONS[tierOf(career)];
+/** Where each tier's lead-up regattas can be sailed. A new season in the same tier moves them round these. */
+const LEAD_WATERS: Record<Tier, string[]> = {
+  club: [],
+  state: ['circuit-lantern-quay', 'circuit-heron-reach', 'circuit-kestrelwater', 'circuit-skerry-sound'],
+  national: ['circuit-skerry-sound', 'circuit-aurel-lake', 'circuit-kestrelwater', 'circuit-heron-reach'],
+  world: ['circuit-port-meridian', 'circuit-tamarind-lagoon', 'circuit-skerry-sound'],
+};
+const WATER_NAME: Record<string, string> = {
+  'circuit-lantern-quay': 'Lantern Quay', 'circuit-heron-reach': 'Heron Reach', 'circuit-kestrelwater': 'Kestrelwater', 'circuit-aurel-lake': 'Aurel Lake',
+  'circuit-skerry-sound': 'Skerry Sound', 'circuit-tamarind-lagoon': 'Tamarind Lagoon', 'circuit-port-meridian': 'Port Meridian',
+};
+const BREEZES: CareerEvent['wind'][] = ['medium', 'light', 'fresh'];
+
+/**
+ * A tier's calendar in its nth season there (0: the first). Each new season redraws it: the lead-up
+ * regattas move round the Circuit's waters with new breezes, and the club's race days swap theirs,
+ * so a second season isn't the first again. The Championship stays where it is, with its title to defend.
+ */
+export function calendarOf(tier: Tier, redraw = 0): CareerEvent[] {
+  const base = SEASONS[tier];
+  if (redraw <= 0) return base;
+  if (tier === 'club') {
+    const days = base.filter(e => e.kind === 'raceday');
+    return base.map((e, i) => {
+      if (e.kind !== 'raceday') return e;
+      const from = days[(i + redraw) % days.length];
+      return { ...e, wind: from.wind, character: from.character };
+    });
+  }
+  const pool = LEAD_WATERS[tier];
+  return base.map((e, i) => {
+    if (e.kind !== 'regatta') return e;
+    const water = pool[(i + redraw) % pool.length];
+    return { ...e, water, name: `${WATER_NAME[water]} ${tier === 'world' ? 'Pre-Worlds' : 'Regatta'}`, wind: BREEZES[(i + redraw) % BREEZES.length] };
+  });
+}
+export const seasonOf = (career: Career): CareerEvent[] => calendarOf(tierOf(career), career.calendar ?? 0);
+/** Won this tier's Championship last season, and racing it again: the title to defend. */
+export const defending = (career: Career): boolean => {
+  const last = career.history[career.history.length - 1];
+  return !!last && (last.tier ?? 'club') === tierOf(career) && last.championship === 1;
+};
 
 export function newCareer(cls: ClassId, now: number): Career {
   return { cls, season: 1, fleet: draw(1), day: null, done: [], medals: [], history: [], at: now, money: START_MONEY, owned: [], sponsor: deal('club', 1), ledger: [] };
@@ -528,7 +571,7 @@ export function finishDay(career: Career, me: Me, now: number): { career: Career
     // A finish this good in the Championship is a place in the season above (taken up with the licence: see moveUp).
     const up = tierAbove(tier);
     const ticket: Tier | undefined = up && mine.rank <= QUALIFY[tier] && TIERS.indexOf(up) > TIERS.indexOf(career.ticket ?? tier) ? up : career.ticket;
-    next = { ...next, season: career.season + 1, fleet: draw(career.season + 1, tier), done: [], sponsor: deal(tier, career.season + 1), ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
+    next = { ...next, season: career.season + 1, calendar: (career.calendar ?? 0) + 1, fleet: draw(career.season + 1, tier), done: [], sponsor: deal(tier, career.season + 1), ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
   }
   return { career: next, result, medal, earned: { prize, goals: metNow, unlocked } };
 }
@@ -541,7 +584,7 @@ export function moveUp(career: Career, now: number): Career {
   const { ticket: _used, ...rest } = career;
   void _used;
   const season = career.season + (career.done.length ? 1 : 0);
-  const up: Career = { ...rest, tier, season, fleet: draw(season, tier), done: [], at: now, sponsor: deal(tier, season) };
+  const up: Career = { ...rest, tier, season, calendar: 0, fleet: draw(season, tier), done: [], at: now, sponsor: deal(tier, season) };
   return GRANT[tier] ? book(up, `Travel grant: the ${TIER_NAME[tier]} season`, GRANT[tier], now) : up;
 }
 

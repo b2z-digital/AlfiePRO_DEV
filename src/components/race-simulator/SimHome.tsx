@@ -447,7 +447,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, world = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -464,6 +464,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   career?: Career | null; onCareer?: () => void;
   /** The scoring bench (club admins and race officers). */
   onBench?: () => void;
+  /** The world (the daily race, the World Regatta, the Majors and the tables), once it has races. */
+  world?: { line: string; onOpen: () => void } | null;
   /** The boats you've designed (Design your yacht). */
   yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -771,6 +773,16 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <p className="m-0 mt-1.5 text-[14px] leading-snug" style={{ color: C.mute }}>{career ? `${career.done.length} of ${seasonOf(career).length} events sailed this season. ${career.medals.length ? `${career.medals.length} medal${career.medals.length > 1 ? 's' : ''} so far.` : 'A podium earns a medal.'}` : 'Six race days against nine club mates, then the Club Championship. Scored by AlfiePRO; a podium earns a medal.'}</p>
                 </div>
                 <button type="button" className="sim-btn-lg sim-btn-go" onClick={onCareer}>{career?.day ? 'Carry on' : career ? 'Open the race day' : 'See the season'}</button>
+              </section>
+            )}
+            {world && (
+              <section className="sim-glass flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:p-6" aria-labelledby="world-title">
+                <div className="min-w-[240px] flex-1">
+                  <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>Every {CLASS_LABEL[s.classId]} skipper in the world</p>
+                  <h2 id="world-title" className="m-0 mt-1 font-display text-[24px] font-bold leading-tight tracking-tight">The world</h2>
+                  <p className="m-0 mt-1.5 text-[14px] leading-snug" style={{ color: C.mute }}>{world.line} The same races for everyone, sailed in your own time, with world points and tables.</p>
+                </div>
+                <button type="button" className="sim-btn-lg sim-btn-go" onClick={world.onOpen}>Open the world</button>
               </section>
             )}
             {next && <RehearseCard {...next} race={next.race} />}
