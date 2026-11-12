@@ -64,6 +64,8 @@ interface RaceSimulatorPageProps {
   /** The signed-in member, to sail under their own name and sail number and keep progress in their
    *  account; `admin` when they can set challenges for their club, `superAdmin` for every club. */
   account?: (Account & { admin?: boolean; superAdmin?: boolean }) | null;
+  /** Leave the Sailing Academy (it fills the window, with no menu: this is the way out). */
+  onExit?: () => void;
 }
 
 // v2: the new defaults (sails on your stick, choppy water, the bank view). Old v1 settings are
@@ -169,7 +171,7 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
   return n ? { spec: n, label: `Next: ${n.title}` } : null;
 }
 
-export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimulatorPageProps) {
+export default function RaceSimulatorPage({ darkMode, account = null, onExit }: RaceSimulatorPageProps) {
   void darkMode; // the simulator is always on the water: one dark look
   const [where, setWhere] = useState<Where>('home');
   // Which of the Academy's doors is open (it's kept while you're off in a race or a drill).
@@ -993,7 +995,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setEvFrom('home'); setWhere('event'); }} onCreateEvent={setEvent}

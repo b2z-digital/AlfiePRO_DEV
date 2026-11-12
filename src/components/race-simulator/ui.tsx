@@ -45,14 +45,14 @@ export function Btn({ primary, quiet, small, icon, className, children, type = '
     <button
       type={type}
       className={cx(
-        'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl border text-[13.5px] font-semibold text-[#F1F4FA] transition-colors disabled:cursor-not-allowed disabled:opacity-45',
+        'inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full border text-[13.5px] font-semibold text-[#F1F4FA] transition-[background,border-color,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45',
         small ? 'h-9 px-3' : 'h-10 px-3.5',
         icon && (small ? 'w-9 px-0' : 'w-10 px-0'),
         primary
-          ? 'border-transparent bg-gradient-to-b from-[#2A8BFF] to-[#0A6FD6] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_6px_18px_rgba(10,132,255,0.3)] hover:from-[#3A95FF] hover:to-[#1679E0]'
+          ? 'border-[rgba(150,200,255,0.5)] bg-[radial-gradient(130%_150%_at_50%_-30%,#6CB8FF_0%,#2286FF_42%,#0B5FD3_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_10px_24px_-8px_rgba(24,120,255,0.75)] hover:border-[rgba(185,220,255,0.7)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_14px_30px_-8px_rgba(24,120,255,0.85)]'
           : quiet
             ? 'border-transparent bg-transparent text-[#A9D2FF] hover:bg-white/[0.06]'
-            : 'border-white/10 bg-white/[0.05] hover:bg-white/[0.09]',
+            : 'border-white/[0.14] bg-gradient-to-b from-white/[0.1] to-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] hover:border-white/25 hover:from-white/[0.16] hover:to-white/[0.06]',
         className,
       )}
       {...rest}
