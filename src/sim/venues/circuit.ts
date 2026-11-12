@@ -140,5 +140,55 @@ export const AUREL_LAKE = build({
   },
 });
 
-/** The Circuit's waters built so far. */
-export const CIRCUIT_WATERS: VenueDef[] = [LANTERN_QUAY, HERON_REACH, KESTRELWATER, AUREL_LAKE];
+
+export const SKERRY_SOUND = build({
+  id: 'circuit-skerry-sound', name: 'Skerry Sound', short: 'Skerry Sound', place: 'A sound between low islands',
+  a: 280, b: 150, square: 2.8, wander: 0.04, stand: 0.2, seed: 4505,
+  woods: [[290, 320]], buildings: [30, 330, 205],
+  landmarks: [['The Skerries', 20], ['Pilot house', 300]],
+  look: { hills: 0.25, trees: 0.2, houses: 0.3 },
+  traits: {
+    about: 'Open, cold water between low islands, with a breeze that comes in hard off the sea. A test of boat handling as much as tactics.',
+    winds: [
+      { from: 320, name: 'North-westerly off the sea', character: 'steady', note: 'Strong and even. Chop builds across the sound: keep her powered up through it.', pays: 'out' },
+      { from: 30, name: 'North-easterly round the skerries', character: 'oscillating', note: 'It bends round the islands: big, regular shifts.', pays: 'bank' },
+    ],
+    notes: ['A fresh day here is a B-rig day for an IOM.', 'The chop is worst on the far side.'],
+  },
+});
+
+export const TAMARIND_LAGOON = build({
+  id: 'circuit-tamarind-lagoon', name: 'Tamarind Lagoon', short: 'Tamarind Lagoon', place: 'A warm lagoon behind the reef',
+  a: 320, b: 170, square: 2.5, wander: 0.03, stand: -0.15, seed: 4606,
+  woods: [[250, 300], [40, 80], [110, 140]], buildings: [320, 335, 350, 5],
+  landmarks: [['The reef pass', 0], ['Palm Point', 270]],
+  look: { hills: 0.2, trees: 0.9, houses: 0.35 },
+  traits: {
+    about: 'A wide, warm lagoon with a trade wind that blows all day. The home of the National Championship.',
+    winds: [
+      { from: 60, name: 'Trade wind over the reef', character: 'steady', note: 'Builds through the day and holds. Clear air decides it.', pays: 'out' },
+      { from: 300, name: 'Afternoon sea breeze', character: 'oscillating', note: 'Comes in across the palms in steady swings.', pays: 'bank' },
+    ],
+    notes: ['The breeze is a knot or two stronger out by the reef.', 'Flat water inside the reef: speed upwind is everything.'],
+  },
+});
+
+export const PORT_MERIDIAN = build({
+  id: 'circuit-port-meridian', name: 'Port Meridian', short: 'Port Meridian', place: 'The great harbour',
+  a: 350, b: 200, square: 3.4, wander: 0.025, stand: 0, seed: 4707,
+  woods: [[255, 285]], buildings: [300, 315, 330, 345, 0, 15, 30, 45, 60, 75, 90, 110],
+  landmarks: [['Meridian Light', 10], ['The harbour wall', 80], ['Old Town quay', 300]],
+  look: { hills: 0.6, trees: 0.4, houses: 1 },
+  traits: {
+    about: 'A great harbour ringed by the city. The home of the AlfiePRO World Championship.',
+    winds: [
+      { from: 330, name: 'Northerly down the harbour', character: 'oscillating', note: 'Shifts off the city, every minute or so. The best read them a shift ahead.', pays: 'out' },
+      { from: 40, name: 'Sea breeze through the heads', character: 'steady', note: 'Fills in by midday, clean and strong.', pays: 'out' },
+      { from: 290, name: 'Westerly over the old town', character: 'puffy', note: 'Gusty off the rooftops, with holes near the quay.', pays: 'bank' },
+    ],
+    notes: ['A long course: tack less, and only on the big shifts.', 'The harbour wall throws the breeze back near the eastern end.'],
+  },
+});
+
+/** The Circuit's waters. */
+export const CIRCUIT_WATERS: VenueDef[] = [LANTERN_QUAY, HERON_REACH, KESTRELWATER, AUREL_LAKE, SKERRY_SOUND, TAMARIND_LAGOON, PORT_MERIDIAN];

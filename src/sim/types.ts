@@ -33,7 +33,7 @@ export interface RaceSettings {
   tune?: number;
   /** A career event: the computer's skippers by name, in boat order after yours. Each carries her own
    *  number and hull colour, and sails at her own level (not given: the fleet's). */
-  cast?: { name: string; sail: string; hull?: string; level?: SkipperLevel }[];
+  cast?: { id?: string; name: string; sail: string; hull?: string; level?: SkipperLevel }[];
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length

@@ -10,7 +10,7 @@ const base: RaceSettings = { classId: 'IOM', fleetSize: 16, level: 'state', wind
 
 describe('The Circuit', () => {
   it("has its own waters, apart from the clubs' real ones", () => {
-    expect(CIRCUIT_WATERS.length).toBe(4);
+    expect(CIRCUIT_WATERS.length).toBe(7);
     for (const w of CIRCUIT_WATERS) {
       expect(VENUES[w.id]).toBe(w);
       expect(BUILT_IN.includes(w)).toBe(false);
