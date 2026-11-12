@@ -5,6 +5,7 @@ import { CAUSES, CAUSE_WORDS, type Cause } from './ledger';
 import { PLAYS, type PlayLink } from './playbook';
 import type { Profile } from './profile';
 import type { TrainingProgress } from './progress';
+import { FIRST } from '@/sim/training/first';
 
 export interface PlanItem {
   link: PlayLink;
@@ -65,4 +66,22 @@ export function todaysPlan(profile: Profile, training: TrainingProgress, now: nu
     });
   }
   return out;
+}
+
+/**
+ * Is this someone to offer "learn to sail" to? Not once they've shown they can sail: three races
+ * sailed, or one finished in the top half of the fleet, or three Start Trainer stars, or a Rules
+ * Academy situation sailed, or a Scenario Lab scenario won. Not once they've done First sail's
+ * five steps, and not once they've said they don't want it.
+ */
+export function offerFirstSail(profile: Profile, training: TrainingProgress): boolean {
+  if (training.dismissed?.['first-sail']) return false;
+  if (FIRST.every(m => training.lab[m.id]?.won)) return false;
+  if (profile.races.length >= 3) return false;
+  if (profile.races.some(r => r.status === 'finished' && r.place != null && r.place <= Math.ceil(r.of / 2))) return false;
+  if (Object.values(training.drills).reduce((n, d) => n + (d.stars ?? 0), 0) >= 3) return false;
+  if (Object.values(training.lessons).some(l => l.played)) return false;
+  const first = new Set(FIRST.map(m => m.id));
+  if (Object.entries(training.lab).some(([id, r]) => r.won && !first.has(id))) return false;
+  return true;
 }

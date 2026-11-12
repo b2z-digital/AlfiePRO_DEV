@@ -127,7 +127,8 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
   classId: ClassId;
   /** Signed in: the yachts are saved to the account as well as this device. */
   signedIn: boolean;
-  onChange: (yard: Yard) => void; onBack: () => void;
+  /** Back to the home screen: with the class of the yacht in hand, when she's a saved one. */
+  onChange: (yard: Yard) => void; onBack: (cls?: ClassId) => void;
   /** Done: race this class. */
   onRace: (cls: ClassId) => void;
 }) {
@@ -198,6 +199,13 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
     set(auto ? { cls: id, name: newYacht({ ...yard, yachts: yard.yachts.filter(y => y.id !== yacht.id) }, id).name } : { cls: id });
   };
   const race = () => { onChange(raceYacht(putYacht(yard, yacht), yacht.id)); onRace(yacht.cls); };
+  // Leaving with one of your yachts on the stage makes her the one you sail: she is what the home
+  // screen shows and what your next race is sailed in. (A new one you never touched changes nothing.)
+  const back = () => {
+    if (!saved) { onBack(); return; }
+    if (yard.racing[saved.cls] !== saved.id) onChange(raceYacht(yard, saved.id));
+    onBack(saved.cls);
+  };
 
   const panel = (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pb-5 pt-4">
@@ -332,7 +340,7 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
 
       {/* Top bar */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-3 px-4 pt-4 sm:px-6">
-        <div className="pointer-events-auto"><Btn small onClick={onBack} aria-label="Back to the Sailing Academy">← Sailing Academy</Btn></div>
+        <div className="pointer-events-auto"><Btn small onClick={back} aria-label="Back to the Sailing Academy">← Sailing Academy</Btn></div>
         <h1 className={cx('m-0 min-w-0 font-display font-extrabold leading-none tracking-tight text-white [text-shadow:0_2px_18px_rgba(0,0,0,0.55)]', wide ? 'text-[30px]' : 'sr-only')}>Design your yacht</h1>
         <div className="pointer-events-auto ml-auto flex items-center gap-2">
           <Btn small onClick={() => change({ ...yacht, ...surprise(), country: yacht.country })}>Surprise me</Btn>
