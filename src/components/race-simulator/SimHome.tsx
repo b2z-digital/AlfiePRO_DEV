@@ -530,7 +530,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -541,6 +541,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onWay?: (w: Way, newcomer?: boolean) => void;
   /** Start again: everything cleared (the yachts kept, or not). */
   onReset?: (keepYachts: boolean) => void;
+  /** Open your year in sailing. */
+  onYear?: () => void;
   /** Comfort settings, Alfie's help at your level now, and the way to change them. */
   comfort?: Comfort; helpNow?: CoachMode; onComfort?: (c: Omit<Comfort, 'at'>) => void;
   /** Open a play in the Playbook. */
@@ -1089,6 +1091,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     {onCareer && <Btn small onClick={onCareer}>The Circuit</Btn>}
                   </div>
                   <MedalShelf medals={career.medals} />
+                </section>
+              )}
+              {onYear && (
+                <section className="sim-card flex flex-wrap items-center gap-4 p-5" aria-labelledby="year-title">
+                  <div className="min-w-[220px] flex-1">
+                    <h2 id="year-title" className="sim-h3">Your {new Date().getFullYear()} in sailing</h2>
+                    <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>The year so far: your races, your rating through the year, where the lengths went then and lately, and your medals.</p>
+                  </div>
+                  <Btn onClick={onYear}>See your year</Btn>
                 </section>
               )}
               {comfort && onComfort && <ComfortCard comfort={comfort} helpNow={helpNow} onChange={onComfort} />}
