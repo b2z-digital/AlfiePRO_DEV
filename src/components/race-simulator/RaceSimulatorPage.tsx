@@ -47,6 +47,8 @@ import { currentId, ensureVenue, loadWaters, type Water } from './waters';
 import { regionOf, waterName } from './circuitWaters';
 import SimYear from './SimYear';
 import { fromSummary, loadAllRaces, yearSummary, type YearRace } from './year';
+import SimBroadcast from './SimBroadcast';
+import { deleteTape, loadTapes, saveTape, tapeOf, tapeSub, type Tape } from './broadcast';
 import { DEFAULT_COMFORT, PACE_RATE, TEXT_ZOOM, helpFor } from './comfort';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
@@ -209,6 +211,9 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   // Your year in sailing: every race in your account (or this device's last thirty), and the year shown.
   const [allRaces, setAllRaces] = useState<{ races: YearRace[]; source: 'account' | 'device' } | null>(null);
   const [yearShown, setYearShown] = useState(() => new Date().getFullYear());
+  // Broadcasts: the races kept as tapes on this device, and the one playing.
+  const [tapes, setTapes] = useState<Tape[]>(() => loadTapes());
+  const [broadcast, setBroadcast] = useState<Tape | null>(null);
   const [worldClub, setWorldClub] = useState<string | null>(null);
   const [worldFlags, setWorldFlags] = useState<Map<string, Skipper>>(new Map());
   const [evFrom, setEvFrom] = useState<'home' | 'world'>('home');
@@ -618,6 +623,8 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     return [...ys].sort((a, b) => b - a);
   }, [allRaces]);
   const nameOfWater = useCallback((id: string) => waters.find(w => w.def.id === id)?.def.name ?? waterName(id), [waters]);
+  const nameOfWaterRef = useRef(nameOfWater);
+  nameOfWaterRef.current = nameOfWater;
   const homeRegion = useMemo(() => regionOf(venueForClub(clubId) ?? waters.find(w => w.published && w.clubId === clubId)?.def), [clubId, waters]);
   const careerMe = useCallback((c: Career | null) => ({ name: me?.short ?? 'You', sail: sailFor(yardNow.current, c?.cls ?? setup.classId, me).sail }), [me, setup.classId]);
   /** Sail the next race of your race day on the Circuit (with the day done, back to its screen). */
@@ -710,6 +717,11 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     if (run?.career && !run.resume) {
       recordCareer(race);
       careerNote = careerNoteRef.current;
+      // A podium on the Circuit is kept as a tape, to watch again as a broadcast (a Championship's, as a title race).
+      if (sum.mode === 'race' && sum.status === 'finished' && sum.place !== null && sum.place <= 3 && run.title) {
+        const event = run.title.split(' · ')[0];
+        setTapes(saveTape(tapeOf(race, { title: run.title, sub: tapeSub(race.settings, nameOfWaterRef.current, sum.at), kind: /Championship/.test(event) ? 'title' : 'podium', event, at: sum.at })));
+      }
       // A note on how you sailed it, for Alfie's report at the end of the event (once a race).
       const c = loadTraining().career;
       if (c?.day && notedRef.current !== run.key) {
@@ -856,6 +868,15 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     return () => { document.body.style.overflow = prev; };
   }, [where]);
 
+  if (broadcast) {
+    return createPortal(
+      <SimBroadcast tape={broadcast} kept={tapes.some(t => t.at === broadcast.at)}
+        onKeep={() => setTapes(saveTape(broadcast))}
+        onClose={() => setBroadcast(null)} />,
+      document.body,
+    );
+  }
+
   if (where === 'race' && run) {
     const scene = run.scene;
     return createPortal(
@@ -896,7 +917,8 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   if (where === 'debrief' && debrief) {
     return (
       <div key={where} className="sim-zoomable h-full overflow-y-auto">
-        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onTakeOver={debrief.race.live ? undefined : takeOver}
+        <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments}
+          onBroadcast={() => setBroadcast(tapes.find(t => t.at === debrief.sum.at) ?? tapeOf(debrief.race, { title: debrief.career?.title ?? (debrief.event && debrief.challenge ? `${debrief.event.title} · Race ${(debrief.challenge as EventRace).race_no}` : debrief.sum.title), sub: tapeSub(debrief.race.settings, nameOfWater, debrief.sum.at), kind: 'kept', at: debrief.sum.at }))} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onTakeOver={debrief.race.live ? undefined : takeOver}
           challenge={debrief.event && debrief.challenge
             ? {
               title: `${debrief.event.title} · Race ${(debrief.challenge as EventRace).race_no}`, note: chNote, event: true,
@@ -986,7 +1008,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} home={homeRegion} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
           licence={training.career?.ticket ? levelLicence(TIERS[TIERS.indexOf(training.career.ticket) - 1] as SkipperLevel, profile, training) : null} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
-          onLink={openLink} onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
+          onLink={openLink} tapes={tapes} onWatchTape={setBroadcast} onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
     );
@@ -1055,7 +1077,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onYear={openYear} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onYear={openYear} tapes={tapes} onWatchTape={setBroadcast} onDeleteTape={id => setTapes(deleteTape(id))} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setEvFrom('home'); setWhere('event'); }} onCreateEvent={setEvent}

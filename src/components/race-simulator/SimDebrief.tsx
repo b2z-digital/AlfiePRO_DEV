@@ -303,7 +303,9 @@ function ReplayMap({ race, moments, onTakeOver, onLink }: { race: Race; moments:
   );
 }
 
-export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onPlay, onTakeOver, challenge = null, onWriteUp }: {
+export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink, onPlay, onTakeOver, challenge = null, onWriteUp, onBroadcast }: {
+  /** Watch the race again under AlfiePRO's broadcast graphics. */
+  onBroadcast?: () => void;
   /** Open the Playbook at a play. */
   onPlay?: (playId: string) => void;
   race: Race; sum: RaceSummary; moments: Moment[]; onHome: () => void; onAgain: () => void; onLink?: (l: TrainLink) => void;
@@ -322,7 +324,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
 
   return (
     <Page onBack={onHome} title={sum.mode === 'start' ? 'Start report' : 'Race debrief'} text={`${sum.title} · ${sum.cls} · ${levelName(sum.level)} skippers · ${sum.wind}`}
-      side={<Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? challenge.againLabel ?? 'Sail it again' : 'Race again'}</Btn>}>
+      side={<div className="flex flex-wrap gap-2.5">{onBroadcast && sum.mode === 'race' && <Btn onClick={onBroadcast}>Watch it as a broadcast</Btn>}<Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? challenge.againLabel ?? 'Sail it again' : 'Race again'}</Btn></div>}>
 
         {challenge && (
           <section className="flex flex-wrap items-center gap-3 rounded-[20px] border border-[rgba(77,163,255,0.3)] bg-[rgba(42,147,255,0.08)] px-5 py-4">

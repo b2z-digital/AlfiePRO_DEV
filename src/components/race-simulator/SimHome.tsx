@@ -25,6 +25,7 @@ import { learnPath } from './learn';
 import { SYLLABUS, levelLicence, weekPlan } from './programme';
 import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
 import { HELP_WORDS, type Comfort } from './comfort';
+import type { Tape } from './broadcast';
 import { Brand, ComfortCard, DOOR_NAME, DoorBack, DoorCard, LearnCard, LevelCard, LicenceCard, NextUpCard, StartAgain, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
 import { CAUSE_WORDS } from './ledger';
 import { dayState, seasonOf, type Career } from './career';
@@ -530,7 +531,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, tapes = [], onWatchTape, onDeleteTape, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -543,6 +544,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onReset?: (keepYachts: boolean) => void;
   /** Open your year in sailing. */
   onYear?: () => void;
+  /** Your broadcasts: races kept as tapes on this device, to watch again under the broadcast graphics. */
+  tapes?: Tape[]; onWatchTape?: (t: Tape) => void; onDeleteTape?: (id: string) => void;
   /** Comfort settings, Alfie's help at your level now, and the way to change them. */
   comfort?: Comfort; helpNow?: CoachMode; onComfort?: (c: Omit<Comfort, 'at'>) => void;
   /** Open a play in the Playbook. */
@@ -1100,6 +1103,26 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>The year so far: your races, your rating through the year, where the lengths went then and lately, and your medals.</p>
                   </div>
                   <Btn onClick={onYear}>See your year</Btn>
+                </section>
+              )}
+              {onWatchTape && (
+                <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="tapes-title">
+                  <div>
+                    <h2 id="tapes-title" className="sim-h3">Your broadcasts</h2>
+                    <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>{tapes.length ? 'Your podiums on the Circuit, and races you kept: watch them again under the broadcast graphics, in full or as highlights you can save as a video.' : 'Finish on the podium on the Circuit and the race is kept here, to watch again as a broadcast. Any race can be watched that way from its debrief.'}</p>
+                  </div>
+                  {tapes.length > 0 && (
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                      {tapes.map(tp => (
+                        <li key={tp.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5">
+                          <span className={cx('shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider', tp.kind === 'title' ? 'bg-[rgba(242,194,48,0.18)] text-[#F2C230]' : 'bg-white/[0.08] text-[#C9D6EA]')}>{tp.kind === 'title' ? 'Title race' : tp.kind === 'podium' ? 'Podium' : 'Kept'}</span>
+                          <span className="min-w-0 flex-1"><b className="block truncate text-[14px] font-semibold">{tp.title}</b><span className="block truncate text-[12.5px]" style={{ color: C.mute }}>{tp.sub}{tp.place ? ` · ${ordinal(tp.place)} of ${tp.of}` : ''}</span></span>
+                          <button type="button" className="sim-chip-btn" onClick={() => onWatchTape(tp)}>Watch</button>
+                          {onDeleteTape && <button type="button" className="sim-link text-[13px]" onClick={() => onDeleteTape(tp.id)} aria-label={`Remove ${tp.title}`}>Remove</button>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               )}
               {comfort && onComfort && <ComfortCard comfort={comfort} helpNow={helpNow} onChange={onComfort} />}
