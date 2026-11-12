@@ -46,6 +46,14 @@ export interface RaceSettings {
   noPlayer?: boolean;
   /** Start line bias in degrees (+ = the pin end set upwind, so favoured); random within ±3.5° when not set. */
   lineBias?: number;
+  /**
+   * A course set by a race officer (on the practice pond): the windward mark's compass bearing from
+   * the line's centre (the course axis, which needn't be the wind's), the beat and half the line in
+   * hull lengths. The line's angle comes from lineBias, against this axis.
+   */
+  roCourse?: { axis: number; beat: number; half: number };
+  /** Skippers who mean to cross the line this many seconds early (by sail number), for a race officer to call. */
+  eager?: Record<string, number>;
   /** Scripted shifts: at race time t (s) the wind turns `deg` degrees (+ = clockwise) over `over` seconds. */
   windShifts?: { t: number; deg: number; over: number }[];
   /** A perfectly steady breeze with no puffs (rules lessons). */

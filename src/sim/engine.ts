@@ -141,10 +141,13 @@ export class Race implements AiHost {
     // At a venue the race frame turns with the wind (the course axis stays 0) and the real
     // direction is kept as course.rot; on the practice pond windFrom is the axis itself.
     const def = settings.venue ? VENUES[settings.venue] : undefined;
-    const axis = def ? 0 : settings.windFrom ?? 0;
+    const windDir = def ? 0 : settings.windFrom ?? 0;
+    // A race officer's course is laid on their own axis; otherwise straight into the wind.
+    const ro = !def ? settings.roCourse : undefined;
+    const axis = ro ? ro.axis : windDir;
     const rb = this.rng.range(-3.5, 3.5);
     const bias = settings.lineBias ?? rb;
-    const courseOf = (length: RaceSettings['length']) => buildCourse(axis, cls.loa, { laps: settings.laps, length, fleetSize: settings.fleetSize, lineBias: bias });
+    const courseOf = (length: RaceSettings['length']) => buildCourse(axis, cls.loa, { laps: settings.laps, length, fleetSize: settings.fleetSize, lineBias: bias, ...(ro ? { beat: ro.beat, half: ro.half } : {}) });
     let c = courseOf(settings.length);
     let sideBias = 0;
     if (def) {
@@ -169,11 +172,11 @@ export class Race implements AiHost {
     this.course = c;
     const mid = (c.bounds.alongMin + c.bounds.alongMax) / 2;
     this.wind = new WindField(
-      { strength: settings.windStrength, character: settings.windCharacter, direction: axis, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts, sideBias },
+      { strength: settings.windStrength, character: settings.windCharacter, direction: windDir, knots: settings.windKnots, flat: settings.flatWind, shifts: settings.windShifts, sideBias },
       settings.seed,
       { cx: c.origin.x + c.up.x * mid, cy: c.origin.y + c.up.y * mid, halfAlong: (c.bounds.alongMax - c.bounds.alongMin) / 2, halfAcross: c.bounds.across },
     );
-    this.sea = makeSea(settings.seaState, axis, settings.seed, this.wind.baseTws / KN);
+    this.sea = makeSea(settings.seaState, windDir, settings.seed, this.wind.baseTws / KN);
     this.gunT = settings.sequenceSeconds;
     this.referee = new Referee(this);
     this.makeFleet();
@@ -267,6 +270,7 @@ export class Race implements AiHost {
         const lv = i % 4 === 1 ? sharpStarter(own, s.tune) : own;
         persona!.startSense = lv.startSense;
         const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
+        if (s.eager?.[b.sail]) sk.eager = s.eager[b.sail];
         if (s.forgetfulSkippers && this.rng.chance(lv.forget * 2)) this.forgot.add(b.id);
         this.skippers.push(sk);
       }

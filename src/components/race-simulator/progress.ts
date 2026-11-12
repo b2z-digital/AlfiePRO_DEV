@@ -6,6 +6,7 @@ import type { Outcome, SceneSpec } from '@/sim/training';
 import { newerYard, type Yard } from './yacht';
 import { newerCareer, type Career } from './career';
 import type { Comfort } from './comfort';
+import type { RoRecord } from './ro';
 
 const KEY = 'alfie-race-sim-training-v1';
 
@@ -32,6 +33,8 @@ export interface TrainingProgress {
   career?: Career;
   /** When you said you're new to RC sailing: you start at Club level and on the learn-to-sail path (see learn.ts). */
   newcomer?: number;
+  /** Your race officer's record: each duty's best mark at each standard (see ro.ts). */
+  ro?: RoRecord;
   /** Comfort settings: text size, race pace, captions, how Alfie's help steps down (see comfort.ts). */
   comfort?: Comfort;
   /** When you last started again: anything older, here or in your account, is left behind. */
@@ -95,6 +98,13 @@ export function dismissCard(id: string): TrainingProgress {
   return saveTraining(p);
 }
 
+/** Keep a race officer's duty mark. */
+export function saveRo(ro: RoRecord): TrainingProgress {
+  const p = loadTraining();
+  p.ro = ro;
+  return saveTraining(p);
+}
+
 /** Change your comfort settings. */
 export function saveComfort(c: Omit<Comfort, 'at'>): TrainingProgress {
   const p = loadTraining();
@@ -141,6 +151,7 @@ function since(p: TrainingProgress, t: number): TrainingProgress {
     newcomer: p.newcomer && p.newcomer >= t ? p.newcomer : undefined,
     yard: p.yard && p.yard.at >= t ? p.yard : undefined,
     comfort: p.comfort && p.comfort.at >= t ? p.comfort : undefined,
+    ro: p.ro && p.ro.at >= t ? p.ro : undefined,
   };
 }
 
@@ -213,5 +224,14 @@ export function mergeTraining(a0: TrainingProgress, b0: TrainingProgress): Train
   if (a.way || b.way) out.way = (b.way?.at ?? 0) > (a.way?.at ?? 0) ? b.way : a.way;
   // Comfort settings: the ones changed last.
   if (a.comfort || b.comfort) out.comfort = (b.comfort?.at ?? 0) > (a.comfort?.at ?? 0) ? b.comfort : a.comfort;
+  // The race officer's record: each duty and standard at its best on either device.
+  if (a.ro || b.ro) {
+    const best = { ...(a.ro?.best ?? {}) };
+    for (const [k, v] of Object.entries(b.ro?.best ?? {}) as [keyof RoRecord['best'], NonNullable<RoRecord['best'][keyof RoRecord['best']]>][]) {
+      const w = best[k];
+      best[k] = !w ? v : { score: Math.max(w.score, v.score), at: Math.max(w.at, v.at), tries: Math.max(w.tries, v.tries) };
+    }
+    out.ro = { best, at: Math.max(a.ro?.at ?? 0, b.ro?.at ?? 0) };
+  }
   return out;
 }

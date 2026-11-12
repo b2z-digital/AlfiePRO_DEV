@@ -40,6 +40,8 @@ export interface CourseSettings {
   fleetSize: number;
   /** Degrees; positive means the pin end is set upwind (favoured). */
   lineBias?: number;
+  /** A race officer's own course: the beat and half the line, in hull lengths (instead of the length's). */
+  beat?: number; half?: number;
 }
 
 export interface Course {
@@ -76,9 +78,9 @@ export function buildCourse(axis: number, L: number, s: CourseSettings): Course 
   const right = { x: up.y, y: -up.x };
   const O = { x: 0, y: 0 };
   const at = (along: number, across: number): V2 => add(mul(up, along * L), mul(right, across * L));
-  const beatUp = s.length === 'short' ? 22 : s.length === 'long' ? 42 : 30;
-  const runDown = s.length === 'short' ? 13 : s.length === 'long' ? 22 : 17;
-  const half = Math.max(6, 0.82 * s.fleetSize);
+  const beatUp = s.beat ?? (s.length === 'short' ? 22 : s.length === 'long' ? 42 : 30);
+  const runDown = s.beat ? Math.max(8, s.beat * 0.57) : s.length === 'short' ? 13 : s.length === 'long' ? 22 : 17;
+  const half = s.half ?? Math.max(6, 0.82 * s.fleetSize);
   const bias = ((s.lineBias ?? 0) * Math.PI) / 180;
   const pin = add(O, add(mul(right, -half * L), mul(up, dtan(bias) * half * L)));
   const stbd = add(O, add(mul(right, half * L), mul(up, -dtan(bias) * half * L)));

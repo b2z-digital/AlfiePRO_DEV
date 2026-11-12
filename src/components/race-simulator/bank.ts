@@ -212,6 +212,8 @@ export interface BankOptions {
   detail?: number;
   /** The map credit in the corner (off on a phone, which shows it under your boat's line). */
   credit?: boolean;
+  /** Keep the referee's calls (OCS, penalties) off the boats: the race officer makes the call. */
+  blind?: boolean;
 }
 
 export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptions) {
@@ -551,7 +553,7 @@ function drawBankBoat(ctx: CanvasRenderingContext2D, V: BankView, race: Race, b:
     ctx.fill();
     ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.hail.text, top.x, yy + 0.5);
   }
-  if (b.penalty.owed > 0 || (b.ocs && !b.started && t >= race.gunT)) label(ctx, b.ocs && !b.started ? 'OCS' : 'Penalty', base.x, base.y + 13, b.ocs && !b.started ? '#FCA5A5' : '#FFCB96', 11, 700);
+  if (!v.blind && (b.penalty.owed > 0 || (b.ocs && !b.started && t >= race.gunT))) label(ctx, b.ocs && !b.started ? 'OCS' : 'Penalty', base.x, base.y + 13, b.ocs && !b.started ? '#FCA5A5' : '#FFCB96', 11, 700);
   if (b.disabled) label(ctx, 'Out of control', base.x, base.y + 13, '#FCA5A5', 11, 700);
   void V;
 }
