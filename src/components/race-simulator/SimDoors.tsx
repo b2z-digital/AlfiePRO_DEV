@@ -70,7 +70,7 @@ export function DoorBack({ onHome }: { onHome: () => void }) {
 }
 
 /** The one thing put in front of you. */
-export function NextUpCard({ kicker, title, text, button, onGo, big, children }: { kicker: string; title: string; text: string; button: string; onGo: () => void; big?: boolean; children?: React.ReactNode }) {
+export function NextUpCard({ kicker, title, text, button, onGo, big, quick, children }: { kicker: string; title: string; text: string; button: string; onGo: () => void; big?: boolean; /** A quick race instead: the green button beside the main one. */ quick?: () => void; children?: React.ReactNode }) {
   return (
     <section className={cx('sim-next', big && 'sim-next-big')} aria-labelledby="next-title">
       <div className="min-w-0 flex-1">
@@ -79,7 +79,10 @@ export function NextUpCard({ kicker, title, text, button, onGo, big, children }:
         <p className="sim-next-text">{text}</p>
         {children}
       </div>
-      <button type="button" onClick={onGo} className="sim-btn-lg sim-btn-go sim-next-go">{button}<ArrowRight size={18} aria-hidden="true" /></button>
+      <div className="sim-next-acts">
+        {quick && <button type="button" onClick={quick} className="sim-btn-lg sim-btn-go sim-btn-green sim-next-go" title="Pick the water, wind and boat, and go"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>Quick race</button>}
+        <button type="button" onClick={onGo} className="sim-btn-lg sim-btn-go sim-next-go">{button}<ArrowRight size={18} aria-hidden="true" /></button>
+      </div>
     </section>
   );
 }

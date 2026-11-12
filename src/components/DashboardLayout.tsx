@@ -330,6 +330,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
   // Check if we're in the page editor
   const isPageEditor = location.pathname.includes('/website/pages/edit') || location.pathname.includes('/website/pages/new');
+  // The Sailing Academy fills the window like a game: no menu and no Ask Alfie; it has its own way out.
+  const isAcademy = location.pathname.startsWith('/race-simulator');
+  const chromeless = isPageEditor || isAcademy;
 
   // Listen for storage events (for sidebar state changes from other components)
   useEffect(() => {
@@ -1282,8 +1285,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         </div>
       )}
 
-      {/* Left Navigation - Hidden in page editor */}
-      {!isPageEditor && (
+      {/* Left Navigation - Hidden in page editor and the Sailing Academy */}
+      {!chromeless && (
       <div
         className={`
           fixed left-0 z-40 transition-all duration-300 ease-in-out
@@ -1788,8 +1791,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       </div>
       )}
 
-      {/* Mobile menu button - Hidden in page editor, shown only on small screens */}
-      {!isPageEditor && (
+      {/* Mobile menu button - Hidden in page editor and the Sailing Academy, shown only on small screens */}
+      {!chromeless && (
       <>
         <div className="fixed top-4 left-4 z-50 sm:hidden">
           <button
@@ -1961,8 +1964,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
 
       {/* Main Content */}
       <div
-        className={`transition-all duration-300 ${isPageEditor ? '' : (collapsed ? 'ml-[92px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}
-        style={{ ['--alfie-rail' as string]: isPageEditor ? '0px' : (collapsed ? '92px' : '16rem') }}
+        className={`transition-all duration-300 ${chromeless ? '' : (collapsed ? 'ml-[92px]' : 'ml-64')} ${isImpersonating ? 'pt-[44px]' : ''}`}
+        style={{ ['--alfie-rail' as string]: chromeless ? '0px' : (collapsed ? '92px' : '16rem') }}
       >
         <div className="h-full">
           <div className={`h-full transition-opacity duration-150 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
@@ -2192,7 +2195,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
               } />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
-              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
+              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} onExit={() => navigate('/')} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               {(trackingOn || isSuperAdmin) && <Route path="/live-tracking" element={<TrackingPage account={{ userId: user?.id ?? null, clubId: currentClub?.clubId ?? null, superAdmin: isSuperAdmin }} tracking={clubTracking.tracking} onTrackingChanged={clubTracking.reload} />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
@@ -2351,7 +2354,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
         />
       )}
 
-      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && !location.pathname.startsWith('/comms') && (
+      {(can('membership.manage') || isSuperAdmin || currentClub?.role === 'admin' || currentClub?.role === 'editor') && !location.pathname.startsWith('/comms') && !isAcademy && (
         <AskAlfieOrb darkMode={darkMode} />
       )}
     </div>

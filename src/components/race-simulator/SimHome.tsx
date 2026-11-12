@@ -1,7 +1,7 @@
 // Simulator home: set up a quick race, open the Start Trainer, Rules Academy or Scenario Lab, and
 // see your skipper profile (kept on this device for now).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, LogOut } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { SkipperLevel } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
@@ -485,7 +485,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -506,6 +506,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   blownOut?: { day: NextRace & { cancelled: boolean }; at: VenueDef | null; onRace: (races: number, days: number) => Promise<string | null> } | null;
   /** A virtual event of your club's to sail now (Next up puts it first). */
   clubEvent?: { event: SimEvent; left: number; hours: number } | null;
+  /** Leave the Sailing Academy (back to the rest of AlfiePRO): the exit at the top right. */
+  onExit?: () => void;
   /** The world (the daily race, the World Regatta, the Majors and the tables), once it has races. */
   world?: { line: string; onOpen: () => void } | null;
   /** The boats you've designed (Design your yacht). */
@@ -735,13 +737,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <>
               <div className="sim-front-top">
                 <Brand />
-                <div className="sim-front-acts">
-                  {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
-                  <button type="button" className="sim-btn-quick" onClick={quickRace} title="Pick the water, wind and boat, and go">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
-                    Quick race
-                  </button>
-                </div>
+                {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
+                {onExit && <button type="button" className="sim-exit" onClick={onExit} aria-label="Leave the Sailing Academy" title="Leave the Sailing Academy"><LogOut size={19} aria-hidden="true" /></button>}
               </div>
               <h1 className="sr-only">Sailing Academy</h1>
               <div className="sim-front">
@@ -754,7 +751,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                     : up.kind === 'first-sail' && !training.way && onWay ? null
                     : up.kind === 'first-sail' && onLink
                     ? <FirstSailCard bare done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />
-                    : <NextUpCard big={simple} {...upView}>{(up.kind === 'placement' || up.kind === 'race') && <SetupChips items={chips} />}</NextUpCard>}
+                    : <NextUpCard big={simple} {...upView} quick={!simple && up.kind !== 'placement' && up.kind !== 'race' ? quickRace : undefined}>{(up.kind === 'placement' || up.kind === 'race') && <SetupChips items={chips} />}</NextUpCard>}
                   {simple ? (
                     <div className="sim-deck-cells">
                       <section className="sim-cell" aria-labelledby="going-title">
@@ -765,7 +762,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                         <section className="sim-cell" aria-labelledby="pr-title">
                           <div className="flex flex-wrap items-center gap-3">
                             <span className="min-w-0 flex-1"><span id="pr-title" className="sim-cell-title">A practice race</span><span className="sim-cell-status">About {minutes(s)} minutes</span></span>
-                            <button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onStart('race', s)}>Start race</button>
+                            <button type="button" className="sim-btn-lg sim-btn-go sim-btn-green" onClick={() => onStart('race', s)}><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>Quick race</button>
                           </div>
                           <SetupChips items={chips} />
                         </section>
