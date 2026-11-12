@@ -14,6 +14,7 @@ import { drawCredit } from './bankVenue';
 import { ALFIE, YOU_INTRO, alfieCallout } from './bank';
 import { mapAt, tex, rippleDrift } from './bankWater';
 import { puffLife } from '@/sim/wind';
+import { labelScale } from './textScale';
 
 export interface Camera { x: number; y: number; scale: number } // world metres at screen centre, px per metre
 
@@ -554,6 +555,7 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
 }
 
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, size: number, align: CanvasTextAlign, weight = 500) {
+  size *= labelScale();
   ctx.font = `${weight} ${size}px ${FONT}`;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';

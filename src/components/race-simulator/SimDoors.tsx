@@ -14,6 +14,8 @@ import type { LearnPath } from './learn';
 import { LEVELS, LEVEL_FROM, LEVEL_NAME, type Standing } from './rating';
 import type { TrainLink } from './stats';
 import { AlfieOrb, Btn, C, Cap, Chip, cx } from './ui';
+import { HELP_WORDS, type Comfort, type TextSize } from './comfort';
+import type { CoachMode } from './coach';
 
 export type Door = 'home' | 'race' | 'train' | 'you';
 export const DOOR_NAME: Record<Exclude<Door, 'home'>, string> = { race: 'Race', train: 'Train', you: 'You' };
@@ -323,6 +325,47 @@ export function WaySwitch({ way, newcomer, onChoose }: { way: Way; newcomer?: bo
         <Btn small primary={way === 'simple' && !newcomer} aria-pressed={way === 'simple'} onClick={() => onChoose('simple')}>Help me sail better</Btn>
         <Btn small primary={way === 'full'} aria-pressed={way === 'full'} onClick={() => onChoose('full')}>I want to race</Btn>
       </div>
+    </section>
+  );
+}
+
+/** Comfort: larger type, a calmer race pace, Alfie's words on screen, and help that steps down as you improve. */
+export function ComfortCard({ comfort, helpNow, onChange }: { comfort: Comfort; helpNow: CoachMode; onChange: (c: Omit<Comfort, 'at'>) => void }) {
+  const set = (p: Partial<Comfort>) => { const { at: _at, ...rest } = comfort; void _at; onChange({ ...rest, ...p }); };
+  const pill = (on: boolean) => (on ? { background: '#F1F4FA', color: '#0A1226', borderColor: '#F1F4FA' } : undefined);
+  return (
+    <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="comfort-title">
+      <div>
+        <h2 id="comfort-title" className="sim-h3">Comfort</h2>
+        <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>How the Academy reads and races for you. Kept with your account, on every device.</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Cap>Text size</Cap>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Text size">
+          {(['standard', 'large', 'larger'] as TextSize[]).map(k => (
+            <button key={k} type="button" className="sim-chip-btn" aria-pressed={comfort.text === k} style={pill(comfort.text === k)} onClick={() => set({ text: k })}>
+              <span style={{ fontSize: k === 'standard' ? 14 : k === 'large' ? 16 : 18 }}>{k === 'standard' ? 'Standard' : k === 'large' ? 'Large' : 'Larger'}</span>
+            </button>
+          ))}
+        </div>
+        <span className="text-[12.5px]" style={{ color: C.faint }}>Every screen here, the panels in a race and the labels on the water.</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Cap>Race pace</Cap>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Race pace">
+          <button type="button" className="sim-chip-btn" aria-pressed={comfort.pace === 'normal'} style={pill(comfort.pace === 'normal')} onClick={() => set({ pace: 'normal' })}>As it happens</button>
+          <button type="button" className="sim-chip-btn" aria-pressed={comfort.pace === 'calm'} style={pill(comfort.pace === 'calm')} onClick={() => set({ pace: 'calm' })}>Calmer</button>
+        </div>
+        <span className="text-[12.5px]" style={{ color: C.faint }}>Calmer runs the race at 0.7 speed, so there's more time to think. Your results are the same: the race is timed on its own clock. (Not in live races with others.)</span>
+      </div>
+      <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug">
+        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-[#2E7BFF]" checked={comfort.captions} onChange={e => set({ captions: e.target.checked })} />
+        <span><b className="font-semibold">Alfie's words on screen.</b> <span style={{ color: C.mute }}>What Alfie says in a race, and the other skippers' hails, shown as captions. With the sound off too.</span></span>
+      </label>
+      <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug">
+        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-[#2E7BFF]" checked={comfort.help === 'steps'} onChange={e => set({ help: e.target.checked ? 'steps' : 'mine' })} />
+        <span><b className="font-semibold">Alfie's help steps down as you improve.</b> <span style={{ color: C.mute }}>{comfort.help === 'steps' ? `At your level now, Alfie ${HELP_WORDS[helpNow]}.` : 'Every call at Club level, hints at Regional and National, quiet at World level. Choosing his coaching yourself turns this off.'}</span></span>
+      </label>
     </section>
   );
 }

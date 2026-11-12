@@ -640,3 +640,8 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 /* Alfie's report at the end of an event, under the podium. */
 .sim-podium-report { width: 100%; max-width: 560px; margin: 0 0 10px; padding: 14px 18px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(8, 14, 32, 0.55); text-align: left; animation: sim-podium-rise .6s ease 1s both; }
 .sim-cell-note { display: block; margin-top: 4px; font-size: clamp(13.5px, 0.85vw, 15px); line-height: 1.4; color: rgba(214, 224, 240, 0.72); }
+
+/* Comfort: captions of what Alfie says in a race, and larger type on the Academy's screens. */
+.sim-caption { margin: 0; padding: 8px 14px; border-radius: 14px; background: rgba(6, 11, 24, 0.82); border: 1px solid rgba(255, 255, 255, 0.12); color: #F1F4FA; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15.5px; line-height: 1.35; text-align: left; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+html[data-sim-text="large"] .sim-zoomable > * { zoom: 1.15; }
+html[data-sim-text="larger"] .sim-zoomable > * { zoom: 1.3; }

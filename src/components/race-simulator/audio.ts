@@ -30,6 +30,8 @@ if (typeof window !== 'undefined') for (const ev of ['pointerdown', 'keydown'] a
 
 export class RaceAudio {
   muted = false;
+  /** Told every line as it's asked to be said (even with the voice muted or not working), for captions. */
+  onSay: ((text: string, as: 'alfie' | 'skipper') => void) | null = null;
   /** Why Alfie can't be heard on this device, if the browser has said so ("not-allowed", "synthesis-failed"…). */
   problem: string | null = null;
   private voice: SpeechSynthesisVoice | null = null;
@@ -75,6 +77,7 @@ export class RaceAudio {
    * drop it, and after a run of those stop speaking altogether.)
    */
   say(text: string, urgent = false, as: 'alfie' | 'skipper' = 'alfie') {
+    if (text.trim()) this.onSay?.(text, as);
     const synth = this.synth;
     if (this.muted || !synth || !text.trim()) return;
     this.unstick(synth);

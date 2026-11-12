@@ -35,7 +35,7 @@ import type { RaceSummary } from './stats';
 import { Profile, clearProfile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
 import { loadBlownOut, loadNextRace, type NextRace } from './rehearse';
-import { TrainingProgress, chooseWay, dismissCard, resetTraining, saveCareer, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
+import { TrainingProgress, chooseWay, dismissCard, resetTraining, saveCareer, saveComfort, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import SimYacht from './SimYacht';
@@ -45,6 +45,7 @@ import { VENUES, venueForClub } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
 import { currentId, ensureVenue, loadWaters, type Water } from './waters';
 import { regionOf } from './circuitWaters';
+import { DEFAULT_COMFORT, PACE_RATE, TEXT_ZOOM, helpFor } from './comfort';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
 import SimChallenge from './SimChallenge';
@@ -425,7 +426,15 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   // Was there a saved set-up when the page opened, and has one been chosen since?
   const startedFresh = useRef(!hasSetup()), touched = useRef(false);
-  const changeSetup = useCallback((s: Setup) => { touched.current = true; setSetup(s); storeSetup(s); }, []);
+  const coachWas = useRef(setup.coach);
+  const changeSetup = useCallback((s: Setup) => {
+    touched.current = true;
+    // Choosing Alfie's coaching yourself: it stops stepping down on its own.
+    const c = loadTraining().comfort;
+    if (c?.help === 'steps' && s.coach !== coachWas.current) trainingChanged(saveComfort({ ...c, help: 'mine' }));
+    coachWas.current = s.coach;
+    setSetup(s); storeSetup(s);
+  }, [trainingChanged]);
   // Clubs' own water, from the database: loaded once you're signed in, and kept in step with the
   // set-up (a water that has changed has a new id; a club's own version stands in for the one that
   // came with the app).
@@ -488,6 +497,18 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   const [nextRace, setNextRace] = useState<NextRace | null>(null);
   // Where it's rehearsed: your club's water, or failing that the venue you've set up (null on the practice pond).
   // What the world's tables show beside your name: your level and rating once placed, and your medals.
+  // Comfort settings: larger type on every screen of the Academy, and Alfie's help stepping down as you improve.
+  const comfort = training.comfort ?? DEFAULT_COMFORT;
+  useEffect(() => {
+    const el = document.documentElement;
+    if (comfort.text === 'standard') delete el.dataset.simText; else el.dataset.simText = comfort.text;
+    return () => { delete el.dataset.simText; };
+  }, [comfort.text]);
+  const helpNow = useMemo(() => { const st = standing(profile, !!training.newcomer); return helpFor(st.level, st.placed, !!training.newcomer); }, [profile, training.newcomer]);
+  useEffect(() => {
+    if (comfort.help !== 'steps') return;
+    setSetup(s => { if (s.coach === helpNow) return s; coachWas.current = helpNow; const n = { ...s, coach: helpNow }; storeSetup(n); return n; });
+  }, [comfort.help, helpNow]);
   const worldStats = useMemo(() => {
     const st = standing(profile, !!training.newcomer);
     // Medals from the Circuit and the world (a World Regatta or Major podium); titles: Circuit Championships and Majors won.
@@ -822,6 +843,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       <div className="fixed inset-0 z-[9990]" style={{ background: C.bg }} role="dialog" aria-modal="true" aria-label={scene ? scene.spec.title : 'Race'}>
         <SimRace
           key={run.key}
+          comfort={{ zoom: TEXT_ZOOM[comfort.text], pace: PACE_RATE[comfort.pace], captions: comfort.captions }}
           settings={run.settings}
           scene={scene}
           mode={run.mode}
@@ -854,7 +876,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'debrief' && debrief) {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimDebrief race={debrief.race} sum={debrief.sum} moments={debrief.moments} onHome={() => setWhere('home')} onAgain={again} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onTakeOver={debrief.race.live ? undefined : takeOver}
           challenge={debrief.event && debrief.challenge
             ? {
@@ -871,7 +893,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'live' && room) {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimLive room={room} myId={userId ?? ''} water={roomWater} onLeave={() => { leaveRoom(); setWhere('home'); }} />
       </div>
     );
@@ -880,7 +902,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   if (where === 'event' && openEv) {
     const admin = !!account?.superAdmin || (!!account?.admin && openEv.club_id !== null && openEv.club_id === clubId);
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimEventPage key={openEv.id} event={openEv} me={userId} admin={admin}
           onSail={(race, o) => void sailEventRace(openEv, race, o)}
           countryOf={isWorld(openEv) ? (id => worldFlags.get(id)?.country ?? null) : undefined}
@@ -893,7 +915,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'challenge' && openCh) {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimChallenge challenge={openCh} me={userId} onSail={e => void sailChallenge(openCh, e)} onBack={() => { refreshChallenges(); setWhere('home'); }} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
@@ -902,7 +924,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'world') {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimWorld setup={setup} cls={setup.classId} events={world ?? []} skipper={userId ? skipper : undefined} signedIn={!!userId}
           ownName={me?.name ?? null} club={clubId ? { id: clubId, name: worldClub } : null} country={alpha2(lookFor(yard, setup.classId).country)}
           results={worldResults} loadTable={worldTable} loadClubs={clubTable} loadFlags={skippersOf}
@@ -930,12 +952,12 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   }
 
   if (where === 'bench') {
-    return <div key={where} className="h-full overflow-y-auto"><SimBench setup={setup} onBack={() => setWhere('home')} /></div>;
+    return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimBench setup={setup} onBack={() => setWhere('home')} /></div>;
   }
 
   if (where === 'career') {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} home={homeRegion} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
           licence={training.career?.ticket ? levelLicence(TIERS[TIERS.indexOf(training.career.ticket) - 1] as SkipperLevel, profile, training) : null} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
           onLink={openLink} onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
@@ -946,7 +968,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'trainer') {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimTrainer progress={training} onPlay={d => playScene(d, 'Start Trainer', false)} onFullStart={() => start('start', setup)} onBack={() => setWhere('home')} />
       </div>
     );
@@ -954,7 +976,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   if (where === 'academy') {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimAcademy progress={training} initial={academyAt}
           onAnswer={(id, ok) => trainingChanged(recordAnswer(id, ok))}
           onPlay={(id, watch) => { const spec = findScene('lesson', id); if (spec) playScene(spec, 'Rules Academy', watch); }}
@@ -964,7 +986,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   }
 
   if (where === 'playbook') {
-    return <div key={where} className="h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
+    return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimPlaybook onBack={() => { setPlayAt(null); setWhere('home'); }} onLink={openLink} focus={playAt} /></div>;
   }
   // You be the judge.
   if (where === 'yacht') {
@@ -980,22 +1002,22 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     );
   }
   if (where === 'judge') {
-    return <div key={where} className="h-full overflow-y-auto"><SimJudge training={training} onBack={() => setWhere('home')} onLink={openLink} onCall={(id, points) => trainingChanged(recordJudge(id, points))} /></div>;
+    return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimJudge training={training} onBack={() => setWhere('home')} onLink={openLink} onCall={(id, points) => trainingChanged(recordJudge(id, points))} /></div>;
   }
   // The skill passport.
   if (where === 'passport') {
-    return <div key={where} className="h-full overflow-y-auto"><SimPassport profile={profile} onBack={() => setWhere('home')} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} /></div>;
+    return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimPassport profile={profile} onBack={() => setWhere('home')} onLink={openLink} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} /></div>;
   }
   if (where === 'lab') {
     return (
-      <div key={where} className="h-full overflow-y-auto">
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
         <SimLab progress={training} onPlay={(id, watch) => { const m = findMoment(id); if (m) playScene(m, 'Scenario Lab', watch); }} onBack={() => setWhere('home')} />
       </div>
     );
   }
 
   return (
-    <div key="home" className="sim-home h-full overflow-y-auto">
+    <div key="home" className="sim-home sim-zoomable h-full overflow-y-auto">
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       {opening && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,12,24,0.55)]">
@@ -1007,7 +1029,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setEvFrom('home'); setWhere('event'); }} onCreateEvent={setEvent}

@@ -12,6 +12,7 @@ import type { WorldOverlay } from '@/sim/scene';
 import { DrawOpts, Pose, drawBoat3d, drawReflection, onWaves, rigFor, sailSet, twaFor } from './boat3d';
 import { drawCredit, drawVenueScene } from './bankVenue';
 import { drawGusts, drawRipples, drawWakes, drawWaves } from './bankWater';
+import { labelScale } from './textScale';
 
 interface V2 { x: number; y: number }
 interface Proj { x: number; y: number; z: number }
@@ -187,6 +188,7 @@ function groundLine(ctx: CanvasRenderingContext2D, V: BankView, pts: V2[], close
 }
 
 function label(ctx: CanvasRenderingContext2D, s: string, x: number, y: number, color: string, size = 12, weight = 700) {
+  size *= labelScale();
   ctx.font = `${weight} ${size}px ${FONT}`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(6,11,22,0.6)'; ctx.fillText(s, x + 0.8, y + 0.8);

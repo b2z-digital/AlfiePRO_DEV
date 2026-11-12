@@ -5,6 +5,7 @@ import { DRILLS, MODULES } from '@/sim/training';
 import type { Outcome, SceneSpec } from '@/sim/training';
 import { newerYard, type Yard } from './yacht';
 import { newerCareer, type Career } from './career';
+import type { Comfort } from './comfort';
 
 const KEY = 'alfie-race-sim-training-v1';
 
@@ -31,6 +32,8 @@ export interface TrainingProgress {
   career?: Career;
   /** When you said you're new to RC sailing: you start at Club level and on the learn-to-sail path (see learn.ts). */
   newcomer?: number;
+  /** Comfort settings: text size, race pace, captions, how Alfie's help steps down (see comfort.ts). */
+  comfort?: Comfort;
   /** When you last started again: anything older, here or in your account, is left behind. */
   resetAt?: number;
   updatedAt: number;
@@ -92,6 +95,13 @@ export function dismissCard(id: string): TrainingProgress {
   return saveTraining(p);
 }
 
+/** Change your comfort settings. */
+export function saveComfort(c: Omit<Comfort, 'at'>): TrainingProgress {
+  const p = loadTraining();
+  p.comfort = { ...c, at: Date.now() };
+  return saveTraining(p);
+}
+
 /** "Help me sail better" (simple) or "I want to race" (full); `newcomer`: "I'm new to RC sailing" as well (on), or not any more (off). */
 export function chooseWay(mode: Way, newcomer?: boolean): TrainingProgress {
   const p = loadTraining();
@@ -113,6 +123,8 @@ export function resetTraining(keepYachts: boolean, now = Date.now()): TrainingPr
   const p: TrainingProgress = { drills: {}, lessons: {}, lab: {}, resetAt: now, updatedAt: 0 };
   // (Kept yachts are stamped now, so they're newer than the reset.)
   if (keepYachts && was.yard) p.yard = { ...was.yard, at: Math.max(was.yard.at, now) };
+  // Comfort settings are how you read and race, not progress: they stay.
+  if (was.comfort) p.comfort = { ...was.comfort, at: Math.max(was.comfort.at, now) };
   return saveTraining(p);
 }
 
@@ -128,6 +140,7 @@ function since(p: TrainingProgress, t: number): TrainingProgress {
     career: p.career && p.career.at >= t ? p.career : undefined,
     newcomer: p.newcomer && p.newcomer >= t ? p.newcomer : undefined,
     yard: p.yard && p.yard.at >= t ? p.yard : undefined,
+    comfort: p.comfort && p.comfort.at >= t ? p.comfort : undefined,
   };
 }
 
@@ -198,5 +211,7 @@ export function mergeTraining(a0: TrainingProgress, b0: TrainingProgress): Train
   if (a.newcomer || b.newcomer) out.newcomer = Math.min(a.newcomer ?? Infinity, b.newcomer ?? Infinity);
   // The way of using the Academy that was chosen last.
   if (a.way || b.way) out.way = (b.way?.at ?? 0) > (a.way?.at ?? 0) ? b.way : a.way;
+  // Comfort settings: the ones changed last.
+  if (a.comfort || b.comfort) out.comfort = (b.comfort?.at ?? 0) > (a.comfort?.at ?? 0) ? b.comfort : a.comfort;
   return out;
 }
