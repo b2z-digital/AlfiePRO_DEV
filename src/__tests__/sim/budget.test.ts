@@ -1,7 +1,7 @@
 // Money on the Circuit: entry fees, prize money, sponsors' goals, the shop, and the prizes that are
 // paint; and the deck and bottom colours they unlock, kept with the yacht and drawn on the boat.
 import { describe, expect, it } from 'vitest';
-import { CHAMPION_PAINT, GRANT, ME, SHOP, SPONSORS, START_MONEY, buy, careerRace, dayState, dealOf, eventAt, finishDay, moneyOf, moveUp, newCareer, owns, recordRace, simulateRest, wonPaints, type Career, type RowResult } from '@/components/race-simulator/career';
+import { CHAMPION_PAINT, GRANT, ME, raceConditions, SHOP, SPONSORS, START_MONEY, buy, careerRace, dayState, dealOf, eventAt, finishDay, moneyOf, moveUp, newCareer, owns, recordRace, simulateRest, wonPaints, type Career, type RowResult } from '@/components/race-simulator/career';
 import { mergeTraining, type TrainingProgress } from '@/components/race-simulator/progress';
 import { cleanLook, DEFAULT_LOOK } from '@/sim/look';
 import { lookOf, paintName } from '@/components/race-simulator/yacht';
@@ -80,19 +80,25 @@ describe('Money', () => {
     expect(SHOP.map(s => s.id)).toEqual(['deck', 'bottom', 'rigB']);
   });
 
-  it("an IOM without the B rig sails a fresh day on the A rig, overpowered; with it, the right rig for the breeze", () => {
-    let c = newCareer('IOM', NOW);
-    for (let i = 0; i < 3; i++) c = day(c, 5).career;
-    expect(eventAt(c).event.wind).toBe('fresh');
-    expect(careerRace(c, base).rig).toBe('A');
-    const r = new Race(careerRace(c, base));
+  it("an IOM without the B rig sails a fresh race on the A rig, overpowered; with it, the right rig for the breeze", () => {
+    let c0 = newCareer('IOM', NOW);
+    for (let i = 0; i < 3; i++) c0 = day(c0, 5).career;
+    expect(eventAt(c0).event.wind).toBe('fresh');
+    // Each race has its own breeze now (see conditions.ts): on an open bay, a season whose first race of the day is fresh.
+    const bay = { ...base, venue: 'kbryc' };
+    const season = Array.from({ length: 40 }, (_, k) => k + 1).find(n => raceConditions({ ...c0, season: n }, 1, 'kbryc').wind === 'fresh')!;
+    const c = { ...c0, season };
+    expect(careerRace(c, bay).rig).toBe('A');
+    const calm = Array.from({ length: 40 }, (_, k) => k + 1).find(n => raceConditions({ ...c0, season: n }, 1, 'kbryc').wind !== 'fresh')!;
+    expect(careerRace({ ...c0, season: calm }, bay).rig).toBeUndefined();
+    const r = new Race(careerRace(c, bay));
     expect(r.boats[0].rig).toBe('A');
     expect(r.boats.slice(1).every(b => b.rig === 'B')).toBe(true);
     const kit = buy({ ...c, money: 1000 }, 'rigB', NOW);
-    expect(careerRace(kit, base).rig).toBeUndefined();
-    expect(new Race(careerRace(kit, base)).boats[0].rig).toBe('B');
-    // Not an IOM, or not a fresh day: no say.
-    expect(careerRace({ ...c, cls: 'DF65' }, base).rig).toBeUndefined();
+    expect(careerRace(kit, bay).rig).toBeUndefined();
+    expect(new Race(careerRace(kit, bay)).boats[0].rig).toBe('B');
+    // Not an IOM, or not a fresh race: no say.
+    expect(careerRace({ ...c, cls: 'DF65' }, bay).rig).toBeUndefined();
   });
 
   it('money and what you own follow you between devices with the season', () => {
