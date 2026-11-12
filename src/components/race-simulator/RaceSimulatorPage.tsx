@@ -16,6 +16,10 @@ import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import type { Door } from './SimDoors';
 import SimCareer from './SimCareer';
 import SimBench from './SimBench';
+import SimWorld from './SimWorld';
+import { alpha2 } from './flags';
+import { standing } from './rating';
+import { clubName, isWorld, listWorld, myResults, mySkipper, saveSkipper, skippersOf, stopAppearing, syncSkipperStats, worldNow, worldTable, type Skipper, type WorldEvent, type WorldResult } from './world';
 import { FLEET_NAME } from './heats';
 import { levelLicence } from './programme';
 import { ME, TIERS, wonPaints, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
@@ -65,6 +69,8 @@ interface RaceSimulatorPageProps {
 // v2: the new defaults (sails on your stick, choppy water, the bank view). Old v1 settings are
 // carried over except auto-trim, which now starts off.
 const SETUP_KEY = 'alfie-race-sim-setup-v2';
+/** "Not now" to appearing on the world's boards, on this device. */
+const WORLD_ASKED = 'alfie-race-sim-world-asked-v1';
 const SETUP_KEY_V1 = 'alfie-race-sim-setup-v1';
 
 /** Has a set-up been saved on this device? (If not, a member starts at their own club's water.) */
@@ -129,7 +135,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'career' | 'bench' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'career' | 'bench' | 'world' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean, yard: Yard | null): RaceSettings {
@@ -189,6 +195,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const [debrief, setDebrief] = useState<{ race: Race; sum: RaceSummary; moments: Moment[]; challenge?: Challenge; event?: SimEvent; career?: { title: string; left: number } } | null>(null);
   // Virtual race events you can see, and the one open.
   const [events, setEvents] = useState<SimEvent[] | null>(null);
+  // The world: its events (null until loaded, or not there), how you appear, your results, and the
+  // flags of the skippers on the event you've opened from it.
+  const [world, setWorld] = useState<WorldEvent[] | null>(null);
+  const [skipper, setSkipper] = useState<Skipper | null | undefined>(undefined);
+  const [worldResults, setWorldResults] = useState<WorldResult[] | null>(null);
+  const [worldClub, setWorldClub] = useState<string | null>(null);
+  const [worldFlags, setWorldFlags] = useState<Map<string, Skipper>>(new Map());
+  const [evFrom, setEvFrom] = useState<'home' | 'world'>('home');
+  const [declined, setDeclined] = useState(() => { try { return localStorage.getItem(WORLD_ASKED) === 'no'; } catch { return false; } });
   const [openEv, setOpenEv] = useState<SimEvent | null>(null);
   // Challenges you can see, the one open, and how your last go at one went.
   const [challenges, setChallenges] = useState<Challenge[] | null>(null);
@@ -368,6 +383,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     });
   }, [userId]);
   useEffect(() => { refreshEvents(); }, [refreshEvents]);
+  const refreshWorld = useCallback(() => {
+    if (!userId) return;
+    const a = { userId, clubId };
+    void listWorld().then(setWorld);
+    void mySkipper(a).then(setSkipper);
+    void myResults(a).then(setWorldResults);
+  }, [userId, clubId]);
+  useEffect(() => { refreshWorld(); }, [refreshWorld]);
+  useEffect(() => { if (clubId && userId) void clubName(clubId).then(setWorldClub); }, [clubId, userId]);
   const trainingChanged = useCallback((t: TrainingProgress) => {
     setTraining(t);
     if (userId) void syncTraining({ userId, clubId }, t);
@@ -460,6 +484,20 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   // The club's next race day and its forecast, to rehearse (signed in, with a club).
   const [nextRace, setNextRace] = useState<NextRace | null>(null);
   // Where it's rehearsed: your club's water, or failing that the venue you've set up (null on the practice pond).
+  // What the world's tables show beside your name: your level and rating once placed, and your medals.
+  const worldStats = useMemo(() => {
+    const st = standing(profile, !!training.newcomer);
+    const medals = training.career?.medals ?? [];
+    return { rating: st.placed ? st.rating : null, level: st.placed ? st.level : null, medals: medals.length, titles: medals.filter(m => m.trophy).length };
+  }, [profile, training.newcomer, training.career]);
+  useEffect(() => { if (userId && skipper) void syncSkipperStats({ userId, clubId }, skipper, worldStats); }, [userId, clubId, skipper, worldStats]);
+  // The world's card in the Race door: shown once the world has races (they open only when it's switched on).
+  const worldCard = useMemo(() => {
+    if (!userId || !world || !world.length) return null;
+    const w = worldNow(world, setup.classId);
+    const line = [w.daily ? "Today's daily race is open" : null, w.major ? `${w.major.title} is under way` : w.regatta ? "this week's World Regatta is open" : null].filter(Boolean).join('; ');
+    return { line: line ? `${line[0].toUpperCase()}${line.slice(1)}.` : 'The daily race, the World Regatta and the Majors.', onOpen: () => { refreshWorld(); setWhere('world'); } };
+  }, [userId, world, setup.classId, refreshWorld]);
   const rehearseAt = useMemo(() => venueForClub(clubId) ?? (setup.venue !== 'pond' ? VENUES[setup.venue] ?? null : null), [clubId, setup.venue, waters]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!userId || !clubId) { setNextRace(null); return; }
@@ -604,10 +642,13 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     if (!(await waterFor(race.settings))) return;
     const seq = startSeq && startSeq.seconds >= race.settings.sequenceSeconds ? startSeq : null;
     // A race that has closed can only be sailed for practice.
-    setRun({ settings: challengeSettings(race, me, setup.autoTrim, yardNow.current), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race), ghost, sequence: seq });
+    // A world race counts only for those who appear on its boards: until then it's practice.
+    const unseen = isWorld(ev) && !skipper;
+    if (unseen && !o.practice) setWaterNote("Sailing for practice: choose how you appear (in The world) and your first try at a race will count.");
+    setRun({ settings: challengeSettings(race, me, setup.autoTrim, yardNow.current), mode: 'race', key: Date.now(), challenge: race, event: ev, practice: o.practice || !isOpen(race) || unseen, ghost, sequence: seq });
     setRunView(setup.view);
     setWhere('race');
-  }, [me, setup.autoTrim, setup.view, startSeq, waterFor]);
+  }, [me, setup.autoTrim, setup.view, startSeq, waterFor, skipper]);
 
   const again = useCallback(() => {
     if (!run) return;
@@ -754,7 +795,8 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       <div key={where} className="h-full overflow-y-auto">
         <SimEventPage key={openEv.id} event={openEv} me={userId} admin={admin}
           onSail={(race, o) => void sailEventRace(openEv, race, o)}
-          onBack={() => { refreshEvents(); setWhere('home'); }}
+          countryOf={isWorld(openEv) ? (id => worldFlags.get(id)?.country ?? null) : undefined}
+          onBack={() => { refreshEvents(); if (evFrom === 'world') refreshWorld(); setWhere(evFrom); }}
           onDelete={admin ? () => { void deleteEvent(openEv.id).then(ok => { if (ok) { setOpenEv(null); refreshEvents(); setWhere('home'); } }); } : undefined} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
@@ -766,6 +808,35 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       <div key={where} className="h-full overflow-y-auto">
         <SimChallenge challenge={openCh} me={userId} onSail={e => void sailChallenge(openCh, e)} onBack={() => { refreshChallenges(); setWhere('home'); }} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
+      </div>
+    );
+  }
+
+  if (where === 'world') {
+    return (
+      <div key={where} className="h-full overflow-y-auto">
+        <SimWorld setup={setup} cls={setup.classId} events={world ?? []} skipper={userId ? skipper : undefined} signedIn={!!userId}
+          ownName={me?.name ?? null} club={clubId ? { id: clubId, name: worldClub } : null} country={alpha2(lookFor(yard, setup.classId).country)}
+          results={worldResults} loadTable={worldTable} loadFlags={skippersOf}
+          onAppear={async a => {
+            if (!userId) return 'Sign in to AlfiePRO first.';
+            const r = await saveSkipper({ userId, clubId }, a, worldStats);
+            if (typeof r === 'string') return r;
+            setSkipper(r);
+            return null;
+          }}
+          onStopAppearing={async () => {
+            if (!userId) return false;
+            const ok = await stopAppearing({ userId, clubId });
+            if (ok) setSkipper(null);
+            return ok;
+          }}
+          declined={declined} onDecline={() => { setDeclined(true); try { localStorage.setItem(WORLD_ASKED, 'no'); } catch { /* this device only */ } }}
+          onOpen={ev => {
+            setOpenEv(ev); setEvFrom('world'); setWhere('event');
+            void eventEntries(ev).then(es => skippersOf((es ?? []).map(e => e.user_id))).then(setWorldFlags);
+          }}
+          onBack={() => setWhere('home')} />
       </div>
     );
   }
@@ -847,10 +918,10 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
-        events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
+        events={userId ? events : null} onEvent={e => { setOpenEv(e); setEvFrom('home'); setWhere('event'); }} onCreateEvent={setEvent}
         canSet={account?.admin || account?.superAdmin ? { everyone: !!account.superAdmin } : null} onCreateChallenge={setChallenge}
         sequences={sequences} startSeq={startSeq} startFinding={seqBusy && !sequences.length}
         live={userId ? { rooms: openRooms, onOpen: openLive, onJoin: joinLive } : null}

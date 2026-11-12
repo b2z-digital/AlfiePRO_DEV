@@ -158,7 +158,10 @@ const EVENT_COLS = `id, club_id, title, description, tries, drops, created_at, r
 export async function listEvents(limit = 12): Promise<SimEvent[] | null> {
   try {
     const supabase = await db();
-    const { data, error } = await supabase.from('sim_events').select(EVENT_COLS).order('created_at', { ascending: false }).limit(limit);
+    // (The world's events, the daily race and the rest, have their own screen: see world.ts. Before the
+    // world was set up there's no kind to filter on, so ask again without it.)
+    let { data, error } = await supabase.from('sim_events').select(EVENT_COLS).is('kind', null).order('created_at', { ascending: false }).limit(limit);
+    if (error) ({ data, error } = await supabase.from('sim_events').select(EVENT_COLS).order('created_at', { ascending: false }).limit(limit));
     if (error) return null;
     return ((data ?? []) as unknown as SimEvent[]).map(e => ({ ...e, races: [...(e.races ?? [])].sort((a, b) => a.race_no - b.race_no) }));
   } catch { return null; }

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
-import { ME, QUALIFY, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
+import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
 import { scoreText, type StandingRow } from './series';
@@ -275,7 +275,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
         <div className="sim-home-hero-body px-4 sm:px-6 lg:px-10 xl:px-16">
           <div className="flex flex-wrap items-center gap-3"><DoorBack onHome={onBack} /><Brand /></div>
           <h1 className="sim-home-title">The AlfiePRO Circuit</h1>
-          <p className="sim-home-sub">{career ? `Season ${career.season} · ${tier === 'club' ? 'Club pointscore' : `${TIER_NAME[tier]} season`} · ${classLabel(career.cls)}` : 'A club season against a fleet of skippers with names, numbers and form of their own.'}</p>
+          <p className="sim-home-sub">{career ? `Season ${career.season} · ${tier === 'club' ? 'Club pointscore' : `${TIER_NAME[tier]} season`} · ${classLabel(career.cls)}${defending(career) ? ' · defending your title' : ''}` : 'A club season against a fleet of skippers with names, numbers and form of their own.'}</p>
         </div>
       </section>
 
