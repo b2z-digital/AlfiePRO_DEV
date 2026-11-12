@@ -15,6 +15,7 @@ import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findSce
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import type { Door } from './SimDoors';
 import SimCareer from './SimCareer';
+import SimBench from './SimBench';
 import { FLEET_NAME } from './heats';
 import { levelLicence } from './programme';
 import { ME, TIERS, wonPaints, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
@@ -128,7 +129,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'career' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'career' | 'bench' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean, yard: Yard | null): RaceSettings {
@@ -769,6 +770,10 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     );
   }
 
+  if (where === 'bench') {
+    return <div key={where} className="h-full overflow-y-auto"><SimBench setup={setup} onBack={() => setWhere('home')} /></div>;
+  }
+
   if (where === 'career') {
     return (
       <div key={where} className="h-full overflow-y-auto">
@@ -842,7 +847,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
