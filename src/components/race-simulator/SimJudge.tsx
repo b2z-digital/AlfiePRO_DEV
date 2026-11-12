@@ -12,7 +12,7 @@ const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1
 const sameDay = (at: number) => dayKey(new Date(at)) === dayKey();
 
 /** The clip, played from above at one and a half times speed, then held on its last moment. `run` restarts it. */
-function ClipView({ clip, run }: { clip: Clip; run: number }) {
+export function ClipView({ clip, run }: { clip: Clip; run: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const data: DiagramData | null = useMemo(() => {
     try {
