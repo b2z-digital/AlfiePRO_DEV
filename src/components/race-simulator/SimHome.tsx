@@ -447,7 +447,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -462,6 +462,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onPlay?: (id: string) => void;
   /** Your season on the Circuit (null: not begun), and the way to its screen. */
   career?: Career | null; onCareer?: () => void;
+  /** The scoring bench (club admins and race officers). */
+  onBench?: () => void;
   /** The boats you've designed (Design your yacht). */
   yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -638,6 +640,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
   }, [door]);
+  // Quick race: straight to the race set-up (water, wind and its direction, boat, fleet), for a race and nothing else.
+  const setCard = useRef<HTMLElement | null>(null);
+  const [toSet, setToSet] = useState(false);
+  useEffect(() => {
+    if (!toSet || door !== 'race') return;
+    setToSet(false);
+    requestAnimationFrame(() => setCard.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, [toSet, door]);
+  const quickRace = () => { setToSet(true); onDoor?.('race'); };
   const go = (d: Door) => { onDoor?.(d); window.scrollTo({ top: 0 }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0 }); };
   const upView: { kicker: string; title: string; text: string; button: string; onGo: () => void } =
     up.kind === 'career-day' ? { kicker: `Next up · your race day is under way`, title: `${up.event}: race ${up.race} of ${up.of}`, text: up.canSimulate ? 'Sail the next race, or simulate the rest of the day from the ones you\'ve sailed.' : 'Sail at least three races; after that the rest of the day can be simulated.', button: 'Open the race day', onGo: () => onCareer?.() }
@@ -679,7 +690,13 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <>
               <div className="sim-front-top">
                 <Brand />
-                {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
+                <div className="sim-front-acts">
+                  {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
+                  <button type="button" className="sim-btn-quick" onClick={quickRace} title="Pick the water, wind and boat, and go">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
+                    Quick race
+                  </button>
+                </div>
               </div>
               <h1 className="sr-only">Sailing Academy</h1>
               <div className="sim-front">
@@ -757,8 +774,18 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               </section>
             )}
             {next && <RehearseCard {...next} race={next.race} />}
+            {onBench && (
+              <section className="sim-card flex flex-wrap items-center gap-x-6 gap-y-3 p-5" aria-labelledby="bench-title">
+                <div className="min-w-[240px] flex-1">
+                  <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>For race officers</p>
+                  <h2 id="bench-title" className="sim-h3 mt-0.5">Scoring bench</h2>
+                  <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>Sail one fleet as a whole regatta under low point, HMS and SHRS, see how each system ranks the same skippers, and take the results into Race Management's event simulation.</p>
+                </div>
+                <Btn onClick={onBench}>Open the bench</Btn>
+              </section>
+            )}
         {/* ── Race set-up ── */}
-        <section className="sim-set-card" aria-labelledby="qr-title">
+        <section ref={setCard} className="sim-set-card scroll-mt-4" aria-labelledby="qr-title">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pb-4 pt-5 sm:px-6">
             <div className="min-w-[220px] flex-1">
               <h2 id="qr-title" className="sim-h2">Your race</h2>
@@ -773,7 +800,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
               {!(s.venue === practiceAt.id && s.windDir === 'today') && <button type="button" onClick={() => set({ venue: practiceAt.id, windDir: 'today', todayStrength: true })} className="sim-btn-lg flex-1 sm:flex-none" title={`${practiceAt.name}, in the wind blowing there today`}>Today's wind</button>}
               <button type="button" onClick={surprise} className="sim-btn-lg flex-1 sm:flex-none">Surprise me</button>
-              <button type="button" onClick={() => onStart('race', s)} className="sim-btn-lg sim-btn-go flex-1 sm:flex-none">
+              <button type="button" onClick={() => onStart('race', s)} className="sim-btn-lg sim-btn-go sim-btn-green flex-1 sm:flex-none">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
                 Start race
               </button>
