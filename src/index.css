@@ -613,3 +613,26 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 .sim-podium-earned { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; text-align: center; font-size: 14.5px; color: rgba(235, 240, 255, 0.82); animation: sim-podium-rise .6s ease .7s both; }
 .sim-podium-earned b { color: #F2C230; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .sim-podium-earned { animation: none; } }
+
+/* A picker sheet with more below: the foot fades and a button says what's there and goes to it. */
+.sim-sheet-more {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 88px;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 14px;
+  background: linear-gradient(to bottom, rgba(11, 19, 34, 0), rgba(11, 19, 34, 0.92) 55%, #0B1322);
+  pointer-events: none;
+}
+.sim-sheet-more-btn {
+  pointer-events: auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px 8px 16px; border-radius: 999px;
+  border: 1px solid rgba(77, 163, 255, 0.45);
+  background: rgba(46, 123, 255, 0.18);
+  color: #DCEBFF; font-size: 13.5px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  animation: sim-more-nudge 1.8s ease-in-out 0.4s 2;
+}
+.sim-sheet-more-btn:hover { background: rgba(46, 123, 255, 0.28); }
+@keyframes sim-more-nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .sim-sheet-more-btn { animation: none; } }
