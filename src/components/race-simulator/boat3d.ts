@@ -758,9 +758,10 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 - 1.2 + flutter, b.x, b.y + flutter); ctx.stroke();
       }
     }
-    if (sl.kind === 'main') {
+    // The booms along each foot: the main's, and the jib's (a radio yacht's jib is set on a boom too).
+    {
       const bt = o.P(...sl.S(0, 0)), bc = o.P(...sl.S(0, 1));
-      ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(0.009);
+      ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(sl.kind === 'main' ? 0.009 : 0.0075);
       ctx.beginPath(); ctx.moveTo(bt.x, bt.y); ctx.lineTo(bc.x, bc.y); ctx.stroke();
     }
   } });
