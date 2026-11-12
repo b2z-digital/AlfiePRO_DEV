@@ -2,6 +2,7 @@
 // profile) → race or training scene → debrief. Racing fills the whole window, above the app's
 // navigation; "Main Menu" brings you back. The racing itself runs on the engine in src/sim; this
 // file only moves between the screens and keeps your settings and progress.
+import type { SkipperLevel } from '@/sim/types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Race, RaceLog } from '@/sim/engine';
@@ -14,8 +15,9 @@ import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findSce
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import type { Door } from './SimDoors';
 import SimCareer from './SimCareer';
+import { FLEET_NAME } from './heats';
 import { levelLicence } from './programme';
-import { ME, careerRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
+import { ME, TIERS, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
 import SimTrainer from './SimTrainer';
@@ -506,14 +508,16 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const careerMe = useCallback((c: Career | null) => ({ name: me?.short ?? 'You', sail: sailFor(yardNow.current, c?.cls ?? setup.classId, me).sail }), [me, setup.classId]);
   /** Sail the next race of your race day on the Circuit (with the day done, back to its screen). */
   const sailCareer = useCallback(() => {
-    const career = loadTraining().career ?? newCareer(setup.classId, Date.now());
-    if (dayState(career).left <= 0) { setWhere('career'); return; }
-    if (!loadTraining().career) trainingChanged(saveCareer(career));
+    const was = loadTraining().career ?? newCareer(setup.classId, Date.now());
+    if (dayState(was).left <= 0) { setWhere('career'); return; }
+    // (A heat event: the heats before yours in the round are sailed first, so the next one is yours.)
+    const career = prepareRace(was, Date.now());
+    if (career !== loadTraining().career) trainingChanged(saveCareer(career));
     withSequences(list => {
       const seq = chosenSequence(list, setup.startSeq, setup.sequenceSeconds);
       const base = toSettings({ ...setup, classId: career.cls }, 'race', null, me, seq, yardNow.current);
-      const day = dayState(career);
-      setRun({ settings: careerRace(career, base), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), career: true, title: `${day.event.name} · Race ${day.raced + 1} of ${day.event.races}` });
+      const day = dayState(career), hn = heatNow(career);
+      setRun({ settings: careerRace(career, base), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), career: true, title: hn ? `${day.event.name} · Round ${hn.round} of ${hn.rounds}, ${hn.finals ? `${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}` : `${day.event.name} · Race ${day.raced + 1} of ${day.event.races}` });
       setRunView(setup.view);
       setWhere('race');
     });
@@ -557,13 +561,17 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     let careerNote: { title: string; left: number } | undefined;
     if (run?.career && !run.resume) {
       const before = loadTraining().career ?? newCareer(race.settings.classId, Date.now());
-      const rows = raceRows(before, race.results().map(r => ({ boat: race.boats.indexOf(r.boat), isPlayer: r.boat.isPlayer, status: r.status, place: r.place })));
+      const rows = raceRows(before, race.results().map(r => ({ boat: race.boats.indexOf(r.boat), isPlayer: r.boat.isPlayer, status: r.status, place: r.place })), race.settings.cast?.map(c => c.id));
+      const hnBefore = heatNow(before);
       const after = recordRace(before, rows, Date.now());
       trainingChanged(saveCareer(after));
       const st = dayState(after), mine = dayStandings(after, careerMe(after)).find(r => r.userId === ME);
       const my = rows.find(r => r.id === ME);
-      careerNote = { title: `${st.event.name} · Race ${st.raced} of ${st.event.races}`, left: st.left };
-      setChNote(`This race: ${my?.place ? ordinal(my.place) : my?.code ?? 'not finished'}.${mine ? ` On the day so far: ${ordinal(mine.rank)} of ${rows.length}, ${mine.net} point${mine.net === 1 ? '' : 's'} net.` : ''}${st.canSimulate ? ' You can simulate the rest of the day from here, or sail on.' : st.left ? '' : ' That was the last race of the day.'}`);
+      const hnAfter = heatNow(after);
+      // HMS: finish high enough in your heat and you're promoted into the one above, to sail it in the same round.
+      const promoted = !!hnBefore?.heat && !!hnAfter && hnAfter.round === hnBefore.round && hnAfter.heat !== hnBefore.heat && hnAfter.ids.includes(ME);
+      careerNote = hnBefore ? { title: `${st.event.name} · Round ${hnBefore.round}, ${hnBefore.finals ? `${FLEET_NAME[hnBefore.heat as 'A'] ?? hnBefore.heat} fleet` : `heat ${hnBefore.heat}`}`, left: st.left } : { title: `${st.event.name} · Race ${st.raced} of ${st.event.races}`, left: st.left };
+      setChNote(`${hnBefore ? `Heat ${hnBefore.heat}` : 'This race'}: ${my?.place ? `${ordinal(my.place)} of ${rows.length}` : my?.code ?? 'not finished'}.${promoted ? ` Promoted: you sail heat ${hnAfter!.heat} next, in this round.` : ''}${mine ? ` On the day so far: ${ordinal(mine.rank)} of ${rows.length}, ${mine.net} point${mine.net === 1 ? '' : 's'} net.` : ''}${st.canSimulate ? ' You can simulate the rest of the day from here, or sail on.' : st.left ? '' : ' That was the last race of the day.'}`);
     } else if (run?.career) setChNote("Taken over part way through, so this one is practice: it isn't on the day's sheet.");
     setDebrief({ race, sum, moments, challenge: ch, event: ev, career: careerNote });
     setWhere('debrief');
@@ -765,7 +773,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return (
       <div key={where} className="h-full overflow-y-auto">
         <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
-          licence={levelLicence('club', profile, training)} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
+          licence={training.career?.ticket ? levelLicence(TIERS[TIERS.indexOf(training.career.ticket) - 1] as SkipperLevel, profile, training) : null} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
           onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
       </div>
     );
