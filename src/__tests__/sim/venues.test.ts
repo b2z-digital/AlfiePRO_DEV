@@ -3,7 +3,7 @@
 // on the water to sail; and what the club knows about its winds reaches the wind and Alfie.
 import { describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
-import { VENUES, venueForClub } from '@/sim/venues';
+import { BUILT_IN, VENUES, venueForClub } from '@/sim/venues';
 import { controlAt, cutEdge, nearestShore, shoreWet, toGeo, venueWindFor, wetIn, windAt, windsOf } from '@/sim/venue';
 import type { RaceSettings } from '@/sim/types';
 import { localKnowledge } from '@/components/race-simulator/coach';
@@ -13,7 +13,8 @@ const base: RaceSettings = {
   laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'off', autoTrim: true, seed: 11, noPlayer: true,
 };
 
-describe.each(Object.keys(VENUES))('Venue %s', id => {
+// (The clubs' real waters. The Circuit's invented ones have their own tests: circuit.test.ts.)
+describe.each(BUILT_IN.map(v => v.id))('Venue %s', id => {
   const def = VENUES[id];
   const rings = [def.water, ...def.islands];
 

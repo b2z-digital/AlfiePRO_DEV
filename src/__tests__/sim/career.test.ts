@@ -1,6 +1,7 @@
 // The Circuit's club season: the cast, race days, simulating the rest, scoring and medals.
 import { describe, expect, it } from 'vitest';
-import { CAST, CLUB_SEASON, FLEET, ME, careerRace, dayStandings, dayState, eventAt, finishDay, fleetOf, medalCount, newCareer, newerCareer, recordRace, rival, seasonStandings, simulateRest, type Career, type RowResult } from '@/components/race-simulator/career';
+import { CAST, CLUB_SEASON, FLEET, ME, REGIONAL_SEASON, TIER_FLEET, careerRace, dayStandings, dayState, eventAt, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, newerCareer, recordRace, rival, seasonStandings, simulateRest, tierOf, type Career, type RowResult } from '@/components/race-simulator/career';
+import { VENUES } from '@/sim/venues';
 import { mergeTraining, type TrainingProgress } from '@/components/race-simulator/progress';
 import { Race } from '@/sim/engine';
 import type { RaceSettings } from '@/sim/types';
@@ -12,13 +13,17 @@ const base: RaceSettings = { classId: 'IOM', fleetSize: 6, level: 'national', wi
 const rows = (career: Career, place: number | null, code: RowResult['code'] = null): RowResult[] => {
   const others = [...career.fleet];
   const out: RowResult[] = others.map((id, k) => ({ id, place: k + 1 + (place !== null && k + 1 >= place ? 1 : 0), code: null }));
+  void TIER_FLEET;
   return [{ id: ME, place, code }, ...out];
 };
-/** Sail three races in these places, simulate the rest, and close the day. */
+/** Sail three races a day in these places, simulate the rest of each day, and close the event. */
 const day = (career: Career, places: number[], at = NOW) => {
   let c = career;
-  for (const p of places) c = recordRace(c, rows(c, p), at);
-  return finishDay(simulateRest(c, at), me, at)!;
+  for (let d = 0, days = dayState(c).days; d < days; d++) {
+    for (const p of places) c = recordRace(c, rows(c, p), at);
+    c = simulateRest(c, at);
+  }
+  return finishDay(c, me, at)!;
 };
 
 describe('The cast', () => {
@@ -26,7 +31,7 @@ describe('The cast', () => {
     expect(new Set(CAST.map(m => m.id)).size).toBe(CAST.length);
     expect(new Set(CAST.map(m => m.sail)).size).toBe(CAST.length);
     expect(CAST.every(m => /^\d{2}$/.test(m.sail) && m.sail !== '01' && /^[A-Z]{3}$/.test(m.country) && /^#[0-9A-F]{6}$/i.test(m.hull))).toBe(true);
-    expect(new Set(CAST.map(m => m.country)).size).toBeGreaterThan(6);
+    expect(new Set(CAST.map(m => m.country)).size).toBeGreaterThan(12);
   });
 
   it('sails the race under their own names and numbers, and yours stays yours', () => {
@@ -126,7 +131,8 @@ describe('The season', () => {
     const last = day(c, [1, 1, 1]);
     expect(last.medal).toMatchObject({ kind: 'gold', trophy: true, event: 'Club Championship' });
     expect(last.career).toMatchObject({ season: 2, done: [], day: null });
-    expect(last.career.history).toEqual([{ season: 1, pointscore: expect.any(Number), championship: 1, of: FLEET }]);
+    expect(last.career.history).toEqual([{ season: 1, pointscore: expect.any(Number), championship: 1, of: FLEET, tier: 'club' }]);
+    expect(last.career.ticket).toBe('state');
     expect(last.career.medals.length).toBeGreaterThanOrEqual(1);
     expect(last.career.fleet.length).toBe(FLEET - 1);
   });
@@ -138,5 +144,66 @@ describe('The season', () => {
     expect(newerCareer(undefined, a)).toBe(a);
     const none: TrainingProgress = { drills: {}, lessons: {}, lab: {}, updatedAt: 0 };
     expect(mergeTraining({ ...none, career: a }, { ...none, career: b }).career).toBe(b);
+  });
+});
+
+describe('The Regional season', () => {
+  /** A club season sailed, finishing the Championship in this place. */
+  const clubSeason = (champ: number) => { let c = newCareer('IOM', NOW); for (let i = 0; i < 6; i++) c = day(c, [5, 5, 5]).career; return day(c, [champ, champ, champ]).career; };
+
+  it('top three in the Club Championship qualifies you; lower does not', () => {
+    expect(clubSeason(1).ticket).toBe('state');
+    expect(clubSeason(10).ticket).toBeUndefined();
+    // Still a club season until the place is taken up.
+    expect(tierOf(clubSeason(1))).toBe('club');
+    expect(moveUp(clubSeason(10), NOW)).toEqual(clubSeason(10));
+  });
+
+  it('taking the place up starts a season of regattas on the Circuit waters, in a fleet of sixteen', () => {
+    const up = moveUp(clubSeason(1), NOW);
+    expect(up).toMatchObject({ tier: 'state', done: [], day: null });
+    expect(up.ticket).toBeUndefined();
+    expect(up.fleet.length).toBe(15);
+    expect(new Set(up.fleet).size).toBe(15);
+    expect(eventAt(up).event).toMatchObject({ name: 'Lantern Quay Regatta', kind: 'regatta', water: 'circuit-lantern-quay' });
+    const s = careerRace(up, base);
+    expect(s).toMatchObject({ fleetSize: 16, level: 'state', venue: 'circuit-lantern-quay', windFrom: 250, windCharacter: 'puffy' });
+    const race = new Race(s);
+    expect(race.venue?.def.name).toBe('Lantern Quay');
+    expect(race.boats.length).toBe(16);
+    expect(new Set(race.boats.map(b => b.sail)).size).toBe(16);
+    for (const e of REGIONAL_SEASON) expect(VENUES[e.water!]).toBeTruthy();
+  });
+
+  it('the Championship is two days: each day sail three and simulate the rest, sixteen races in all', () => {
+    let c = moveUp(clubSeason(1), NOW);
+    for (let i = 0; i < 3; i++) c = day(c, [8, 8, 8]).career;
+    expect(eventAt(c).event).toMatchObject({ name: 'Regional Championship', races: 16, perDay: 8 });
+    expect(dayState(c)).toMatchObject({ day: 0, days: 2, leftToday: 8, left: 16 });
+    expect(eventWind(eventAt(c).event, 0)!.from).not.toBe(eventWind(eventAt(c).event, 1)!.from);
+    for (const p of [2, 2, 2]) c = recordRace(c, rows(c, p), NOW);
+    expect(dayState(c)).toMatchObject({ sailedToday: 3, leftToday: 5, canSimulate: true });
+    c = simulateRest(c, NOW);
+    // Day one is on the sheet; day two hasn't begun, and can't be simulated until three of it are sailed.
+    expect(dayState(c)).toMatchObject({ day: 1, raced: 8, sailedToday: 0, leftToday: 8, canSimulate: false, complete: false });
+    expect(finishDay(c, me, NOW)).toBeNull();
+    expect(careerRace(c, base).windFrom).toBe(eventWind(eventAt(c).event, 1)!.from);
+    for (const p of [1, 1, 1]) c = recordRace(c, rows(c, p), NOW);
+    c = simulateRest(c, NOW);
+    expect(dayState(c)).toMatchObject({ raced: 16, complete: true });
+    const t = dayStandings(c, me);
+    expect(t.length).toBe(16);
+    // Sixteen races: three dropped.
+    expect(t.find(r => r.userId === ME)!.scores.filter(s => s?.dropped).length).toBe(3);
+    const fin = finishDay(c, me, NOW)!;
+    expect(fin.career).toMatchObject({ tier: 'state', done: [], day: null });
+    expect(fin.career.history.at(-1)).toMatchObject({ tier: 'state', of: 16 });
+    if (fin.medal?.trophy) expect(fin.medal.event).toBe('Regional Championship');
+  });
+
+  it('a Regional season is further on than any club season, between devices', () => {
+    const club = clubSeason(1), up = moveUp(club, NOW + 1);
+    expect(newerCareer(club, up)).toBe(up);
+    expect(newerCareer(up, club)).toBe(up);
   });
 });

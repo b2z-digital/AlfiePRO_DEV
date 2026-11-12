@@ -14,6 +14,7 @@ import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findSce
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
 import type { Door } from './SimDoors';
 import SimCareer from './SimCareer';
+import { levelLicence } from './programme';
 import { ME, careerRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
@@ -746,6 +747,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     return (
       <div key={where} className="h-full overflow-y-auto">
         <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
+          licence={levelLicence('club', profile, training)} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
           onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
       </div>
     );

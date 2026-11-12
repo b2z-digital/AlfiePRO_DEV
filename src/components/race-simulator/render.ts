@@ -1,6 +1,7 @@
 // Canvas renderer for the race: water with wind streaks and the puffs that are really out there,
 // the course, wakes, boats with their sails set to the wind, hails, and teaching overlays
 // (zone, laylines, time to the line, who has right of way). Draws one frame; owns no state.
+import { creditLine } from '@/sim/venue';
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
 import type { WorldOverlay } from '@/sim/scene';
@@ -479,7 +480,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
     ctx.lineWidth = 2.2;
     ctx.beginPath(); ctx.arc(X(f.x), Y(f.y), r, 0, Math.PI * 2); ctx.stroke();
   }
-  if (race.venue && v.credit !== false) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
+  if (race.venue && v.credit !== false) drawCredit(ctx, creditLine(race.venue.def), w, h);
 }
 
 /** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on
@@ -705,5 +706,5 @@ export function drawReplayMap(ctx: CanvasRenderingContext2D, race: Race, w: numb
     ctx.moveTo(ax, ay); ctx.lineTo(ax - wd.x * 6 - pxv.x * 5, ay + wd.y * 6 - pxv.y * 5);
     ctx.stroke();
   }
-  if (race.venue) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
+  if (race.venue) drawCredit(ctx, creditLine(race.venue.def), w, h);
 }

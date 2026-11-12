@@ -2,6 +2,8 @@
 // HUD over it (wind, clock, line or course, fleet, coach, boat strip, sticks). Rules moments pause
 // the race in full-coach mode. Keyboard, transmitter and on-screen sticks all steer.
 // The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
+import { levelName } from './rating';
+import { creditLine } from '@/sim/venue';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Race, RaceLog } from '@/sim/engine';
 import { PERSONAS, Skipper, knownFor, levelsFor } from '@/sim/ai';
@@ -859,8 +861,8 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const sub = scene
     ? `${scene.group} · ${scene.spec.brief}`
     : race.venue
-      ? `${race.venue.def.short} · ${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText} from the ${compassName(race.course.rot)}, ${s.windCharacter}`
-      : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${s.level[0].toUpperCase()}${s.level.slice(1)} skippers · ${windText}, ${s.windCharacter}`;
+      ? `${race.venue.def.short} · ${race.boats[0].cls.name} · ${s.fleetSize} boats · ${levelName(s.level)} skippers · ${windText} from the ${compassName(race.course.rot)}, ${s.windCharacter}`
+      : `${race.boats[0].cls.name} · ${s.fleetSize} boats · ${levelName(s.level)} skippers · ${windText}, ${s.windCharacter}`;
   const title = scene ? scene.spec.title : live ? 'Live race' : mode === 'start' ? 'Start practice' : raceTitle ?? 'Quick race';
   const p = race.player;
   const otherSail = moment ? (() => { const id = moment.offender === p?.id ? moment.victim : moment.offender; return id ? race.boatById(id).sail : null; })() : null;
@@ -977,7 +979,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             bottom={!replay}
             watchSticks={watching && !replay && !sceneOut && !intro}
             autoTrim={race.settings.autoTrim}
-            credit={race.venue ? `Map data ${race.venue.def.credit}` : null}
+            credit={race.venue ? creditLine(race.venue.def) : null}
           />
         )}
         {phone && sheetOpen && hud && <CourseSheet race={race} hud={hud} cam={view === 'bank' ? bcam : null} portrait={scrH > scrW} onClose={() => setSheetOpen(false)} />}

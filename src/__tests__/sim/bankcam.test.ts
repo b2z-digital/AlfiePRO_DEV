@@ -2,7 +2,8 @@
 // the bank with the boat between, and never so far down it that the gate is looked back up at.
 import { describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
-import { VENUES } from '@/sim/venues';
+import { BUILT_IN, CIRCUIT_WATERS, VENUES } from '@/sim/venues';
+import { windsOf } from '@/sim/venue';
 import type { RaceSettings } from '@/sim/types';
 import { bankStation, followCam, newBankCam } from '@/components/race-simulator/bank';
 
@@ -10,7 +11,7 @@ const base: RaceSettings = {
   classId: 'IOM', fleetSize: 8, level: 'state', windStrength: 'medium', windCharacter: 'oscillating',
   laps: 2, length: 'medium', sequenceSeconds: 60, coach: 'off', autoTrim: true, seed: 3,
 };
-const WHERE: Partial<RaceSettings>[] = [{}, { classId: 'DF65' }, ...Object.keys(VENUES).flatMap(v => [{ venue: v }, { venue: v, classId: 'DF65' as const }, { venue: v, windFrom: (VENUES[v].usualWind + 180) % 360 }])];
+const WHERE: Partial<RaceSettings>[] = [{}, { classId: 'DF65' }, ...BUILT_IN.map(v => v.id).flatMap(v => [{ venue: v }, { venue: v, classId: 'DF65' as const }, { venue: v, windFrom: (VENUES[v].usualWind + 180) % 360 }]), ...CIRCUIT_WATERS.flatMap(w => windsOf(w).map(x => ({ venue: w.id, windFrom: x.from })))];
 
 describe('Standing in the control area', () => {
   it.each(WHERE.map(w => [JSON.stringify(w), w] as const))('%s', (_n, w) => {

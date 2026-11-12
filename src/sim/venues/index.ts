@@ -3,8 +3,10 @@ import type { VenueDef } from '../venue';
 import { LMRYC } from './lmryc';
 import { KBRYC } from './kbryc';
 import { PLRMYC } from './plrmyc';
+import { CIRCUIT_WATERS } from './circuit';
 
-export const VENUES: Record<string, VenueDef> = { [LMRYC.id]: LMRYC, [KBRYC.id]: KBRYC, [PLRMYC.id]: PLRMYC };
+export const VENUES: Record<string, VenueDef> = { [LMRYC.id]: LMRYC, [KBRYC.id]: KBRYC, [PLRMYC.id]: PLRMYC, ...Object.fromEntries(CIRCUIT_WATERS.map(w => [w.id, w])) };
+export { CIRCUIT_WATERS };
 
 /** The default venue: Lake Macquarie RYC on the Booragul foreshore. */
 export const DEFAULT_VENUE = LMRYC.id;
