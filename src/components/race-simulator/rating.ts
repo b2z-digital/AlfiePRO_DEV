@@ -55,7 +55,8 @@ export interface Standing {
   series: { at: number; rating: number }[];
 }
 
-export function standing(profile: Profile): Standing {
+/** `known`: their level is already known (they said they're new to RC sailing, so Club), and no placement races are needed. */
+export function standing(profile: Profile, known = false): Standing {
   const rs = profile.races.filter(rated).sort((a, z) => a.at - z.at);
   let rating = START_RATING, last: number | null = null;
   const series: Standing['series'] = [];
@@ -72,7 +73,7 @@ export function standing(profile: Profile): Standing {
   const from = level === 'club' ? FLOOR : LEVEL_FROM[level];
   const to = up ? LEVEL_FROM[up] : LEVEL_FROM.world + 300;
   return {
-    rating: shown, races: rs.length, placed: rs.length >= PLACED_AFTER, level, last,
+    rating: shown, races: rs.length, placed: known || rs.length >= PLACED_AFTER, level, last,
     next: up ? { level: up, at: LEVEL_FROM[up], gap: LEVEL_FROM[up] - shown } : null,
     through: Math.max(0, Math.min(1, (shown - from) / (to - from))),
     series,

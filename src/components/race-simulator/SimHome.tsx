@@ -21,9 +21,10 @@ import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
 import { offerFirstSail } from './plan';
 import { nextUp } from './nextup';
+import { learnPath } from './learn';
 import { SYLLABUS, levelLicence, weekPlan } from './programme';
 import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
-import { Brand, DOOR_NAME, DoorBack, DoorCard, LevelCard, LicenceCard, NextUpCard, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
+import { Brand, DOOR_NAME, DoorBack, DoorCard, LearnCard, LevelCard, LicenceCard, NextUpCard, StartAgain, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
 import { CAUSE_WORDS } from './ledger';
 import { dayState, seasonOf, type Career } from './career';
 import { MedalShelf } from './SimCareer';
@@ -446,15 +447,17 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onPlay, career = null, onCareer, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
   onDismiss?: (card: string) => void;
   /** Which part of the Academy is open: the front, or behind one of its three doors. */
   door?: Door; onDoor?: (d: Door) => void;
-  /** "Help me sail better" or "I want to race". */
-  onWay?: (w: Way) => void;
+  /** "Help me sail better" or "I want to race", and "I'm new to RC sailing" (on or off). */
+  onWay?: (w: Way, newcomer?: boolean) => void;
+  /** Start again: everything cleared (the yachts kept, or not). */
+  onReset?: (keepYachts: boolean) => void;
   /** Open a play in the Playbook. */
   onPlay?: (id: string) => void;
   /** Your season on the Circuit (null: not begun), and the way to its screen. */
@@ -608,7 +611,12 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   // The layered home: your level, this week's programme, the licence above you, and what's next.
   const way: Way = training.way?.mode ?? 'simple';
   const simple = way === 'simple';
-  const st = useMemo(() => standing(profile), [profile]);
+  // Said they're new to RC sailing: their level is known (Club), and the learn-to-sail path comes first.
+  const st = useMemo(() => standing(profile, !!training.newcomer), [profile, training.newcomer]);
+  const learn = useMemo(() => (training.newcomer ? learnPath(profile, training, training.newcomer) : null), [profile, training]);
+  /** The first race of the path: short, against five Club skippers, with Alfie coaching. */
+  const firstRace = () => onStart('race', { ...s, fleetSize: 6, level: 'club', laps: 1, length: 'short', coach: 'full', autoTrim: true });
+  const goLearn = () => { const n = learn?.next; if (!n) return; if (n.link) onLink?.(n.link); else firstRace(); };
   const clean = useMemo(() => cleanSailing(profile), [profile]);
   const week = useMemo(() => weekPlan(profile, training, Date.now(), st), [profile, training, st]);
   const grad = useMemo(() => levelLicence(st.level, profile, training), [st.level, profile, training]);
@@ -651,7 +659,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   // How you're going, in words (the simple way of using it).
   const lastRace = profile.races.find(r => r.mode === 'race' && r.status !== 'racing');
   const going = [
-    st.placed ? `You're sailing at ${LEVEL_NAME[st.level]} level.` : st.races === 0 ? "Sail three races and we'll know your level." : `${up.kind === 'placement' ? up.of - up.sailed : 3 - st.races} more race${3 - st.races === 1 ? '' : 's'} and we'll know your level.`,
+    learn && !learn.done ? `You're learning the basics: ${learn.progress.done} of ${learn.progress.of} steps done.` : st.placed ? `You're sailing at ${LEVEL_NAME[st.level]} level.` : st.races === 0 ? "Sail three races and we'll know your level." : `${up.kind === 'placement' ? up.of - up.sailed : 3 - st.races} more race${3 - st.races === 1 ? '' : 's'} and we'll know your level.`,
     ...(week.weakest ? [`${CAUSE_WORDS[week.weakest].name} is where you have most to gain.`] : []),
     ...(lastRace ? [`Your last race: ${lastRace.place ? `${ordinal(lastRace.place)} of ${lastRace.of}` : 'not finished'}.`] : []),
   ];
@@ -678,7 +686,11 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 {/* One deck at the foot of the render: what's next across the top, the ways in beneath it. */}
                 <div className="sim-deck" ref={deck}>
                   {!training.way && onWay && <WayAsk onChoose={onWay} />}
-                  {up.kind === 'first-sail' && onLink
+                  {up.kind === 'learn' && learn
+                    ? <LearnCard bare path={learn} onGo={goLearn} />
+                    // (While they're being asked, "I'm new to RC sailing" is one of the answers: no need for the card as well.)
+                    : up.kind === 'first-sail' && !training.way && onWay ? null
+                    : up.kind === 'first-sail' && onLink
                     ? <FirstSailCard bare done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />
                     : <NextUpCard big={simple} {...upView}>{(up.kind === 'placement' || up.kind === 'race') && <SetupChips items={chips} />}</NextUpCard>}
                   {simple ? (
@@ -687,7 +699,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                         <h2 id="going-title" className="sim-cell-kicker">How you're going</h2>
                         {going.map(l => <p key={l} className="sim-cell-say">{l}</p>)}
                       </section>
-                      {up.kind !== 'placement' && up.kind !== 'race' && (
+                      {up.kind !== 'placement' && up.kind !== 'race' && up.kind !== 'learn' && (
                         <section className="sim-cell" aria-labelledby="pr-title">
                           <div className="flex flex-wrap items-center gap-3">
                             <span className="min-w-0 flex-1"><span id="pr-title" className="sim-cell-title">A practice race</span><span className="sim-cell-status">About {minutes(s)} minutes</span></span>
@@ -698,7 +710,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       )}
                       <button type="button" className="sim-cell sim-door" onClick={() => go('train')}>
                         <span className="flex items-center gap-3"><span className="sim-cell-title">Your programme and the library</span><ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto shrink-0" /></span>
-                        <span className="sim-cell-status">{week.done} of {week.sessions.length} sessions done this week</span>
+                        <span className="sim-cell-status">{learn && !learn.done ? `Learning the basics: ${learn.progress.done} of ${learn.progress.of} steps` : `${week.done} of ${week.sessions.length} sessions done this week`}</span>
                       </button>
                       <button type="button" className="sim-cell sim-door" onClick={() => go('you')}>
                         <span className="flex items-center gap-3"><span className="sim-cell-title">You and your yacht</span><ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto shrink-0" /></span>
@@ -851,7 +863,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         {door === 'train' && (
           <div className="flex min-w-0 flex-col gap-5">
             <div className={cx('grid items-start gap-5', !simple && grad && 'xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]')}>
-              {onLink && <WeekCard week={week} level={st.level} onGo={onLink} onPlay={onPlay} />}
+              {learn && !learn.done ? <LearnCard path={learn} onGo={goLearn} /> : onLink && <WeekCard week={week} level={st.level} onGo={onLink} onPlay={onPlay} />}
               {!simple && grad && <LicenceCard lic={grad} onGo={g => (g === 'race' ? go('race') : onOpen(g))} />}
             </div>
               <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:px-5">
@@ -955,7 +967,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <MedalShelf medals={career.medals} />
                 </section>
               )}
-              {onWay && <WaySwitch way={way} onChoose={onWay} />}
+              {onWay && <WaySwitch way={way} newcomer={!!training.newcomer} onChoose={onWay} />}
+              {onReset && <StartAgain onReset={onReset} hasYachts={yard.yachts.length > 0} synced={synced} />}
               {transmitter && <TransmitterCard {...transmitter} />}
             </div>
           </div>

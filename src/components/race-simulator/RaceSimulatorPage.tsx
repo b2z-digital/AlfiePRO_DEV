@@ -25,10 +25,10 @@ import SimPassport from './SimPassport';
 import SimJudge from './SimJudge';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
-import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
+import { Profile, clearProfile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
 import { loadNextRace, type NextRace } from './rehearse';
-import { TrainingProgress, chooseWay, dismissCard, saveCareer, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
+import { TrainingProgress, chooseWay, dismissCard, resetTraining, saveCareer, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import SimYacht from './SimYacht';
@@ -223,8 +223,15 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     let live = true;
     const a = { userId, clubId };
     void loadIdentity(userId, clubId).then(id => { if (live) setMe(id); });
-    void pullRaces(a).then(rs => { if (live && rs) { setProfile(mergeRaces(rs)); setSynced(true); } });
+    // (Training first: a reset made on another device is known before the races are merged.)
     void syncTraining(a, { ...loadTraining(), yard: loadYard() }).then(t => {
+      void pullRaces(a).then(rs => {
+        if (!live || !rs) return;
+        const since = (t ?? loadTraining()).resetAt ?? 0;
+        // Started again on another device: the races from before it go from this one too.
+        if (since) { const p = loadProfile(); if (p.races.some(r => r.at < since)) { clearProfile(); for (const r of p.races.filter(x => x.at >= since).reverse()) saveRace(r); } }
+        setProfile(mergeRaces(rs, since)); setSynced(true);
+      });
       if (!live || !t) return;
       setTraining(saveTraining(t));
       // The newer of this device's boats and the account's.
@@ -362,6 +369,17 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     setTraining(t);
     if (userId) void syncTraining({ userId, clubId }, t);
   }, [userId, clubId]);
+
+  /** Start again: races, training and the Circuit cleared here and in the account; the yachts kept or not. */
+  const startAgain = useCallback((keepYachts: boolean) => {
+    const t = resetTraining(keepYachts);
+    clearProfile();
+    setProfile(loadProfile());
+    if (!keepYachts) { const empty = saveYard({ yachts: [], racing: {}, at: t.resetAt ?? Date.now() }); setYard(empty); }
+    setDebrief(null); setDoor('home');
+    trainingChanged(t);
+    if (userId) void clearRaces({ userId, clubId });
+  }, [trainingChanged, userId, clubId]);
   // A boat redesigned: kept here at once, and sent to the account a moment after the last change
   // (a colour tried and passed over isn't worth a trip).
   const yardSend = useRef(0);
@@ -816,7 +834,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onWay={w => trainingChanged(chooseWay(w))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}

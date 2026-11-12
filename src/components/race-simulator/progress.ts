@@ -29,6 +29,10 @@ export interface TrainingProgress {
   way?: { mode: Way; at: number };
   /** Your season on the AlfiePRO Circuit (see career.ts). */
   career?: Career;
+  /** When you said you're new to RC sailing: you start at Club level and on the learn-to-sail path (see learn.ts). */
+  newcomer?: number;
+  /** When you last started again: anything older, here or in your account, is left behind. */
+  resetAt?: number;
   updatedAt: number;
 }
 
@@ -88,11 +92,43 @@ export function dismissCard(id: string): TrainingProgress {
   return saveTraining(p);
 }
 
-/** "Help me sail better" (simple) or "I want to race" (full). */
-export function chooseWay(mode: Way): TrainingProgress {
+/** "Help me sail better" (simple) or "I want to race" (full); `newcomer`: "I'm new to RC sailing" as well (on), or not any more (off). */
+export function chooseWay(mode: Way, newcomer?: boolean): TrainingProgress {
   const p = loadTraining();
-  p.way = { mode, at: Date.now() };
+  const now = Date.now();
+  p.way = { mode, at: now };
+  if (newcomer === true && !p.newcomer) p.newcomer = now;
+  if (newcomer === false) delete p.newcomer;
   return saveTraining(p);
+}
+
+/**
+ * Start again: your training, programme, licences, Circuit season and medals cleared, and the
+ * question of how you'd like to use the Academy asked again. The time is kept, so anything older
+ * that comes back from your account (or another device) is left behind. Your yachts are kept unless
+ * you say otherwise.
+ */
+export function resetTraining(keepYachts: boolean, now = Date.now()): TrainingProgress {
+  const was = loadTraining();
+  const p: TrainingProgress = { drills: {}, lessons: {}, lab: {}, resetAt: now, updatedAt: 0 };
+  // (Kept yachts are stamped now, so they're newer than the reset.)
+  if (keepYachts && was.yard) p.yard = { ...was.yard, at: Math.max(was.yard.at, now) };
+  return saveTraining(p);
+}
+
+/** Only what's newer than the last reset. */
+function since(p: TrainingProgress, t: number): TrainingProgress {
+  if (!t) return p;
+  const keep = <R extends { at: number }>(o: Record<string, R> | undefined) => Object.fromEntries(Object.entries(o ?? {}).filter(([, r]) => r.at >= t)) as Record<string, R>;
+  return {
+    ...p, drills: keep(p.drills), lessons: keep(p.lessons), lab: keep(p.lab),
+    judge: p.judge ? keep(p.judge) : undefined,
+    dismissed: p.dismissed ? Object.fromEntries(Object.entries(p.dismissed).filter(([, at]) => at >= t)) : undefined,
+    way: p.way && p.way.at >= t ? p.way : undefined,
+    career: p.career && p.career.at >= t ? p.career : undefined,
+    newcomer: p.newcomer && p.newcomer >= t ? p.newcomer : undefined,
+    yard: p.yard && p.yard.at >= t ? p.yard : undefined,
+  };
 }
 
 /** Keep your season on the Circuit. */
@@ -128,7 +164,10 @@ export function drillStars(p: TrainingProgress): { got: number; of: number } {
 }
 
 /** Merge two progress records (device and account): keep the best of each. */
-export function mergeTraining(a: TrainingProgress, b: TrainingProgress): TrainingProgress {
+export function mergeTraining(a0: TrainingProgress, b0: TrainingProgress): TrainingProgress {
+  // Started again on either side: what's older than that is left behind on both.
+  const reset = Math.max(a0.resetAt ?? 0, b0.resetAt ?? 0);
+  const a = since(a0, reset), b = since(b0, reset);
   const out: TrainingProgress = { drills: { ...a.drills }, lessons: { ...a.lessons }, lab: { ...a.lab }, updatedAt: Math.max(a.updatedAt, b.updatedAt) };
   for (const [k, r] of Object.entries(b.drills)) {
     const m = out.drills[k];
@@ -155,6 +194,8 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
     for (const [k, at] of Object.entries(b.dismissed ?? {})) out.dismissed[k] = Math.max(at, out.dismissed[k] ?? 0);
   }
   if (a.career || b.career) out.career = newerCareer(a.career, b.career);
+  if (reset) out.resetAt = reset;
+  if (a.newcomer || b.newcomer) out.newcomer = Math.min(a.newcomer ?? Infinity, b.newcomer ?? Infinity);
   // The way of using the Academy that was chosen last.
   if (a.way || b.way) out.way = (b.way?.at ?? 0) > (a.way?.at ?? 0) ? b.way : a.way;
   return out;

@@ -23,11 +23,11 @@ export function saveRace(sum: RaceSummary): Profile {
 
 export function clearProfile() { try { localStorage.removeItem(KEY); } catch { /* storage unavailable */ } }
 
-/** Add the races from your account that this device hasn't seen (the newest 30 are kept). */
-export function mergeRaces(remote: RaceSummary[]): Profile {
+/** Add the races from your account that this device hasn't seen (the newest 30 are kept). Nothing from before `since` (when you last started again). */
+export function mergeRaces(remote: RaceSummary[], since = 0): Profile {
   const p = loadProfile();
-  const byAt = new Map(p.races.map(r => [r.at, r]));
-  for (const r of remote) if (!byAt.has(r.at)) byAt.set(r.at, r);
+  const byAt = new Map(p.races.filter(r => r.at >= since).map(r => [r.at, r]));
+  for (const r of remote) if (r.at >= since && !byAt.has(r.at)) byAt.set(r.at, r);
   p.races = [...byAt.values()].sort((a, b) => b.at - a.at).slice(0, 30);
   try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* storage unavailable */ }
   return p;

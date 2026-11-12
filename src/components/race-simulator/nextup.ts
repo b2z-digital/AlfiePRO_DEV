@@ -1,5 +1,5 @@
 // "Next up": the one thing the home screen puts in front of you. The first of these that applies:
-// learn to sail (a newcomer), your placement races (not placed yet), the club's real race day in
+// the learn-to-sail path (someone who said they're new to RC sailing), learn to sail (a newcomer), your placement races (not placed yet), the club's real race day in
 // the next few days (rehearse it), a licence that's one requirement short, a club challenge about
 // to close, your season on the Circuit, this week's next session, and otherwise a race. A race day
 // under way comes straight after placement; the next race day is offered once you've trained this week. Pure: nothing stored here.
@@ -7,6 +7,7 @@ import type { SkipperLevel } from '@/sim/types';
 import { dayState, type Career } from './career';
 import type { Challenge } from './challenges';
 import { offerFirstSail } from './plan';
+import { learnPath, type LearnPath, type LearnStep } from './learn';
 import type { Profile } from './profile';
 import type { TrainingProgress } from './progress';
 import type { LevelLicence, Requirement, Session, Week } from './programme';
@@ -15,6 +16,7 @@ import type { NextRace } from './rehearse';
 
 export type NextUp =
   | { kind: 'first-sail' }
+  | { kind: 'learn'; step: LearnStep; path: LearnPath }
   | { kind: 'placement'; sailed: number; of: number }
   | { kind: 'career-day'; event: string; race: number; of: number; canSimulate: boolean }
   | { kind: 'career-next'; event: string; season: number; started: boolean }
@@ -37,7 +39,11 @@ export function nextUp(a: {
   career?: Career | null;
   now: number;
 }): NextUp {
-  if (offerFirstSail(a.profile, a.training)) return { kind: 'first-sail' };
+  // New to RC sailing, said so: the learn-to-sail path, in order, until it's done.
+  if (a.training.newcomer) {
+    const path = learnPath(a.profile, a.training, a.training.newcomer);
+    if (path.next) return { kind: 'learn', step: path.next, path };
+  } else if (offerFirstSail(a.profile, a.training)) return { kind: 'first-sail' };
   if (!a.standing.placed) return { kind: 'placement', sailed: a.standing.races, of: PLACED_AFTER };
   const cs = a.career ? dayState(a.career) : null;
   if (a.career?.day && cs) return { kind: 'career-day', event: cs.event.name, race: Math.min(cs.raced + 1, cs.event.races), of: cs.event.races, canSimulate: cs.canSimulate };
