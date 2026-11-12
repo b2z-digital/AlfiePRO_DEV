@@ -67,7 +67,7 @@ describe('Money', () => {
     expect(moneyOf(recordRace(open, rows(open, 5), NOW))).toBe(GRANT.state - 150);
     const broke = recordRace({ ...up, money: 50 }, rows(up, 5), NOW);
     expect(moneyOf(broke)).toBe(-100);
-    expect(broke.ledger![0]).toMatchObject({ text: 'Entry: Lantern Quay Regatta', amount: -150 });
+    expect(broke.ledger![0]).toMatchObject({ text: 'Entry: Kogarah Bay Regatta', amount: -150 });
   });
 
   it('the shop: buy with money you have, once; nothing for sale makes a boat faster', () => {

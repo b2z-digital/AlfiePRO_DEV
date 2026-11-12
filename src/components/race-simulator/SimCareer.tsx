@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
+import type { Region } from '@/sim/venue';
 import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
@@ -225,8 +226,10 @@ function Budget({ career, classLabel, onBuy }: { career: Career; classLabel: (c:
   );
 }
 
-export default function SimCareer({ career, me, setup, classLabel, licence, onLicence, onChange, onSail, onBack }: {
+export default function SimCareer({ career, me, home, setup, classLabel, licence, onLicence, onChange, onSail, onBack }: {
   career: Career | null; me: Me; setup: Setup; classLabel: (c: ClassId) => string;
+  /** Your home state, from your club's water: where a new Regional season is sailed (null: nothing to go on). */
+  home?: Region | null;
   /** The licence that takes a Club skipper up to the Regional season, and the way to work on one of its requirements. */
   licence: LevelLicence | null; onLicence: (go: Requirement['go']) => void;
   onChange: (c: Career) => void;
@@ -256,7 +259,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
     const full = dayState(c).complete ? c : simulateRest(c, Date.now());
     if (!dayState(full).complete) { onChange(full); return; }
     const rows = dayStandings(full, me);
-    const fin = finishDay(full, me, Date.now());
+    const fin = finishDay(full, me, Date.now(), home);
     if (!fin) return;
     const event = seasonOf(c)[fin.result.event];
     const newSeason = fin.career.season !== c.season;
@@ -297,7 +300,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
                 {SEASON_CLASSES.map(k => <button key={k} type="button" className="sim-chip-btn" aria-pressed={cls === k} style={cls === k ? { background: '#F1F4FA', color: '#0A1226', borderColor: '#F1F4FA' } : undefined} onClick={() => setCls(k)}>{classLabel(k)}</button>)}
               </div>
             </div>
-            <div><button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onChange(newCareer(cls, Date.now()))}>Start your {classLabel(cls)} season<ArrowRight size={18} aria-hidden="true" /></button></div>
+            <div><button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onChange(newCareer(cls, Date.now(), home))}>Start your {classLabel(cls)} season<ArrowRight size={18} aria-hidden="true" /></button></div>
           </section>
         ) : (
           <>
@@ -319,7 +322,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
                     ))}
                   </ul>
                 )}
-                {(!licence || licence.ready) && <div><button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onChange(moveUp(career, Date.now()))}>Start the {TIER_NAME[career.ticket]} season<ArrowRight size={18} aria-hidden="true" /></button></div>}
+                {(!licence || licence.ready) && <div><button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onChange(moveUp(career, Date.now(), home))}>Start the {TIER_NAME[career.ticket]} season<ArrowRight size={18} aria-hidden="true" /></button></div>}
               </section>
             )}
             <section className="sim-glass flex flex-col gap-4 p-5 sm:p-7" aria-labelledby="day-title">

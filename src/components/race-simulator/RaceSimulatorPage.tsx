@@ -44,6 +44,7 @@ import { C, ordinal } from './ui';
 import { VENUES, venueForClub } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
 import { currentId, ensureVenue, loadWaters, type Water } from './waters';
+import { regionOf } from './circuitWaters';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
 import SimChallenge from './SimChallenge';
@@ -573,10 +574,12 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   }, [training, setup, startSeq, me]);
 
   /** You, on the Circuit's sheets: your name and your number in the season's class. */
+  // Your home state on the Circuit's real waters, from your club's water (built in, or the club's own).
+  const homeRegion = useMemo(() => regionOf(venueForClub(clubId) ?? waters.find(w => w.published && w.clubId === clubId)?.def), [clubId, waters]);
   const careerMe = useCallback((c: Career | null) => ({ name: me?.short ?? 'You', sail: sailFor(yardNow.current, c?.cls ?? setup.classId, me).sail }), [me, setup.classId]);
   /** Sail the next race of your race day on the Circuit (with the day done, back to its screen). */
   const sailCareer = useCallback(() => {
-    const was = loadTraining().career ?? newCareer(setup.classId, Date.now());
+    const was = loadTraining().career ?? newCareer(setup.classId, Date.now(), homeRegion);
     if (dayState(was).left <= 0) { setWhere('career'); return; }
     // (A heat event: the heats before yours in the round are sailed first, so the next one is yours.)
     const career = prepareRace(was, Date.now());
@@ -589,7 +592,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       setRunView(setup.view);
       setWhere('race');
     });
-  }, [setup, me, withSequences, trainingChanged]);
+  }, [setup, me, withSequences, trainingChanged, homeRegion]);
 
   // A race of your race day on the Circuit goes on the day's sheet once: when you finish it, or, if
   // you leave it (or start it again) after the gun, as a DNF. Leaving before the gun doesn't count.
@@ -599,7 +602,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   const recordCareer = useCallback((race: Race) => {
     if (!run?.career || run.resume || careerDone.current === run.key) return;
     careerDone.current = run.key;
-    const before = loadTraining().career ?? newCareer(race.settings.classId, Date.now());
+    const before = loadTraining().career ?? newCareer(race.settings.classId, Date.now(), homeRegion);
     const rows = raceRows(before, race.results().map(r => ({ boat: race.boats.indexOf(r.boat), isPlayer: r.boat.isPlayer, status: r.status, place: r.place })), race.settings.cast?.map(c => c.id));
     const hnBefore = heatNow(before);
     const after = recordRace(before, rows, Date.now());
@@ -611,7 +614,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
     const promoted = !!hnBefore?.heat && !!hnAfter && hnAfter.round === hnBefore.round && hnAfter.heat !== hnBefore.heat && hnAfter.ids.includes(ME);
     careerNoteRef.current = hnBefore ? { title: `${st.event.name} · Round ${hnBefore.round}, ${hnBefore.finals ? `${FLEET_NAME[hnBefore.heat as 'A'] ?? hnBefore.heat} fleet` : `heat ${hnBefore.heat}`}`, left: st.left } : { title: `${st.event.name} · Race ${st.raced} of ${st.event.races}`, left: st.left };
     setChNote(`${hnBefore ? `Heat ${hnBefore.heat}` : 'This race'}: ${my?.place ? `${ordinal(my.place)} of ${rows.length}` : my?.code ?? 'not finished'}.${promoted ? ` Promoted: you sail heat ${hnAfter!.heat} next, in this round.` : ''}${mine ? ` On the day so far: ${ordinal(mine.rank)} of ${rows.length}, ${mine.net} point${mine.net === 1 ? '' : 's'} net.` : ''}${st.canSimulate ? ' You can simulate the rest of the day from here, or sail on.' : st.left ? '' : ' That was the last race of the day.'}`);
-  }, [run, trainingChanged, careerMe]);
+  }, [run, trainingChanged, careerMe, homeRegion]);
   /** Left (or started again) after the gun without finishing: a DNF on the day's sheet. True when it was put there. */
   const leaveCareerRace = useCallback((): boolean => {
     if (!run?.career || run.resume || careerDone.current === run.key || careerGun.current !== run.key) return false;
@@ -922,7 +925,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
   if (where === 'career') {
     return (
       <div key={where} className="h-full overflow-y-auto">
-        <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
+        <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} home={homeRegion} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
           licence={training.career?.ticket ? levelLicence(TIERS[TIERS.indexOf(training.career.ticket) - 1] as SkipperLevel, profile, training) : null} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
           onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}

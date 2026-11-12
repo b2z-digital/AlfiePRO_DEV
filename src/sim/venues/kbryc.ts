@@ -94,6 +94,7 @@ export const KBRYC: VenueDef = {
   features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),
   landmarks: [{ name: 'Shipwrights Bay', at: { x: -379, y: -193 } }, { name: 'Saint Kilda Point', at: { x: 446, y: -438 } }, { name: 'Tom Uglys Point', at: { x: -221, y: -587 } }, { name: 'Carss Park', at: { x: -48, y: 994 } }, { name: 'Blakehurst', at: { x: -822, y: 677 } }],
   credit: '© OpenStreetMap contributors',
+  region: 'NSW',
   cut: 1400,
   clubs: ['f7cd9003-8b11-4580-8357-9f58e2ec45cd'], venueId: '4465a809-c406-44cb-9a7d-fac43b3548a6',
   // The country round the water, for the bank view.

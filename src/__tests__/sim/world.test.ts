@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isoWeek, nameProblem, nextMajor, worldNow, worldPoints, type WorldEvent } from '@/components/race-simulator/world';
 import { alpha2, countryName } from '@/components/race-simulator/flags';
+import { VENUES } from '@/sim/venues';
+import { regionOf } from '@/components/race-simulator/circuitWaters';
 import { calendarOf, defending, finishDay, moveUp, newCareer, seasonOf, REGIONAL_SEASON, type Career } from '@/components/race-simulator/career';
 
 const at = (iso: string) => Date.parse(iso);
@@ -28,9 +30,9 @@ describe('the calendar', () => {
     expect(isoWeek(at('2027-01-01T12:00:00Z')).week).toBe(53);
   });
   it('knows the next Major', () => {
-    expect(nextMajor(at('2026-11-12T06:00:00Z'))).toMatchObject({ name: 'The Port Meridian Major', opens: at('2026-11-30T00:00:00Z'), now: false });
-    expect(nextMajor(at('2026-12-02T06:00:00Z'))).toMatchObject({ name: 'The Port Meridian Major', now: true });
-    expect(nextMajor(at('2026-12-08T06:00:00Z'))).toMatchObject({ name: 'The Aurel Lake Major', opens: at('2027-03-08T00:00:00Z') });
+    expect(nextMajor(at('2026-11-12T06:00:00Z'))).toMatchObject({ name: 'The Melbourne Major', opens: at('2026-11-30T00:00:00Z'), now: false });
+    expect(nextMajor(at('2026-12-02T06:00:00Z'))).toMatchObject({ name: 'The Melbourne Major', now: true });
+    expect(nextMajor(at('2026-12-08T06:00:00Z'))).toMatchObject({ name: 'The Gold Coast Major', opens: at('2027-03-08T00:00:00Z') });
   });
 });
 
@@ -92,7 +94,54 @@ describe('the Circuit renews', () => {
     const c: Career = { ...newCareer('IOM', 0), calendar: 2, ticket: 'state', done: [{ event: 6, order: [], rank: 1, net: 1, at: 0 }] };
     const up = moveUp(c, 1);
     expect(up.calendar).toBe(0);
-    expect(seasonOf(up)).toBe(REGIONAL_SEASON);
+    expect(seasonOf(up)).toEqual(calendarOf('state', 0, { real: true }));
+  });
+  it('keeps a season begun on the invented waters there until it ends, then moves to the real ones', () => {
+    const old: Career = { ...newCareer('IOM', 0), tier: 'state' };
+    delete old.real;
+    expect(seasonOf(old)).toBe(REGIONAL_SEASON);
+    const up = moveUp({ ...old, tier: 'club', ticket: 'state' }, 1, 'QLD');
+    expect(up).toMatchObject({ real: true, home: 'QLD' });
+    expect(seasonOf(up)[3]).toMatchObject({ name: 'Queensland State Championship', water: 'paradise' });
+  });
+  it('sails the Regional season in your home state, borrowing a neighbour\'s waters when it has few', () => {
+    const qld = calendarOf('state', 0, { real: true, home: 'QLD' });
+    expect(qld.map(e => e.name)).toEqual(['Lake Kawana Regatta', 'Gladstone Marina Regatta', 'Lake Macquarie Regatta', 'Queensland State Championship']);
+    expect(qld[3].water).toBe('paradise');
+    const wa = calendarOf('state', 0, { real: true, home: 'WA' });
+    expect(wa.map(e => e.water)).toEqual(['patawalonga', 'plrmyc', 'lillydale', 'jackadder']);
+    expect(wa[3].name).toBe('Western Australian State Championship');
+    // Every region: three different regattas off its main water, then its Championship on it.
+    for (const home of ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NZ'] as const) {
+      for (let r = 0; r < 4; r++) {
+        const s = calendarOf('state', r, { real: true, home });
+        const lead = s.slice(0, 3).map(e => e.water!);
+        expect(new Set(lead).size).toBe(3);
+        expect(lead).not.toContain(s[3].water);
+        for (const e of s) expect(VENUES[e.water!]?.invented).toBeFalsy();
+      }
+    }
+    // No home to go on: New South Wales.
+    expect(calendarOf('state', 0, { real: true })[3].name).toBe('NSW State Championship');
+  });
+  it('moves the Australian and World Championships round the main waters, the Oceania Championship in New Zealand', () => {
+    const champs = [0, 1, 2, 3, 4, 5].map(r => calendarOf('national', r, { real: true }));
+    expect(champs.map(s => s[2].water)).toEqual(['paradise', 'lmryc', 'plrmyc', 'patawalonga', 'jackadder', 'risdon']);
+    for (const s of champs) {
+      expect(s[2]).toMatchObject({ name: 'Australian Championship', heat: { system: 'hms' } });
+      expect(s.slice(0, 2).map(e => e.water)).not.toContain(s[2].water);
+      expect(s[0].water).not.toBe(s[1].water);
+    }
+    const w = calendarOf('world', 1, { real: true });
+    expect(w.map(e => [e.name, e.water])).toEqual([['Oceania Championship', 'taurikura'], ['World Championship', 'paradise']]);
+  });
+  it('works out your home state from your club\'s water', () => {
+    expect(regionOf(VENUES.jackadder)).toBe('WA');
+    // A club's own water, not marked: the state of the nearest real water (here Canberra, so NSW).
+    expect(regionOf({ ...VENUES.lmryc, region: undefined, lat: -35.28, lon: 149.13 })).toBe('NSW');
+    expect(regionOf({ ...VENUES.lmryc, region: undefined, lat: -37.68, lon: 176.17 })).toBe('NZ');
+    expect(regionOf(null)).toBeNull();
+    expect(regionOf(VENUES['circuit-aurel-lake'])).toBeNull();
   });
   it('knows a title to defend', () => {
     const c = newCareer('IOM', 0);

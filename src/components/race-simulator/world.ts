@@ -48,10 +48,10 @@ export const KIND_BASE: Record<WorldKind, number> = { daily: 10, regatta: 100, m
 export const BEST_OF = 16, TABLE_DAYS = 365;
 /** The Majors: ISO weeks and waters (as the schedule opens them). */
 export const MAJORS: { week: number; water: string; name: string }[] = [
-  { week: 10, water: 'circuit-aurel-lake', name: 'The Aurel Lake Major' },
-  { week: 23, water: 'circuit-skerry-sound', name: 'The Skerry Sound Major' },
-  { week: 36, water: 'circuit-tamarind-lagoon', name: 'The Tamarind Lagoon Major' },
-  { week: 49, water: 'circuit-port-meridian', name: 'The Port Meridian Major' },
+  { week: 10, water: 'paradise', name: 'The Gold Coast Major' },
+  { week: 23, water: 'jackadder', name: 'The Perth Major' },
+  { week: 36, water: 'lmryc', name: 'The Lake Macquarie Major' },
+  { week: 49, water: 'plrmyc', name: 'The Melbourne Major' },
 ];
 
 /**

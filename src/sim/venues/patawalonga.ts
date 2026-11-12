@@ -1,0 +1,92 @@
+// Adelaide Radio Control Yacht Racing Club's sailing water: the Patawalonga, Glenelg North SA. Map
+// data © OpenStreetMap contributors, under the Open Database Licence (ODbL):
+// https://www.openstreetmap.org/copyright. The water is the Patawalonga, cut to 900 m round where
+// the skippers stand on its east bank at the end of Anderson Avenue; the rest is the mapped bank
+// near it. Metres from that point (-34.9640355, 138.513059): x east, y north. Built by
+// src/sim/venueBuild.ts from the Overpass extract of 12 Nov 2026; edit with care.
+import type { VenueDef } from '../venue';
+import { pts } from '../venue';
+
+const LAKE = [90,-900,82.5,-824,52.5,-700,54,-652,42,-598,42,-530,67.5,-385,67.5,-313,60,-275,60,-268,48,-229,30,-155,19.5,-143.2,19.5,-137.2,24,-129.7,25.5,-120.7,3,-15.7,6,51.8,10.5,56.3,16.5,71.3,16.5,95.3,15,96.8,16.5,108.8,21,117.8,30,147.8,55.5,200,88.5,250,113.3,275,134.3,291,173,309,214,308,251,291,273,269,287,238,290,135.8,293,129.8,316,105,350,87,374,84.8,359,108,311,144.8,305,273,415,324,496,335,512,344,493,351,437,350,400,372,305,375,275,359,317,308,311,299,284,290,233,351,176,407,166,407,131.3,401,99.8,386,54.8,336,42.8,338,35.3,321,24.8,326,21,319,12,296,1.5,277,-4.5,269,-19.5,238,-54,157,-54,152,-64.5,123.8,-67.5,107.3,-78,72.8,-79.5,39.8,-81,38.3,-81,24.8,-79.5,23.3,-79.5,12.8,-78,11.3,-69,-57.7,-66,-65.2,-66,-71.2,-63,-78.7,-61.5,-92.2,-54,-122.2,-46.5,-191,-40.5,-212,-21,-310,-14.2,-313,-10.5,-320,-64.5,-538,-70.5,-592,-57,-659,-63,-698,-22.5,-833,-16.5,-900];
+
+const FEATURES: [VenueDef["features"][number]["kind"], string, number[]][] = [
+  ['park', '', [306,21.8,278,258,239,298,181,311,151,303,89.5,251,62.3,212,45.8,183,34.1,155,8.9,2.4]],
+  ['park', '', [82.9,-821,43.5,-593,67.9,-313,20,-139.8,8.9,2.4,26.2,3.5,25.9,-57.6,47.7,-56.1,55.7,-68.1,54.8,-55.6,71.4,-54.4,47.3,-127,85.8,-325,70.6,-447,88.7,-820]],
+  ['path', '', [108.5,258,89.7,237,66.9,202,50.9,174,44.6,158,33,125.6,22.4,82.9,16.3,17.3,18.3,-55.3,28.6,-92.5,31.6,-115.4,53.6,-214,58.6,-257,68.1,-309,68.5,-384,55.9,-458,57.3,-541,64.1,-541,65.3,-569,69.5,-590,68.6,-600,60.6,-628,61.9,-653,59.2,-676,71.2,-751,89.8,-808,89.5,-815,87,-819,88.5,-828]],
+  ['path', '', [70.1,-13.3,16.4,-17]],
+  ['parking', '', [53.5,24.8,61.2,10.2,44.8,5.3,35.2,5.1,29.2,23.5]],
+  ['road', 'Anderson Avenue', [332,13.7,35.7,-7.5]],
+  ['bld', 'Scout Hall', [33.7,46.4,34.8,24.8,50.4,25.7,49.3,47.2]],
+  ['road', '', [44.8,-6.8,43.8,4.7]],
+  ['bld', '', [27.6,-47.5,28.4,-56.9,58.7,-54.6,57.9,-44.1,54.9,-44.3,53.7,-29.8,45.7,-30.4,46.9,-46.1]],
+  ['path', '', [70.1,-13.3,86,-12.4]],
+  ['road', 'Adelphi Crescent', [80.9,-606,82.6,-524,78.2,-440,91.2,-376,92.6,-324,85.8,-275,61.8,-203,55.2,-128.4,58.8,-103.3,76,-70.8,78.9,-61.8,80.7,-42.1,78.2,-4.3]],
+  ['park', '', [-93.3,-28.3,-74.9,-25.8,-21,-310,-10,-322,-71.5,-592,-57.5,-725,-22.7,-838,-32,-839,-97.3,-703,-104.6,-646,-105.6,-552,-47.1,-367,-41.3,-312,-54.7,-290,-68,-130.1,-91.5,-40.7]],
+  ['path', '', [-80,-2.6,-83.1,35.8,-81.3,71.4,-78,86,-57,159,-0.8,291,-0.5,295]],
+  ['path', '', [86,-12.4,86.9,-65,92.8,-80.4,98.2,-86.9,112.2,-96.4,128.3,-99.6,316,-88.4]],
+  ['path', '', [86,-12.4,305,4.2]],
+  ['parking', '', [87.7,32,89.2,13.3,278,27.9,276,46.7,185,39.6,167,30.7,157,37.4]],
+  ['pitch', '', [59.8,178,53.9,80.2,62.7,68.5,82.3,69.5,164,88.9,160,139.5,152,157,139,171,121.4,176]],
+  ['bld', '', [91.6,-34.2,109.4,-33.6,109,-21.7,104.1,-21.9,104.3,-28.3,98.7,-28.5,98.6,-24.7,93.6,-24.9,93.8,-29.2,91.4,-29.3]],
+  ['path', '', [-96.4,6.7,-96.1,51.4,-83.1,112.4,-75.4,139.6,-57.2,193,-23.4,280,-10.7,286,-0.5,295]],
+  ['road', '', [95.4,20,279,34.4]],
+  ['road', 'Military Road', [-98.3,-7.2,-102.9,6.3,-104,17.8,-103.7,53.2,-101.2,80.4,-96.6,100.5,-56.4,222,-48.8,269,-50.1,305,-56.8,346,-68.6,387,-84.9,433]],
+  ['bld', '', [93.1,-50.7,109.8,-50,109.2,-35,92.2,-35.8,92.4,-39.9,91.3,-40,91.6,-45.9,92.8,-45.9]],
+  ['road', 'Patawalonga Frontage', [-98.7,-23.4,-93.6,-48.6,-78,-98.3,-61,-275]],
+  ['road', 'Anderson Avenue', [-131,-18.3,-108.9,-17.3]],
+  ['bld', '', [-120.7,-47.4,-118.2,-79.8,-106.9,-78.9,-109.4,-46.6]],
+  ['road', 'Brooklyn Avenue', [58.8,-103.3,85.8,-110.2,324,-96.4]],
+  ['road', 'Anderson Avenue', [-367,-37.1,-268,-26.9,-131,-18.3]],
+  ['road', 'Hamilton Street', [-75.7,-119.1,-180,-127.9,-237,-141.3]],
+  ['pitch', '', [180,169,171,69.5,174,59.8,194,50,289,59.8,276,134.6,264,150,243,163,212,167]],
+  ['pitch', '', [165,277,158,181,161,175,264,163,266,201,248,258,218,277,182,284]],
+  ['road', 'Richardson Avenue', [-109.2,-549,-126.3,-543,-268,-26.9]],
+  ['bridge', '', [108.5,258,36.2,324,20.4,332]],
+  ['road', 'Tapleys Hill Road', [319,-12.5,318,97.4]],
+  ['road', 'Tapleys Hill Road', [324,-96.4,319,-12.5]],
+  ['bridge', 'Reece Jennings Bikeway', [315,102.8,320,137.5]],
+  ['bridge', 'Tapleys Hill Road', [318,97.4,323,135.3]],
+  ['road', 'Clovelly Avenue', [92.6,-324,336,-310]],
+  ['bridge', 'Tapleys Hill Road', [337,124.3,332,91.6]],
+  ['park', 'Drummond Golf Driving Range', [426,1836,-11.6,1475,-294,1830,-586,1579,-434,1126,-304,681,-257,638,-160,621,-125,590,-53.7,377,-19.5,362,24.6,380,46.4,402,53.8,433,47.9,456,13.5,496,6.1,526,9.3,552,35.6,586,63.1,602,74.7,710,88.4,766,112.8,822,145.2,868,300,1002,349,1054,409,1137,437,1220,450,1314,435,1607]],
+  ['bridge', 'Reece Jennings Bikeway', [305,271,292,295]],
+  ['bridge', 'Tapleys Hill Road', [311,267,293,304]],
+  ['bridge', 'Old Tapleys Hill Road Bridge', [461,364,437,313]],
+];
+
+export const PATAWALONGA: VenueDef = {
+  id: 'patawalonga',
+  name: 'Adelaide RCYRC',
+  short: 'The Patawalonga',
+  place: 'The Patawalonga, Glenelg North, Adelaide',
+  lat: -34.9640355, lon: 138.513059,
+  usualWind: 225, usualWindName: 'SW sea breeze',
+  // The control area: the east bank at the end of Anderson Avenue, 1.5 m back from the water.
+  control: [{ x: 5.2, y: -19.1 }, { x: 6.0, y: 18.8 }],
+  // The lake is narrow off Anderson Avenue: when a course won't fit there, the fleet sails from the west bank of the wider basin to the north.
+  alsoFrom: [{ x: -10.0, y: 230.0 }],
+  water: pts(LAKE),
+  islands: [],
+  features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),
+  landmarks: [{ name: 'Glenelg North', at: { x: 457, y: -522 } }, { name: 'Novar Gardens', at: { x: 1697, y: -215 } }],
+  credit: '© OpenStreetMap contributors',
+  cut: 900,
+  // Where it is, for the Circuit's seasons: South Australia.
+  region: 'SA',
+  // The country round the water, for the bank view.
+  look: { hills: 0, trees: 0.6, houses: 0.9 },
+  // What the club knows about its water. A first reading from the map and the local climate, for the
+  // club to put right in its own words.
+  traits: {
+    about: 'The Patawalonga at Glenelg North: a long, narrow lake running north and south behind the beach, with parkland along both banks. You stand on the east bank and race up and down the lake.',
+    winds: [
+      { from: 225, name: 'SW sea breeze', when: 'Summer afternoons', character: 'steady', note: 'Off the gulf, over the dunes to the west. Fills in strong and stays all afternoon.' },
+      { from: 10, name: 'Northerly', when: 'Hot days', character: 'puffy', pays: 'out', note: 'Hot and gusty, down the length of the lake. Long beats with big puffs.' },
+      { from: 280, name: 'Westerly', when: 'Winter', character: 'oscillating', note: 'Across the lake from the beach side. Short beats and a lot of tacks.' },
+    ],
+    notes: [
+      'The lake is narrow off Anderson Avenue: winds across it give short beats and crowded starts, and big fleets move up to the wider basin to the north.',
+      'Winds along the lake give the best racing, with long beats.',
+    ],
+  },
+};

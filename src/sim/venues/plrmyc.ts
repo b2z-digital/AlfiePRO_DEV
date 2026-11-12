@@ -106,6 +106,7 @@ export const PLRMYC: VenueDef = {
   features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),
   landmarks: [{ name: 'Patterson Lakes', at: { x: -458, y: -1476 } }, { name: 'Bonbeach', at: { x: -1827, y: -770 } }, { name: 'Bangholme', at: { x: 2071, y: 853 } }, { name: 'Chelsea Heights', at: { x: -1374, y: 1832 } }],
   credit: '© OpenStreetMap contributors',
+  region: 'VIC',
   cut: 900,
   clubs: ['abb46e7d-848f-430e-9017-7006cb41ed03'], venueId: 'aceb93b9-bfa2-4b96-bfa2-b4f08ed054f4',
   // The country round the water, for the bank view.

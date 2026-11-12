@@ -165,11 +165,11 @@ describe('The Regional season', () => {
     expect(up.ticket).toBeUndefined();
     expect(up.fleet.length).toBe(15);
     expect(new Set(up.fleet).size).toBe(15);
-    expect(eventAt(up).event).toMatchObject({ name: 'Lantern Quay Regatta', kind: 'regatta', water: 'circuit-lantern-quay' });
+    expect(eventAt(up).event).toMatchObject({ name: 'Kogarah Bay Regatta', kind: 'regatta', water: 'kbryc' });
     const s = careerRace(up, base);
-    expect(s).toMatchObject({ fleetSize: 16, level: 'state', venue: 'circuit-lantern-quay', windFrom: 250, windCharacter: 'puffy' });
+    expect(s).toMatchObject({ fleetSize: 16, level: 'state', venue: 'kbryc', windFrom: 50, windCharacter: 'oscillating' });
     const race = new Race(s);
-    expect(race.venue?.def.name).toBe('Lantern Quay');
+    expect(race.venue?.def.name).toBe('Kogarah Bay RYC');
     expect(race.boats.length).toBe(16);
     expect(new Set(race.boats.map(b => b.sail)).size).toBe(16);
     for (const e of REGIONAL_SEASON) expect(VENUES[e.water!]).toBeTruthy();
@@ -178,7 +178,7 @@ describe('The Regional season', () => {
   it('the Championship is two days: each day sail three and simulate the rest, sixteen races in all', () => {
     let c = moveUp(clubSeason(1), NOW);
     for (let i = 0; i < 3; i++) c = day(c, [8, 8, 8]).career;
-    expect(eventAt(c).event).toMatchObject({ name: 'Regional Championship', races: 16, perDay: 8 });
+    expect(eventAt(c).event).toMatchObject({ name: 'NSW State Championship', races: 16, perDay: 8 });
     expect(dayState(c)).toMatchObject({ day: 0, days: 2, leftToday: 8, left: 16 });
     expect(eventWind(eventAt(c).event, 0)!.from).not.toBe(eventWind(eventAt(c).event, 1)!.from);
     for (const p of [2, 2, 2]) c = recordRace(c, rows(c, p), NOW);
@@ -198,7 +198,7 @@ describe('The Regional season', () => {
     const fin = finishDay(c, me, NOW)!;
     expect(fin.career).toMatchObject({ tier: 'state', done: [], day: null });
     expect(fin.career.history.at(-1)).toMatchObject({ tier: 'state', of: 16 });
-    if (fin.medal?.trophy) expect(fin.medal.event).toBe('Regional Championship');
+    if (fin.medal?.trophy) expect(fin.medal.event).toBe('NSW State Championship');
   });
 
   it('a Regional season is further on than any club season, between devices', () => {

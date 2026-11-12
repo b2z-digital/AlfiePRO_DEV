@@ -84,6 +84,7 @@ export const LMRYC: VenueDef = {
   features: FEATURES.map(([kind, name, p]) => ({ kind, name: name || undefined, pts: pts(p) })),
   landmarks: [{ name: 'Speers Point Park', at: { x: 565, y: 945 } }],
   credit: '© OpenStreetMap contributors',
+  region: 'NSW',
   clubs: ['bafdff76-ebe7-4890-b7fa-20aa9bb37491'], venueId: '23ee6cc8-8da5-4b4b-b148-0ac5640bca76',
   // What the club knows about its water. A first reading from the map and the local climate, for the
   // club to put right in its own words.
