@@ -11,6 +11,9 @@ export interface DrillRecord { best: number | null; stars: number; tries: number
 export interface LessonRecord { answered: boolean; correct: boolean; played: boolean; at: number }
 export interface LabRecord { won: boolean; tries: number; at: number }
 
+/** The two ways of using the Academy: the programmes on their own, or racing as well. */
+export type Way = 'simple' | 'full';
+
 export interface TrainingProgress {
   drills: Record<string, DrillRecord>;
   lessons: Record<string, LessonRecord>;
@@ -21,6 +24,8 @@ export interface TrainingProgress {
   yard?: Yard;
   /** Cards on the home screen you've said you don't want to see again, and when you said so. */
   dismissed?: Record<string, number>;
+  /** How you've said you want to use the Academy, and when you said so: 'simple' to sail better, 'full' to race as well. */
+  way?: { mode: Way; at: number };
   updatedAt: number;
 }
 
@@ -80,6 +85,13 @@ export function dismissCard(id: string): TrainingProgress {
   return saveTraining(p);
 }
 
+/** "Help me sail better" (simple) or "I want to race" (full). */
+export function chooseWay(mode: Way): TrainingProgress {
+  const p = loadTraining();
+  p.way = { mode, at: Date.now() };
+  return saveTraining(p);
+}
+
 /** Record an answer to a Rules Academy question (`id` is module/situation). */
 export function recordAnswer(id: string, correct: boolean): TrainingProgress {
   const p = loadTraining();
@@ -132,5 +144,7 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
     out.dismissed = { ...(a.dismissed ?? {}) };
     for (const [k, at] of Object.entries(b.dismissed ?? {})) out.dismissed[k] = Math.max(at, out.dismissed[k] ?? 0);
   }
+  // The way of using the Academy that was chosen last.
+  if (a.way || b.way) out.way = (b.way?.at ?? 0) > (a.way?.at ?? 0) ? b.way : a.way;
   return out;
 }

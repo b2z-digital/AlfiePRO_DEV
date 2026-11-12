@@ -9,6 +9,7 @@
 import { CAUSES, CAUSE_WORDS, type Part } from './ledger';
 import { ledgerRaces, rate } from './focus';
 import type { Profile } from './profile';
+import { levelName } from './rating';
 
 export type Grade = 'bronze' | 'silver' | 'gold';
 /** The share of the fleet you must give away less than, on average, for each grade. */
@@ -44,7 +45,6 @@ export interface Passport {
 const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
 const r1 = (x: number | null) => (x === null ? null : Math.round(x * 10) / 10);
 const LEVELS = ['club', 'state', 'national', 'world'];
-const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 export function gradeFor(beat: number | null): Grade | null {
   if (beat === null) return null;
@@ -74,7 +74,7 @@ export function passport(profile: Profile): Passport | null {
   const levels = [...new Set(graded.map(r => r.ledger!.vs!.level))].sort((a, z) => LEVELS.indexOf(a) - LEVELS.indexOf(z));
   return {
     races: rs.length, graded: graded.length,
-    against: !can ? null : levels.length === 1 ? `${cap(levels[0])} skippers` : `${cap(levels[0])} to ${cap(levels[levels.length - 1])} skippers`,
+    against: !can ? null : levels.length === 1 ? `${levelName(levels[0])} skippers` : `${levelName(levels[0])} to ${levelName(levels[levels.length - 1])} skippers`,
     total: of('total', 'Everything'),
     skills: CAUSES.map(c => of(c, CAUSE_WORDS[c].name)),
   };

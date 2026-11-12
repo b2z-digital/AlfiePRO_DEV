@@ -3,6 +3,7 @@
 // (sim_challenges with event_id and race_no) and its results are the challenge entries. Whoever
 // runs the event chooses whether a skipper's first try at each race counts (from the gun) or her
 // best. Row-level security keeps it fair: see the 20261110200000_sim_events migration.
+import { levelName } from './rating';
 import type { RaceSettings } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
 import { VENUES } from '@/sim/venues';
@@ -81,12 +82,12 @@ export function eventRaceSettings(base: RaceSettings, n: number, mixed: boolean,
   });
 }
 
-/** "5 races · IOM · 8 boats · State skippers · LMRYC · 2 laps". */
+/** "5 races · IOM · 8 boats · Regional skippers · LMRYC · 2 laps". */
 export function eventLine(ev: SimEvent): string {
   const s = ev.races[0]?.settings;
   const parts = [`${ev.races.length} race${ev.races.length === 1 ? '' : 's'}`];
   if (!s) return parts[0];
-  parts.push(CLASSES[s.classId]?.name ?? s.classId, `${s.fleetSize} boats`, `${s.level[0].toUpperCase()}${s.level.slice(1)} skippers`);
+  parts.push(CLASSES[s.classId]?.name ?? s.classId, `${s.fleetSize} boats`, `${levelName(s.level)} skippers`);
   const v = s.venue ? VENUES[s.venue] : undefined;
   parts.push(v ? v.short : 'Practice pond');
   parts.push(`${s.laps} lap${s.laps > 1 ? 's' : ''}`);

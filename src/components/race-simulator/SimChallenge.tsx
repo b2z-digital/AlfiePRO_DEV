@@ -1,5 +1,6 @@
 // A challenge: the race everyone sails the same way, its leaderboard, and the ghosts to race. Each
 // row's ghost is that member's best race, sailed again alongside yours.
+import { levelName } from './rating';
 import { useEffect, useState } from 'react';
 import { CLASSES } from '@/sim/classes';
 import { VENUES } from '@/sim/venues';
@@ -7,10 +8,10 @@ import { Challenge, ChallengeEntry, closesText, isOpen, leaderboard } from './ch
 import { fmt } from './stats';
 import { AlfieOrb, Btn, C, Chip, compassName, cx, ordinal, Page } from './ui';
 
-/** "IOM · 8 boats · State skippers · LMRYC · Booragul · ENE breeze". */
+/** "IOM · 8 boats · Regional skippers · LMRYC · Booragul · ENE breeze". */
 export function challengeLine(c: Challenge): string {
   const s = c.settings;
-  const parts = [CLASSES[s.classId]?.name ?? s.classId, `${s.fleetSize} boats`, `${s.level[0].toUpperCase()}${s.level.slice(1)} skippers`];
+  const parts = [CLASSES[s.classId]?.name ?? s.classId, `${s.fleetSize} boats`, `${levelName(s.level)} skippers`];
   const v = s.venue ? VENUES[s.venue] : undefined;
   if (v) parts.push(v.short);
   parts.push(`${s.windKnots != null ? `${Math.round(s.windKnots)} kn` : `${s.windStrength} wind`}${v && s.windFrom != null ? ` from the ${compassName(s.windFrom)}` : ''}`);

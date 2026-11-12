@@ -9,7 +9,7 @@ import type { CoachMode } from './coach';
 import type { SeaKind } from '@/sim/sea';
 import { LAB, FIRST, nextFirst } from '@/sim/training';
 import { Profile, clearProfile, skills } from './profile';
-import { TrainingProgress, drillStars, licence } from './progress';
+import { TrainingProgress, drillStars, licence, type Way } from './progress';
 import type { SimView } from './SimRace';
 import { AlfieOrb, Btn, C, Cap, Chip, Seg, Tile, compassName, cx, ordinal } from './ui';
 import { BUILT_IN, DEFAULT_VENUE, VENUES, venueForClub } from '@/sim/venues';
@@ -18,7 +18,12 @@ import type { VenueWind as TodayWind } from './venueWind';
 import { RaceAudio } from './audio';
 import VenuePick from './VenuePick';
 import { PLAYS, practiceLink } from './playbook';
-import { offerFirstSail, todaysPlan } from './plan';
+import { offerFirstSail } from './plan';
+import { nextUp } from './nextup';
+import { SYLLABUS, levelLicence, weekPlan } from './programme';
+import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
+import { Brand, DOOR_NAME, DoorBack, DoorCard, LevelCard, LicenceCard, NextUpCard, WayAsk, WaySwitch, WeekCard, type Door } from './SimDoors';
+import { CAUSE_WORDS } from './ledger';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
 import { todaysCases } from './judge';
@@ -76,7 +81,6 @@ const CHARACTER_WORD: Record<WindCharacter, string> = { steady: 'steady', oscill
 
 const CLASS_LABEL: Record<ClassId, string> = { IOM: 'IOM', DF95: 'DF95', DF65: 'DF65', '10R': '10 Rater', M: 'Marblehead' };
 
-const LEVEL_NAME: Record<SkipperLevel, string> = { club: 'Club', state: 'State', national: 'National', world: 'World' };
 
 const LEVEL_TEXT: Record<SkipperLevel, string> = {
   club: 'Learning the ropes: late starts, wide roundings, and the odd foul you can protest.',
@@ -230,7 +234,7 @@ function FirstSailCard({ done, onGo, onDismiss }: { done: (id: string) => boolea
   if (!next) return null;
   const n = FIRST.findIndex(m => m.id === next.id);
   return (
-    <section className="relative flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.08)] p-5 pr-12 sm:pl-6 sm:pr-14" aria-labelledby="fs-title">
+    <section className="relative flex flex-wrap items-center gap-x-6 gap-y-4 rounded-[22px] border border-[rgba(77,163,255,0.36)] bg-[rgba(10,24,54,0.74)] p-5 pr-12 backdrop-blur-[18px] sm:pl-6 sm:pr-14" aria-labelledby="fs-title">
       {onDismiss && (
         <button type="button" onClick={onDismiss} aria-label="Don't show this again" title="Don't show this again"
           className="absolute right-3 top-3 inline-flex h-8 w-8 cursor-pointer items-center justify-center border-0 bg-transparent text-white/60 transition-colors hover:bg-white/10 hover:text-white" style={{ borderRadius: '50%' }}>
@@ -439,11 +443,17 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onPlay, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
   onDismiss?: (card: string) => void;
+  /** Which part of the Academy is open: the front, or behind one of its three doors. */
+  door?: Door; onDoor?: (d: Door) => void;
+  /** "Help me sail better" or "I want to race". */
+  onWay?: (w: Way) => void;
+  /** Open a play in the Playbook. */
+  onPlay?: (id: string) => void;
   /** The boats you've designed (Design your yacht). */
   yard: Yard;
   /** Start a drill or scenario straight from the home screen (today's ten minutes). */
@@ -514,7 +524,6 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     }, 8000);
   };
   // Today's three: from where the races are going, and what's due.
-  const plan = useMemo(() => todaysPlan(profile, training, Date.now()), [profile, training]);
   // The one thing your next race is for: your biggest leak lately.
   const focus = useMemo(() => raceFocus(profile), [profile]);
   const pp = useMemo(() => passport(profile), [profile]);
@@ -591,34 +600,95 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const strengthName = useToday ? `Today's ${Math.round(todayKn!)} kn` : STRENGTH[s.windStrength];
   const startName = startSeq ? startSeq.name : s.sequenceSeconds % 60 ? `${s.sequenceSeconds} seconds, called` : `${s.sequenceSeconds / 60} minute${s.sequenceSeconds > 60 ? 's' : ''}, called`;
 
-  // Alfie's pick: the session that works on what your racing says you need most.
-  const advice: { where: 'trainer' | 'academy' | 'lab'; title: string; text: string } = !sk
-    ? { where: 'trainer', title: 'Start with the Start Trainer', text: 'Most races are won or lost in the first thirty seconds. Twelve short drills, starting with time on distance.' }
-    : weakest && weakest[0] === 'starts' ? { where: 'trainer', title: 'Work on your starts', text: `Starts are where you have most to gain (${weakest[1]} of 100). Ten minutes in the Start Trainer is worth a morning of racing.` }
-      : weakest && weakest[0] === 'rules' ? { where: 'academy', title: 'Sharpen your rules', text: `Your rules score is ${weakest[1]} of 100. The next Rules Academy module takes about five minutes: answer it, then sail it.` }
-        : { where: 'lab', title: `Work on your ${weakest ? weakest[0] : 'racecraft'}`, text: `${weakest ? `${weakest[0][0].toUpperCase()}${weakest[0].slice(1)} is where you have most to gain (${weakest[1]} of 100). ` : ''}Replay a tricky moment in the Scenario Lab until you win it.` };
+  // The layered home: your level, this week's programme, the licence above you, and what's next.
+  const way: Way = training.way?.mode ?? 'simple';
+  const simple = way === 'simple';
+  const st = useMemo(() => standing(profile), [profile]);
+  const clean = useMemo(() => cleanSailing(profile), [profile]);
+  const week = useMemo(() => weekPlan(profile, training, Date.now(), st), [profile, training, st]);
+  const grad = useMemo(() => levelLicence(st.level, profile, training), [st.level, profile, training]);
+  const newcomer = offerFirstSail(profile, training);
+  // (In the simple way of using it, licences and challenges stay out of sight.)
+  const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], now: Date.now() }),
+    [profile, training, st, week, simple, grad, next, challenges]);
+  const go = (d: Door) => { onDoor?.(d); window.scrollTo({ top: 0 }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0 }); };
+  const raceLine = `${CLASS_LABEL[s.classId]}, ${s.fleetSize} boats, ${LEVEL_NAME[s.level]} skippers, ${venue ? venue.short : 'the practice pond'}. About ${minutes(s)} minutes.`;
+  const upView: { kicker: string; title: string; text: string; button: string; onGo: () => void } =
+    up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. ${raceLine}`, button: 'Start race', onGo: () => onStart('race', s) }
+      : up.kind === 'rehearse' && next ? { kicker: `Next up · your club races ${rehearseWords(up.race, next.at).when.toLowerCase()}`, title: rehearseWords(up.race, next.at).title, text: `${rehearseWords(up.race, next.at).wind} Sail it now, so the shifts and the laylines aren't new on the day.`, button: rehearseWords(up.race, next.at).button, onGo: next.onRehearse }
+        : up.kind === 'licence' ? { kicker: `Next up · one step from your ${LEVEL_NAME[up.to]} licence`, title: `${up.req.label}: ${up.req.need}`, text: `You have: ${up.req.have.toLowerCase()}. It's the last thing between you and your ${LEVEL_NAME[up.to]} licence.`, button: up.req.go === 'race' ? 'Start race' : 'Work on it', onGo: () => { const g = up.req.go; if (g === 'race') onStart('race', s); else onOpen(g); } }
+          : up.kind === 'challenge' ? { kicker: `Next up · closes in ${up.hours < 24 ? `${up.hours} hour${up.hours === 1 ? '' : 's'}` : 'a day or so'}`, title: up.challenge.title, text: `Your club's challenge: the same race for everyone, with a leaderboard. ${challengeLine(up.challenge)}`, button: 'Open the challenge', onGo: () => onChallenge?.(up.challenge) }
+            : up.kind === 'session' ? { kicker: simple ? "Today's session" : `Next up · session ${up.n} of ${up.of} this week`, title: practiceLink(up.session.link).label.replace(/^(Start Trainer|Scenario): /, ''), text: `${up.session.why} About five minutes.`, button: 'Start the session', onGo: () => onLink?.(practiceLink(up.session.link)) }
+              : { kicker: simple ? "This week's sessions are done" : 'Next up', title: 'Go racing', text: `${focus ? `${focusWords(focus).title}. ` : ''}${raceLine}`, button: 'Start race', onGo: () => onStart('race', s) };
+  // How you're going, in words (the simple way of using it).
+  const lastRace = profile.races.find(r => r.mode === 'race' && r.status !== 'racing');
+  const going = [
+    st.placed ? `You're sailing at ${LEVEL_NAME[st.level]} level.` : st.races === 0 ? "Sail three races and we'll know your level." : `${up.kind === 'placement' ? up.of - up.sailed : 3 - st.races} more race${3 - st.races === 1 ? '' : 's'} and we'll know your level.`,
+    ...(week.weakest ? [`${CAUSE_WORDS[week.weakest].name} is where you have most to gain.`] : []),
+    ...(lastRace ? [`Your last race: ${lastRace.place ? `${ordinal(lastRace.place)} of ${lastRace.of}` : 'not finished'}.`] : []),
+  ];
+  const openCh = (challenges ?? []).filter(c => isOpen(c) && !c.event_id).length, openEv = (events ?? []).filter(e => eventState(e).open.length).length;
+  const mateLine = openCh || openEv ? [openCh ? `${openCh} challenge${openCh > 1 ? 's' : ''}` : '', openEv ? `${openEv} event${openEv > 1 ? 's' : ''}` : ''].filter(Boolean).join(' and ') + ' open' : 'Challenges and events: the same race for everyone';
 
   return (
     <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
-      {/* ── Your race, live: edge to edge under the menu, fading into the page ── */}
-      <section className="sim-home-hero">
+      {/* ── The front of the Academy: the fleet racing live, with what's next and the ways in over it ── */}
+      <section className={cx('sim-home-hero', door === 'home' && 'sim-home-front')}>
         <div className="sim-home-media" aria-hidden="true">
           <SimHero setup={s} fill />
           <div className="sim-home-scrim" />
         </div>
         <div className="sim-home-hero-body px-4 sm:px-6 lg:px-10 xl:px-16">
-          <p className="m-0 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em]" style={{ color: 'rgba(241,244,250,.86)' }}>
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-[#34D399]" />On the water now
-            <span className="hidden font-medium normal-case tracking-normal sm:inline" style={{ color: 'rgba(241,244,250,.72)' }}>· AI skippers racing in the conditions you've set</span>
-          </p>
-          <h1 className="sim-home-title">Sailing Academy</h1>
-          <p className="sim-home-sub">Race skippers who sail like real radio sailors, on your own water, with Alfie coaching from the bank.</p>
+          {door === 'home' ? (
+            <>
+              <Brand />
+              <h1 className="sr-only">Sailing Academy</h1>
+              <div className="sim-front">
+                {!training.way && onWay && <WayAsk onChoose={onWay} />}
+                {up.kind === 'first-sail' && onLink
+                  ? <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />
+                  : <NextUpCard big={simple} {...upView} />}
+                {simple ? (
+                  <div className="sim-front-row">
+                    <section className="sim-glass flex flex-col gap-2 p-5 sm:p-6" aria-labelledby="going-title">
+                      <h2 id="going-title" className="m-0 text-[12px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>How you're going</h2>
+                      {going.map(l => <p key={l} className="m-0 text-[16px] leading-snug">{l}</p>)}
+                    </section>
+                    <div className="flex flex-col gap-3">
+                      <button type="button" className="sim-glass sim-quiet" onClick={() => onStart('race', s)}><span>A practice race</span><span>{CLASS_LABEL[s.classId]}, {s.fleetSize} boats, about {minutes(s)} minutes</span></button>
+                      <button type="button" className="sim-glass sim-quiet" onClick={() => go('train')}><span>Your programme and the library</span><span>{week.done} of {week.sessions.length} sessions done this week</span></button>
+                      <button type="button" className="sim-glass sim-quiet" onClick={() => go('you')}><span>You and your yacht</span><span>{yachtFor(yard, s.classId)?.name ?? CLASS_LABEL[s.classId]}, sail {sailFor(yard, s.classId, me).sail}</span></button>
+                      <button type="button" className="sim-link self-start text-[13.5px]" onClick={() => go('race')}>Set up the race, or race with others</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="sim-doors">
+                    <DoorCard title="Race" status={`${CLASS_LABEL[s.classId]} · ${s.fleetSize} boats · ${LEVEL_NAME[s.level]} skippers`} onOpen={() => go('race')}
+                      lines={['Practice: your own race, as you set it', live && live.rooms.length ? `${live.rooms.length} live room${live.rooms.length > 1 ? 's' : ''} open now` : 'Live: race your mates, each on your own screen', mateLine]} />
+                    <DoorCard title="Train" status={`${week.done} of ${week.sessions.length} sessions done this week`} onOpen={() => go('train')}
+                      lines={[`${LEVEL_NAME[st.level]} programme: ${SYLLABUS[st.level].aim.toLowerCase()}`, grad ? `${LEVEL_NAME[grad.to]} licence: ${grad.met} of ${grad.reqs.length}` : 'World level: nothing above it', 'The library: tactics, rules, starts, race moments']} />
+                    <DoorCard title="You" status={st.placed ? `${LEVEL_NAME[st.level]} skipper · ${st.rating.toLocaleString()}` : `${st.races} of 3 placement races sailed`} onOpen={() => go('you')}
+                      lines={[`${yachtFor(yard, s.classId)?.name ?? CLASS_LABEL[s.classId]} · sail ${sailFor(yard, s.classId, me).sail}`, pp?.total.grade ? `Passport: ${GRADE_NAME[pp.total.grade]} overall` : 'Your skill passport and race history', 'Design your yacht']}>
+                      <YachtStage still className="block h-full w-full" cls={s.classId} look={lookFor(yard, s.classId)} sail={sailFor(yard, s.classId, me).sail} inset={{ bottom: 4 }} />
+                    </DoorCard>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <DoorBack onHome={() => go('home')} />
+              <h1 className="sim-home-title">{DOOR_NAME[door]}</h1>
+              <p className="sim-home-sub">{door === 'race' ? 'Your own race as you set it, live rooms with your mates, and club challenges and events.' : door === 'train' ? 'Your programme first: three sessions a week, picked from how you race. Then the library.' : 'Your level, your yacht, and how your racing is going.'}</p>
+            </>
+          )}
         </div>
       </section>
 
       <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
-        {onLink && offerFirstSail(profile, training) && <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />}
-
+        {door === 'race' && (
+          <>
+            {next && <RehearseCard {...next} race={next.race} />}
         {/* ── Race set-up ── */}
         <section className="sim-set-card" aria-labelledby="qr-title">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4 px-5 pb-4 pt-5 sm:px-6">
@@ -633,6 +703,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               )}
             </div>
             <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
+              {!(s.venue === practiceAt.id && s.windDir === 'today') && <button type="button" onClick={() => set({ venue: practiceAt.id, windDir: 'today', todayStrength: true })} className="sim-btn-lg flex-1 sm:flex-none" title={`${practiceAt.name}, in the wind blowing there today`}>Today's wind</button>}
               <button type="button" onClick={surprise} className="sim-btn-lg flex-1 sm:flex-none">Surprise me</button>
               <button type="button" onClick={() => onStart('race', s)} className="sim-btn-lg sim-btn-go flex-1 sm:flex-none">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 001.5.86l12.5-7.5a1 1 0 000-1.72L8.5 3.64A1 1 0 007 4.5z" /></svg>
@@ -658,148 +729,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </SetupGroup>
           </div>
         </section>
-
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,26vw)]">
-          <div className="flex min-w-0 flex-col gap-6">
-            {/* ── Training ── */}
-            <section className="flex flex-col gap-4" aria-labelledby="train-title">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 id="train-title" className="sim-h2">Your training</h2>
-                  <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Coaching, drills and the Playbook: learn it here, then take it to the pond.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Chip tone={lic.level ? 'blue' : 'plain'}>Rules licence · level {lic.level} of 6</Chip>
-                  <Chip tone={stars.got ? 'blue' : 'plain'}>{stars.got} of {stars.of} start stars</Chip>
-                </div>
-              </div>
-              {onLink && plan.length > 0 ? (
-                <div className="flex flex-col gap-3 sim-card p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <AlfieOrb size={36} />
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 font-display text-[18px] font-bold leading-tight">Today's ten minutes</p>
-                      <p className="m-0 text-[13px]" style={{ color: C.mute }}>Three things, picked from where your races are going and what's due.</p>
-                    </div>
-                    <Chip tone={plan.every(p => p.done) ? 'good' : 'blue'}>{plan.filter(p => p.done).length} of {plan.length} done</Chip>
-                  </div>
-                  <ol className="m-0 flex list-none flex-col p-0">
-                    {plan.map((it, i) => {
-                      const link = practiceLink(it.link);
-                      return (
-                        <li key={`${it.link.kind}:${it.link.id}`} className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] py-3 last:pb-0">
-                          <span aria-hidden="true" className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12.5px] font-bold', it.done ? 'bg-[rgba(126,226,168,0.18)] text-[#7EE2A8]' : 'bg-white/[0.08]')}>{it.done ? '✓' : i + 1}</span>
-                          <span className="min-w-[180px] flex-1">
-                            <span className="block text-[14.5px] font-semibold">{link.label.replace(/^(Start Trainer|Scenario): /, '')}</span>
-                            <span className="block text-[12.5px] leading-snug" style={{ color: C.mute }}>{it.why}</span>
-                          </span>
-                          <Btn small primary={!it.done} onClick={() => onLink(link)}>{it.done ? 'Again' : 'Go'}</Btn>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:p-5">
-                  <AlfieOrb size={44} />
-                  <div className="min-w-[200px] flex-1">
-                    <Cap>Alfie's pick for you</Cap>
-                    <p className="m-0 mt-0.5 font-display text-[18px] font-bold leading-tight">{advice.title}</p>
-                    <p className="m-0 mt-1 text-[13.5px] leading-snug" style={{ color: C.mute }}>{advice.text}</p>
-                  </div>
-                  <Btn primary onClick={() => onOpen(advice.where)}>Start the session</Btn>
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:px-5">
-                <span aria-hidden="true" className="sim-set-icon flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B4FF]"><Glyph name="flag" size={21} /></span>
-                <div className="min-w-[200px] flex-1">
-                  <Cap>Call of the day</Cap>
-                  <p className="m-0 mt-0.5 font-display text-[17px] font-bold leading-tight">{callToday ? `Called: ${callToday.points} of 2` : 'One incident. Who broke a rule, and which one?'}</p>
-                  <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{callToday ? `${judgedToday} of today's five cases done. The same five for everyone, new tomorrow.` : "Watch a short clip from above and make the call. The simulator's referee gives the verdict."}</p>
-                </div>
-                <Btn primary={!callToday} onClick={() => onOpen('judge')}>{callToday ? (judgedToday < 5 ? 'Carry on judging' : 'More cases') : 'Make the call'}</Btn>
-              </div>
-              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
-                <AcademyCard icon="book" tint="#34D3C8" kicker={`${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
-                  progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
-                <AcademyCard icon="flag" tint="#4DA3FF" kicker="12 drills" title="Start Trainer" text="Time on distance, the favoured end, port-tack starts, crowded lines, and getting back after a recall."
-                  progress={stars.of ? stars.got / stars.of : 0} progressText={`${stars.got}/${stars.of} stars`} action={() => onOpen('trainer')} actionLabel={stars.got ? 'Carry on' : 'Begin'} />
-                <AcademyCard icon="book" tint="#B692FF" kicker="6 modules" title="Rules Academy" text="26 situations from the Racing Rules with Appendix E. Answer each one, then sail it, and earn your licence."
-                  progress={lic.level / 6} progressText={`Level ${lic.level}/6`} action={() => onOpen('academy')} actionLabel={lic.level ? 'Next module' : 'Begin'} />
-                <AcademyCard icon="flask" tint="#FF9F43" kicker={`${LAB.length} scenarios`} title="Scenario Lab" text="Boat speed upwind and down, tacks, gybes and roundings against the clock, and classic race moments. Replay each until you win it."
-                  progress={LAB.length ? labWon / LAB.length : 0} progressText={`${labWon}/${LAB.length} won`} action={() => onOpen('lab')} actionLabel={labWon ? 'Carry on' : 'Begin'} />
-                {onLink && (
-                  <AcademyCard icon="boat" tint="#7DB7FF" kicker="5 steps" title="First sail" text="Never sailed a radio yacht? Steer her, trim the sail, tack, round a mark and cross a start line, a step at a time."
-                    progress={firstWon / FIRST.length} progressText={`${firstWon}/${FIRST.length} done`} action={() => onLink({ kind: 'lab', id: (nextFirst(id => !!training.lab[id]?.won) ?? FIRST[0]).id, label: 'First sail' })} actionLabel={firstWon === 0 ? 'Begin' : firstWon < FIRST.length ? 'Carry on' : 'Sail them again'} />
-                )}
-                <AcademyCard icon="pin" tint="#34D399" kicker="Today's wind" title="Venue practice" text={`${practiceAt.name}'s real water in the wind blowing there today. Rehearse the shifts before you get to the club.`}
-                  progress={s.venue === practiceAt.id && s.windDir === 'today' ? 1 : 0} progressText={s.venue === practiceAt.id && s.windDir === 'today' ? 'Set up' : 'Live wind'}
-                  action={() => { set({ venue: practiceAt.id, windDir: 'today', todayStrength: true }); window.scrollTo({ top: 0, behavior: 'smooth' }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0, behavior: 'smooth' }); }} actionLabel="Use today's wind" />
-              </div>
-            </section>
-          </div>
-
-          {/* ── You ── */}
-          <aside className="flex min-w-0 flex-col gap-5">
-            {next && <RehearseCard {...next} race={next.race} />}
-            <YachtCard yard={yard} cls={s.classId} me={me} onDesign={() => onOpen('yacht')} />
-            <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="pf-title">
-              <div className="flex items-center gap-3">
-                <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{sailFor(yard, s.classId, me).sail}</span>
-                <div className="min-w-0">
-                  <h2 id="pf-title" className="sim-h3 truncate">{me ? me.name : 'Your skipper profile'}</h2>
-                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
-                </div>
-              </div>
-              {me && sailFor(yard, s.classId, me).from === 'none' && (
-                <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
-                  Add your {CLASS_LABEL[s.classId]} in My Garage, or give her a number in Design your yacht, to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.
-                </p>
-              )}
-              {!sk ? (
-                <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Sail a race and your profile starts here: starts, upwind, roundings, downwind and rules, worked out from how you race.</p>
-              ) : (
-                <>
-                  <div className="flex flex-col gap-2.5">
-                    <SkillBar label="Starts" v={sk.starts} />
-                    <SkillBar label="Upwind" v={sk.upwind} />
-                    <SkillBar label="Roundings" v={sk.roundings} />
-                    <SkillBar label="Downwind" v={sk.downwind} />
-                    <SkillBar label="Rules" v={sk.rules} />
-                  </div>
-                  <p className="m-0 text-[13px] leading-normal" style={{ color: C.mute }}>
-                    {weakest && `${weakest[0][0].toUpperCase()}${weakest[0].slice(1)} is where you have most to gain.`}
-                    {sk.avgPlace !== null && ` Average finish: top ${Math.round(sk.avgPlace * 100)}% of the fleet.`}
-                    {sk.wins > 0 && ` ${sk.wins} win${sk.wins > 1 ? 's' : ''}.`}
-                  </p>
-                  <div className="flex flex-col">
-                    {profile.races.slice(0, 5).map(r => (
-                      <div key={r.at} className="flex items-center gap-3 border-t border-white/[0.055] py-2 text-[13px]">
-                        <span className="w-12 font-semibold tabular-nums">{r.mode === 'start' ? 'Start' : r.place ? ordinal(r.place) : r.status.toUpperCase()}</span>
-                        <span className="min-w-0 flex-1 leading-snug" style={{ color: C.mute }}>{r.cls} · {r.level} · {r.wind}</span>
-                        <span className="tabular-nums" style={{ color: C.mute }}>{new Date(r.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
-                      </div>
-                    ))}
-                  </div>
-                  {pp && (
-                    <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
-                      <b className="font-semibold text-[#F1F4FA]">Passport:</b> {pp.total.grade && pp.against
-                        ? `${GRADE_NAME[pp.total.grade]} overall against ${pp.against}, with Gold in ${pp.skills.filter(k => k.grade === 'gold').length} of 8 parts.`
-                        : pp.graded >= 3 ? `No grade overall yet against ${pp.against ?? 'the fleet'}: give away less than a quarter of the fleet for Bronze.`
-                          : `${pp.graded} of the 3 finished races it takes to be graded.`}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
-                    <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>
-                  </div>
-                </>
-              )}
-            </section>
             {transmitter && <TransmitterCard {...transmitter} />}
-          </aside>
-        </div>
-
         {live && <LiveSection {...live} />}
 
         {events && (events.length > 0 || canSet) && (
@@ -859,7 +789,112 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
             </div>
           </section>
         )}
+          </>
+        )}
 
+        {door === 'train' && (
+          <div className="flex min-w-0 flex-col gap-5">
+            <div className={cx('grid items-start gap-5', !simple && grad && 'xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]')}>
+              {onLink && <WeekCard week={week} level={st.level} onGo={onLink} onPlay={onPlay} />}
+              {!simple && grad && <LicenceCard lic={grad} onGo={g => (g === 'race' ? go('race') : onOpen(g))} />}
+            </div>
+              <div className="flex flex-wrap items-center gap-4 sim-card p-4 sm:px-5">
+                <span aria-hidden="true" className="sim-set-icon flex h-11 w-11 shrink-0 items-center justify-center text-[#C9B4FF]"><Glyph name="flag" size={21} /></span>
+                <div className="min-w-[200px] flex-1">
+                  <Cap>Call of the day</Cap>
+                  <p className="m-0 mt-0.5 font-display text-[17px] font-bold leading-tight">{callToday ? `Called: ${callToday.points} of 2` : 'One incident. Who broke a rule, and which one?'}</p>
+                  <p className="m-0 mt-1 text-[13px] leading-snug" style={{ color: C.mute }}>{callToday ? `${judgedToday} of today's five cases done. The same five for everyone, new tomorrow.` : "Watch a short clip from above and make the call. The simulator's referee gives the verdict."}</p>
+                </div>
+                <Btn primary={!callToday} onClick={() => onOpen('judge')}>{callToday ? (judgedToday < 5 ? 'Carry on judging' : 'More cases') : 'Make the call'}</Btn>
+              </div>
+            <section className="flex flex-col gap-4" aria-labelledby="lib-title">
+              <div>
+                <h2 id="lib-title" className="sim-h2">The library</h2>
+                <p className="m-0 mt-1 text-[13.5px]" style={{ color: C.mute }}>Four shelves: tactics, rules, starts and race moments. Learn it here, then take it to the pond.</p>
+              </div>
+              <div className="grid gap-3.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))' }}>
+                <AcademyCard icon="book" tint="#34D3C8" kicker={`Tactics · ${PLAYS.length} plays`} title="The Playbook" text="Race strategy and tactics for radio sailing: starts, the beat, marks, the run and coming back. Read a play, then practise it."
+                  progress={0} progressText="Strategy and tactics" action={() => onOpen('playbook')} actionLabel="Open" />
+                <AcademyCard icon="book" tint="#B692FF" kicker="Rules · 6 modules" title="Rules Academy" text="26 situations from the Racing Rules with Appendix E. Answer each one, then sail it, and earn your licence."
+                  progress={lic.level / 6} progressText={`Level ${lic.level}/6`} action={() => onOpen('academy')} actionLabel={lic.level ? 'Next module' : 'Begin'} />
+                <AcademyCard icon="flag" tint="#4DA3FF" kicker="Starts · 12 drills" title="Start Trainer" text="Time on distance, the favoured end, port-tack starts, crowded lines, and getting back after a recall."
+                  progress={stars.of ? stars.got / stars.of : 0} progressText={`${stars.got}/${stars.of} stars`} action={() => onOpen('trainer')} actionLabel={stars.got ? 'Carry on' : 'Begin'} />
+                <AcademyCard icon="flask" tint="#FF9F43" kicker={`Race moments · ${LAB.length} scenarios`} title="Scenario Lab" text="Boat speed upwind and down, tacks, gybes and roundings against the clock, and classic race moments. Replay each until you win it."
+                  progress={LAB.length ? labWon / LAB.length : 0} progressText={`${labWon}/${LAB.length} won`} action={() => onOpen('lab')} actionLabel={labWon ? 'Carry on' : 'Begin'} />
+                {onLink && (newcomer || (firstWon > 0 && firstWon < FIRST.length)) && (
+                  <AcademyCard icon="boat" tint="#7DB7FF" kicker="Learn to sail · 5 steps" title="First sail" text="Never sailed a radio yacht? Steer her, trim the sail, tack, round a mark and cross a start line, a step at a time."
+                    progress={firstWon / FIRST.length} progressText={`${firstWon}/${FIRST.length} done`} action={() => onLink({ kind: 'lab', id: (nextFirst(id => !!training.lab[id]?.won) ?? FIRST[0]).id, label: 'First sail' })} actionLabel={firstWon === 0 ? 'Begin' : 'Carry on'} />
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {door === 'you' && (
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            <div className="flex min-w-0 flex-col gap-5">
+              <LevelCard st={st} clean={clean} simple={simple} />
+            <section className="flex flex-col gap-4 sim-card p-5" aria-labelledby="pf-title">
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2E7BFF] to-[#8A4DFF] font-display text-[17px] font-extrabold text-white">{sailFor(yard, s.classId, me).sail}</span>
+                <div className="min-w-0">
+                  <h2 id="pf-title" className="sim-h3 truncate">{me ? me.name : 'Your skipper profile'}</h2>
+                  <p className="m-0 text-[12.5px]" style={{ color: C.mute }}>{sk ? `From your last ${sk.races} race${sk.races > 1 ? 's' : ''}${synced ? '' : ' on this device'}` : synced ? 'Saved to your account' : 'Kept on this device'}</p>
+                </div>
+              </div>
+              {me && sailFor(yard, s.classId, me).from === 'none' && (
+                <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                  Add your {CLASS_LABEL[s.classId]} in My Garage, or give her a number in Design your yacht, to race with your own sail number. Until then you're <b className="text-[#F1F4FA]">01</b>.
+                </p>
+              )}
+              {!sk ? (
+                <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Sail a race and your profile starts here: starts, upwind, roundings, downwind and rules, worked out from how you race.</p>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2.5">
+                    <SkillBar label="Starts" v={sk.starts} />
+                    <SkillBar label="Upwind" v={sk.upwind} />
+                    <SkillBar label="Roundings" v={sk.roundings} />
+                    <SkillBar label="Downwind" v={sk.downwind} />
+                    <SkillBar label="Rules" v={sk.rules} />
+                  </div>
+                  <p className="m-0 text-[13px] leading-normal" style={{ color: C.mute }}>
+                    {weakest && `${weakest[0][0].toUpperCase()}${weakest[0].slice(1)} is where you have most to gain.`}
+                    {sk.avgPlace !== null && ` Average finish: top ${Math.round(sk.avgPlace * 100)}% of the fleet.`}
+                    {sk.wins > 0 && ` ${sk.wins} win${sk.wins > 1 ? 's' : ''}.`}
+                  </p>
+                  <div className="flex flex-col">
+                    {profile.races.slice(0, 5).map(r => (
+                      <div key={r.at} className="flex items-center gap-3 border-t border-white/[0.055] py-2 text-[13px]">
+                        <span className="w-12 font-semibold tabular-nums">{r.mode === 'start' ? 'Start' : r.place ? ordinal(r.place) : r.status.toUpperCase()}</span>
+                        <span className="min-w-0 flex-1 leading-snug" style={{ color: C.mute }}>{r.cls} · {levelName(r.level)} · {r.wind}</span>
+                        <span className="tabular-nums" style={{ color: C.mute }}>{new Date(r.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {pp && (
+                    <p className="m-0 rounded-xl bg-white/[0.04] px-3 py-2.5 text-[13px] leading-snug" style={{ color: C.mute }}>
+                      <b className="font-semibold text-[#F1F4FA]">Passport:</b> {pp.total.grade && pp.against
+                        ? `${GRADE_NAME[pp.total.grade]} overall against ${pp.against}, with Gold in ${pp.skills.filter(k => k.grade === 'gold').length} of 8 parts.`
+                        : pp.graded >= 3 ? `No grade overall yet against ${pp.against ?? 'the fleet'}: give away less than a quarter of the fleet for Bronze.`
+                          : `${pp.graded} of the 3 finished races it takes to be graded.`}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Btn small onClick={() => onOpen('passport')}>Open your skill passport</Btn>
+                    <Btn quiet small onClick={() => { clearProfile(); onProfileCleared(); }}>Clear my history</Btn>
+                  </div>
+                </>
+              )}
+            </section>
+            </div>
+            <div className="flex min-w-0 flex-col gap-5">
+              <YachtCard yard={yard} cls={s.classId} me={me} onDesign={() => onOpen('yacht')} />
+              {onWay && <WaySwitch way={way} onChoose={onWay} />}
+              {transmitter && <TransmitterCard {...transmitter} />}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── The sheets ── */}

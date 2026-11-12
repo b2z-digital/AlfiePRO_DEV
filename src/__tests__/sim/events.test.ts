@@ -47,7 +47,7 @@ describe('Virtual race events', () => {
     expect(mixed.map(s => s.windFrom)).toEqual([75, 55, 90, 65]);
     expect(mixed.every(s => s.classId === 'IOM' && s.fleetSize === 8 && s.laps === 2)).toBe(true);
     expect(breezeText(mixed[1])).toBe('Light, puffy');
-    expect(eventLine(event())).toBe('3 races · IOM · 8 boats · State skippers · LMRYC · Booragul · 2 laps');
+    expect(eventLine(event())).toBe('3 races · IOM · 8 boats · Regional skippers · LMRYC · Booragul · 2 laps');
   });
 
   it('knows which race is open and what comes next', () => {
