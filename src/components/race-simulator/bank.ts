@@ -476,7 +476,7 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
     ...(b.look ? { luffTape: b.look.jibLuff, patch: b.look.patch, hatch: b.look.deckPatch }
       : b.isPlayer ? { luffTape: DEFAULT_LOOK.jibLuff, patch: DEFAULT_LOOK.patch }
         : { luffTape: t.tape, patch: fleetPatch(b) }),
-    sail: b.sail, country: b.look?.country ?? 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
+    sail: b.sail, country: b.look?.country ?? b.country ?? 'AUS', spd, hullSpeed: b.cls.hullSpeed, isPlayer: b.isPlayer, alpha: b.finished ? 0.5 : 1,
   };
   return onWaves(p, race.sea, race.t);
 }

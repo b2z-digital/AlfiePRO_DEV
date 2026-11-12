@@ -8,6 +8,8 @@ import type { Region } from '@/sim/venue';
 import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
+import Flag from './Flag';
+import { alpha2, countryName } from './flags';
 import { scoreText, type StandingRow } from './series';
 import { Brand, DoorBack } from './SimDoors';
 import SimHero from './SimHero';
@@ -92,7 +94,9 @@ function Who({ id, me, name, sail }: { id: string; me: Me; name: string; sail: s
     <span className="flex min-w-0 items-center gap-2.5">
       <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full border border-white/30" style={{ background: m?.hull ?? '#FFFFFF' }} />
       <span className={cx('truncate', id === ME && 'font-bold')}>{id === ME ? me.name : name}</span>
-      {m && <span className="shrink-0 rounded-[5px] border border-white/20 px-1 text-[10.5px] font-semibold tracking-wider" style={{ color: C.mute }}>{m.country}</span>}
+      {m && (alpha2(m.country)
+        ? <span className="inline-flex shrink-0" title={countryName(alpha2(m.country))}><Flag code={alpha2(m.country)} size={16} /></span>
+        : <span className="shrink-0 rounded-[5px] border border-white/20 px-1 text-[10.5px] font-semibold tracking-wider" style={{ color: C.mute }}>{m.country}</span>)}
       <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: C.faint }}>{sail ?? ''}</span>
     </span>
   );
@@ -374,7 +378,7 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                   <section className="sim-card flex flex-col gap-1.5 p-5" aria-labelledby="rv-title">
                     <Cap>Your rival</Cap>
                     <h2 id="rv-title" className="sim-h3 flex items-center gap-2.5"><span aria-hidden="true" className="h-3.5 w-3.5 rounded-full border border-white/30" style={{ background: rv.skipper.hull }} />{rv.skipper.name}</h2>
-                    <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{rv.gap === 0 ? 'Level with you' : `${rv.gap} point${rv.gap === 1 ? '' : 's'} ${rv.ahead ? 'ahead of' : 'behind'} you`} in the {tier === 'club' ? 'pointscore' : 'ranking'}. {rv.skipper.country}, sail {rv.skipper.sail}.</p>
+                    <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{rv.gap === 0 ? 'Level with you' : `${rv.gap} point${rv.gap === 1 ? '' : 's'} ${rv.ahead ? 'ahead of' : 'behind'} you`} in the {tier === 'club' ? 'pointscore' : 'ranking'}. {countryName(alpha2(rv.skipper.country)) || rv.skipper.country}, sail {rv.skipper.sail}.</p>
                   </section>
                 )}
                 <Budget career={career} classLabel={classLabel} onBuy={id => onChange(buy(career, id, Date.now()))} />

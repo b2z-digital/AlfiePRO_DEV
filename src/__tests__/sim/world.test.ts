@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isoWeek, nameProblem, nextMajor, worldNow, worldPoints, type WorldEvent } from '@/components/race-simulator/world';
+import { clubPeriod, isoWeek, nameProblem, nextMajor, worldMedals, worldNow, worldPoints, type WorldEvent, type WorldResult } from '@/components/race-simulator/world';
+import { CAST } from '@/components/race-simulator/career';
+import { Race } from '@/sim/engine';
 import { alpha2, countryName } from '@/components/race-simulator/flags';
 import { VENUES } from '@/sim/venues';
 import { regionOf } from '@/components/race-simulator/circuitWaters';
@@ -151,3 +153,34 @@ describe('the Circuit renews', () => {
     void finishDay;
   });
 });
+
+describe('World medals and club against club', () => {
+  const res = (event_id: string, kind: WorldResult['kind'], place: number, closed_at: string, title?: string): WorldResult => ({ event_id, kind, class_id: 'IOM', place, of_n: 30, points: 50, closed_at, title });
+  it('gives a medal for a podium in a World Regatta or a Major, and a title for winning a Major; none for the daily race', () => {
+    const m = worldMedals([
+      res('d', 'daily', 1, '2026-11-12T00:00:00Z'),
+      res('r', 'regatta', 2, '2026-11-09T00:07:00Z', 'World Regatta: Lake Kawana'),
+      res('m', 'major', 1, '2026-11-10T00:07:00Z', 'The Perth Major'),
+      res('r4', 'regatta', 4, '2026-11-02T00:07:00Z'),
+    ]);
+    expect(m.map(x => [x.eventId, x.kind, x.trophy])).toEqual([['m', 'gold', true], ['r', 'silver', false]]);
+    expect(m[0].event).toBe('The Perth Major');
+    expect(worldMedals(null)).toEqual([]);
+  });
+  it('shows the club table for last week (scored this Monday), this month, last month and a year, in UTC', () => {
+    const now = Date.parse('2026-11-12T06:00:00Z');
+    expect(clubPeriod('week', now)).toEqual({ from: Date.parse('2026-11-09T00:00:00Z'), to: Date.parse('2026-11-16T00:00:00Z') });
+    expect(clubPeriod('month', now)).toEqual({ from: Date.parse('2026-11-01T00:00:00Z'), to: Date.parse('2026-12-01T00:00:00Z') });
+    expect(clubPeriod('lastMonth', now)).toEqual({ from: Date.parse('2026-10-01T00:00:00Z'), to: Date.parse('2026-11-01T00:00:00Z') });
+    expect(clubPeriod('lastMonth', Date.parse('2027-01-03T00:00:00Z')).from).toBe(Date.parse('2026-12-01T00:00:00Z'));
+  });
+  it('puts each of the cast\'s own country letters on her sail', () => {
+    const r = new Race({ classId: 'IOM', fleetSize: 4, level: 'club', windStrength: 'medium', windCharacter: 'steady', laps: 1, length: 'short', sequenceSeconds: 60, coach: 'off', autoTrim: true, seed: 3,
+      cast: [{ name: 'Ari Solberg', sail: '52', country: 'NOR' }, { name: 'Mia Castellan', sail: '27', country: 'ESP' }, { name: 'X', sail: '9' }] });
+    expect(r.boats.map(b => b.country ?? null)).toEqual([null, 'NOR', 'ESP', null]);
+  });
+  it('draws a flag for every country in the Circuit\'s cast', () => {
+    for (const m of CAST) expect(alpha2(m.country) ?? '', m.country).toMatch(/^[A-Z]{2}$/);
+  });
+});
+
