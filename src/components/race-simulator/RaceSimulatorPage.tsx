@@ -22,7 +22,7 @@ import { standing } from './rating';
 import { clubName, clubTable, isWorld, listWorld, myResults, worldMedals, mySkipper, saveSkipper, skippersOf, stopAppearing, syncSkipperStats, worldNow, worldTable, type Skipper, type WorldEvent, type WorldResult } from './world';
 import { FLEET_NAME } from './heats';
 import { levelLicence } from './programme';
-import { ME, TIERS, abandonRace, wonPaints, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
+import { ME, TIERS, abandonRace, wonPaints, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, noteRace, raceRows, recordRace, type Career } from './career';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
 import SimTrainer from './SimTrainer';
@@ -602,6 +602,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   const careerDone = useRef<number | null>(null);
   const careerGun = useRef<number | null>(null);
   const careerNoteRef = useRef<{ title: string; left: number } | undefined>(undefined);
+  const notedRef = useRef<number | null>(null);
   const recordCareer = useCallback((race: Race) => {
     if (!run?.career || run.resume || careerDone.current === run.key) return;
     careerDone.current = run.key;
@@ -669,10 +670,17 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     if (run?.career && !run.resume) {
       recordCareer(race);
       careerNote = careerNoteRef.current;
+      // A note on how you sailed it, for Alfie's report at the end of the event (once a race).
+      const c = loadTraining().career;
+      if (c?.day && notedRef.current !== run.key) {
+        notedRef.current = run.key;
+        const led = sum.ledger;
+        trainingChanged(saveCareer(noteRace(c, { place: sum.place, of: sum.of, status: sum.status, late: sum.late, ocs: sum.ocs, penalties: sum.penalties, ...(led ? { parts: led.parts, speedUp: led.speedUp, tacks: led.tacks } : {}) })));
+      }
     } else if (run?.career) setChNote("Taken over part way through, so this one is practice: it isn't on the day's sheet.");
     setDebrief({ race, sum, moments, challenge: ch, event: ev, career: careerNote });
     setWhere('debrief');
-  }, [userId, clubId, run, me, leaveRoom, recordCareer]);
+  }, [userId, clubId, run, me, leaveRoom, recordCareer, trainingChanged]);
 
   // Sail a challenge, against nobody or against an entry's ghost.
   const sailChallenge = useCallback(async (c: Challenge, ghostOf: ChallengeEntry | null) => {
@@ -930,7 +938,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       <div key={where} className="h-full overflow-y-auto">
         <SimCareer career={training.career ?? null} me={careerMe(training.career ?? null)} home={homeRegion} setup={setup} classLabel={c => CLASSES[c]?.name ?? c}
           licence={training.career?.ticket ? levelLicence(TIERS[TIERS.indexOf(training.career.ticket) - 1] as SkipperLevel, profile, training) : null} onLicence={g => { if (g === 'race') { setDoor('race'); setWhere('home'); } else setWhere(g); }}
-          onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
+          onLink={openLink} onChange={c => trainingChanged(saveCareer(c))} onSail={sailCareer} onBack={() => setWhere('home')} />
         {waterNote && <PageNote text={waterNote} onClose={() => setWaterNote(null)} />}
       </div>
     );
