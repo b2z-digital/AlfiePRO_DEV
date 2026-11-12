@@ -24,7 +24,8 @@ import { nextUp } from './nextup';
 import { learnPath } from './learn';
 import { SYLLABUS, levelLicence, weekPlan } from './programme';
 import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
-import { Brand, DOOR_NAME, DoorBack, DoorCard, LearnCard, LevelCard, LicenceCard, NextUpCard, StartAgain, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
+import { HELP_WORDS, type Comfort } from './comfort';
+import { Brand, ComfortCard, DOOR_NAME, DoorBack, DoorCard, LearnCard, LevelCard, LicenceCard, NextUpCard, StartAgain, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
 import { CAUSE_WORDS } from './ledger';
 import { dayState, seasonOf, type Career } from './career';
 import { MedalShelf } from './SimCareer';
@@ -529,7 +530,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -540,6 +541,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   onWay?: (w: Way, newcomer?: boolean) => void;
   /** Start again: everything cleared (the yachts kept, or not). */
   onReset?: (keepYachts: boolean) => void;
+  /** Comfort settings, Alfie's help at your level now, and the way to change them. */
+  comfort?: Comfort; helpNow?: CoachMode; onComfort?: (c: Omit<Comfort, 'at'>) => void;
   /** Open a play in the Playbook. */
   onPlay?: (id: string) => void;
   /** Your season on the Circuit (null: not begun), and the way to its screen. */
@@ -1088,6 +1091,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                   <MedalShelf medals={career.medals} />
                 </section>
               )}
+              {comfort && onComfort && <ComfortCard comfort={comfort} helpNow={helpNow} onChange={onComfort} />}
               {onWay && <WaySwitch way={way} newcomer={!!training.newcomer} onChoose={onWay} />}
               {onReset && <StartAgain onReset={onReset} hasYachts={yard.yachts.length > 0} synced={synced} />}
               {transmitter && <TransmitterCard {...transmitter} />}
@@ -1233,7 +1237,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         </Sheet>
       )}
       {pick === 'aids' && (
-        <Sheet icon="aids" title="Coaching and aids" text="How much help you get, and how you see the race." onClose={closePick}>
+        <Sheet icon="aids" title="Coaching and aids" text={comfort?.help === 'steps' ? `Alfie's help is stepping down as you improve: at your level he ${HELP_WORDS[helpNow]}. Choose here to set it yourself.` : 'How much help you get, and how you see the race.'} onClose={closePick}>
           <Opts label="Alfie's coaching" cols={3}>
             <Opt on={s.coach === 'full'} onClick={() => set({ coach: 'full' })} title="Full" text="Alfie calls it aloud as you sail (bear away, ease, tack on the header) and explains every rules incident." />
             <Opt on={s.coach === 'hints'} onClick={() => set({ coach: 'hints' })} title="Hints" text="Written tips as you sail. Incidents show as a banner." />

@@ -24,6 +24,8 @@ import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './input';
 import { usePads } from './transmitter';
 import { RaceAudio } from './audio';
+import { captionWorthy } from './comfort';
+import { setLabelScale } from './textScale';
 import { PlayerLog, RaceSummary, fmt, summarize } from './stats';
 import { focusWords, type Focus } from './focus';
 import { SequencePlayer, SimSequence } from './startbox';
@@ -68,6 +70,8 @@ function alike(a: string, b: string): boolean {
 
 export interface SimRaceProps {
   settings?: RaceSettings;
+  /** Comfort settings: how much larger the panels and labels are, the race's pace, and captions of what Alfie says. */
+  comfort?: { zoom: number; pace: number; captions: boolean };
   scene?: ActiveScene;
   mode: 'race' | 'start' | 'scene';
   coach: CoachMode;
@@ -132,7 +136,16 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, raceTitle, onGun, onResult, focus = null }: SimRaceProps) {
+/** A caption of what Alfie (or another skipper) has just said. */
+function CaptionLine({ caption }: { caption: { text: string; as: 'alfie' | 'skipper' } }) {
+  return (
+    <p className="sim-caption" aria-live="polite">
+      <b className={cx('mr-1.5 font-bold', caption.as === 'skipper' ? 'text-[#FFD27A]' : 'text-[#9CCBFF]')}>{caption.as === 'skipper' ? 'Hail:' : 'Alfie:'}</b> {caption.text}
+    </p>
+  );
+}
+
+export default function SimRace({ comfort, settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, raceTitle, onGun, onResult, focus = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -300,14 +313,32 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
   const pinch = useRef({ pts: new Map<number, { x: number; y: number }>(), d0: 0, z0: 1 }).current;
 
   // Mirrors of state for the animation loop.
-  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, boost: 1, phone: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
+  const R = useRef({ paused, replay, coach, mapping, fast, laylines, follow, zoom, view, glance, pace: 1, captions: false, boost: 1, phone: false, ended: false, playerDoneAt: -1, evIdx: 0, toastId: 0, cueAt: -9, cueChangedAt: -99, resultsAt: -9, cue: null as Cue | null });
   R.current.paused = paused || intro || seqWait !== 'no'; R.current.replay = replay; R.current.coach = coach; R.current.mapping = mapping;
   R.current.fast = fast; R.current.laylines = laylines; R.current.follow = follow; R.current.zoom = zoom;
   R.current.view = view; R.current.glance = glance;
+  R.current.pace = comfort?.pace ?? 1; R.current.captions = !!comfort?.captions;
   // A phone held upright is narrow: from the bank, look a little closer so the boats aren't specks.
   R.current.boost = phone && scrH > scrW ? 1.4 : 1;
   R.current.phone = phone;
   useEffect(() => { audio.muted = muted; if (muted) audio.stop(); }, [muted, audio]);
+  // Captions: what Alfie (or another skipper) says, on screen for a few seconds.
+  const [caption, setCaption] = useState<{ text: string; as: 'alfie' | 'skipper'; n: number } | null>(null);
+  useEffect(() => {
+    if (!comfort?.captions) { audio.onSay = null; setCaption(null); return; }
+    let n = 0, timer: number | undefined;
+    audio.onSay = (text, as) => {
+      if (!captionWorthy(text)) return;
+      const k = ++n;
+      setCaption({ text: text.replace(/\s+/g, ' ').trim(), as, n: k });
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setCaption(c => (c && c.n === k ? null : c)), Math.min(7000, 2600 + text.length * 45));
+    };
+    return () => { audio.onSay = null; window.clearTimeout(timer); };
+  }, [comfort?.captions, audio]);
+  // Larger type: the race's panels (on a bigger screen) and the labels on the water.
+  const hudZoom = Math.min(comfort?.zoom ?? 1, scrW >= 1500 ? 1.3 : scrW >= 1200 ? 1.15 : 1.08);
+  useEffect(() => { setLabelScale(comfort?.zoom ?? 1); return () => setLabelScale(1); }, [comfort?.zoom]);
   useEffect(() => {
     if (!banner) return;
     const id = window.setTimeout(() => setBanner(b => (b === banner ? null : b)), 9000);
@@ -536,7 +567,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
         if (race.replaying) setCatchUp({ to: resume?.step ?? 0, at: race.step_ });
         else { setCatchUp(null); setTookOver(race.t); st.paused = true; setPaused(true); }
       } else if (live ? !st.ended : !st.paused && !st.replay && !st.ended) {
-        acc += dtReal * (st.fast && !live ? 2.5 : 1);
+        acc += dtReal * (live ? 1 : st.fast ? 2.5 : st.pace);
         let n = 0, held = false;
         while (acc >= DT && n < 14) {
           if (live) live.input(ctl.rudder, ctl.sheet);
@@ -579,7 +610,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       // A live race: send your helm to the others, and look after anyone holding it up.
       if (live) live.pump();
       // The club's start sequence keeps time with the race clock.
-      seqPlayer?.update(race.gunT - race.t, live ? !st.ended : !st.paused && !st.replay && !st.ended && !race.replaying, st.fast && !live ? 2.5 : 1, audio.muted);
+      seqPlayer?.update(race.gunT - race.t, live ? !st.ended : !st.paused && !st.replay && !st.ended && !race.replaying, live ? 1 : st.fast ? 2.5 : st.pace, audio.muted);
       // Instant replay playback.
       if (st.replay && st.replay.playing) {
         const back = Math.max(0, st.replay.back - dtReal * 20);
@@ -695,7 +726,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           // (and aloud, in Full coaching).
           const dc = talk.update(race, p, race.skippers[race.boats.indexOf(p)]?.intent, nextTarget(race, p));
           if (st.cue !== dc) { st.cue = dc; setCue(dc); }
-          if (dc.say && st.coach === 'full' && !audio.muted && !st.paused && !st.replay && !st.ended) {
+          if (dc.say && st.coach === 'full' && (!audio.muted || st.captions) && !st.paused && !st.replay && !st.ended) {
             const words = voice.pick(now / 1000, { key: `demo:${dc.key}`, say: dc.say, again: 20 }, audio.speaking);
             if (words) audio.say(words, false);
           }
@@ -705,7 +736,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           const next = coachCue(race, p, mem, lineInfo(race, p));
           // Full coaching: Alfie calls it aloud, the way a coach on the bank would. Handling first
           // (bear away, ease, weave), then the tactics (tack on the header, the layline, the start).
-          if (st.coach === 'full' && !audio.muted && !st.paused && !st.replay && !st.ended && !scene?.watch) {
+          if (st.coach === 'full' && (!audio.muted || st.captions) && !st.paused && !st.replay && !st.ended && !scene?.watch) {
             const call = handlingCall(p, race.settings.autoTrim) ?? cueCall(next);
             const words = voice.pick(now / 1000, call, audio.speaking);
             if (words) audio.say(words, !!call?.urgent);
@@ -925,7 +956,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
           <span className="pr-0.5 text-[13px] font-semibold">Alfie</span>
           <Seg size="sm" label="Alfie's coaching" value={coach} onChange={m => { onCoachChange(m); setCoachHidden(false); }} options={[{ value: 'full', label: 'Full' }, { value: 'hints', label: 'Hints' }, { value: 'off', label: 'Off' }]} className="!bg-transparent !shadow-none" />
         </div>
-        {!live && <Btn icon aria-label={fast ? 'Normal speed' : 'Speed up'} aria-pressed={fast} onClick={() => setFast(v => !v)} title="Speed up (F)"><span className="text-[12px] font-bold">{fast ? '2.5×' : '1×'}</span></Btn>}
+        {!live && <Btn icon aria-label={fast ? 'Normal speed' : 'Speed up'} aria-pressed={fast} onClick={() => setFast(v => !v)} title="Speed up (F)"><span className="text-[12px] font-bold">{fast ? '2.5×' : comfort && comfort.pace < 1 ? `${comfort.pace}×` : '1×'}</span></Btn>}
         <Btn icon aria-label={muted ? 'Sound on' : 'Mute'} onClick={() => { audio.unlock(); setMuted(v => !v); }}>
           {muted
             ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" /></svg>
@@ -989,10 +1020,11 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             credit={race.venue ? creditLine(race.venue.def) : null}
           />
         )}
+        {phone && caption && <div className="pointer-events-none absolute bottom-[42%] left-3 right-3 z-20"><CaptionLine caption={caption} /></div>}
         {phone && sheetOpen && hud && <CourseSheet race={race} hud={hud} cam={view === 'bank' ? bcam : null} portrait={scrH > scrW} onClose={() => setSheetOpen(false)} />}
 
         {hud && !phone && (
-          <>
+          <div className="absolute left-0 top-0 h-full w-full" style={hudZoom > 1 ? { zoom: hudZoom } : undefined}>
             {/* Top row */}
             <div className="absolute left-6 top-5 hidden flex-col gap-4 md:flex">
               {scene ? <GoalCard group={scene.group} title={scene.spec.title} goal={scene.spec.goal.text} progress={hud.goal?.progress ?? null} timeLeft={hud.preStart ? null : hud.goal?.timeLeft ?? null} watching={watching} /> : <WindCard {...hud.wind} />}
@@ -1037,10 +1069,16 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
               )}
             </Hud>
 
-            {/* Bottom row */}
+            {/* Bottom row: Alfie's card, with his words above it as captions */}
+            {(showCoach || caption) && (
+              <div className="absolute bottom-6 left-6 hidden max-w-[460px] flex-col items-stretch gap-3 lg:flex">
+                {caption && <CaptionLine caption={caption} />}
+                {showCoach && (demoCue ? <DemoCard cue={demoCue} onHide={() => setCoachHidden(true)} /> : <CoachCard cue={cue} mode={coach} onHide={() => setCoachHidden(true)} />)}
+              </div>
+            )}
+            {caption && <div className="pointer-events-none absolute bottom-[116px] left-1/2 w-[min(640px,calc(100%-24px))] -translate-x-1/2 lg:hidden"><CaptionLine caption={caption} /></div>}
             {showCoach && (
               <>
-                <div className="absolute bottom-6 left-6 hidden lg:block">{demoCue ? <DemoCard cue={demoCue} onHide={() => setCoachHidden(true)} /> : <CoachCard cue={cue} mode={coach} onHide={() => setCoachHidden(true)} />}</div>
                 <div className="absolute left-3 right-3 top-[124px] sm:top-[168px] lg:hidden">{demoCue ? <DemoCard cue={demoCue} onHide={() => setCoachHidden(true)} compact /> : <CoachCard cue={cue} mode={coach} onHide={() => setCoachHidden(true)} compact />}</div>
               </>
             )}
@@ -1065,15 +1103,15 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
                 />
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* Toasts (on a phone they sit under the top row, with the rest of the notices) */}
-        {!phone && <div className="pointer-events-none absolute left-1/2 top-[168px] -translate-x-1/2"><Toasts items={toasts} /></div>}
+        {!phone && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2" style={{ top: 168 * hudZoom }}><Toasts items={toasts} /></div>}
 
         {/* Hints-mode banner (and every incident in a drill or lesson) */}
         {!phone && banner && !moment && !sceneOut && (
-          <div className="absolute left-1/2 top-[168px] -translate-x-1/2">
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: 168 * hudZoom }}>
             <HintBanner inc={banner} mine={banner.offender === p?.id} onOpen={openBanner} onClose={() => setBanner(null)} />
           </div>
         )}
