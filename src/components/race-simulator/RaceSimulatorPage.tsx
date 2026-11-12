@@ -44,7 +44,9 @@ import { C, ordinal } from './ui';
 import { VENUES, venueForClub } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
 import { currentId, ensureVenue, loadWaters, type Water } from './waters';
-import { regionOf } from './circuitWaters';
+import { regionOf, waterName } from './circuitWaters';
+import SimYear from './SimYear';
+import { fromSummary, loadAllRaces, yearSummary, type YearRace } from './year';
 import { DEFAULT_COMFORT, PACE_RATE, TEXT_ZOOM, helpFor } from './comfort';
 import { VenueWind, fetchVenueWind } from './venueWind';
 import { Challenge, ChallengeEntry, createChallenge, entryLog, isOpen, listChallenges, submitEntry } from './challenges';
@@ -139,7 +141,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'career' | 'bench' | 'world' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'career' | 'bench' | 'world' | 'year' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean, yard: Yard | null): RaceSettings {
@@ -204,6 +206,9 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   const [world, setWorld] = useState<WorldEvent[] | null>(null);
   const [skipper, setSkipper] = useState<Skipper | null | undefined>(undefined);
   const [worldResults, setWorldResults] = useState<WorldResult[] | null>(null);
+  // Your year in sailing: every race in your account (or this device's last thirty), and the year shown.
+  const [allRaces, setAllRaces] = useState<{ races: YearRace[]; source: 'account' | 'device' } | null>(null);
+  const [yearShown, setYearShown] = useState(() => new Date().getFullYear());
   const [worldClub, setWorldClub] = useState<string | null>(null);
   const [worldFlags, setWorldFlags] = useState<Map<string, Skipper>>(new Map());
   const [evFrom, setEvFrom] = useState<'home' | 'world'>('home');
@@ -599,6 +604,20 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   /** You, on the Circuit's sheets: your name and your number in the season's class. */
   // Your home state on the Circuit's real waters, from your club's water (built in, or the club's own).
+  // Open your year: load every race from the account the first time (this device's races until then, or without one).
+  const openYear = useCallback(() => {
+    setYearShown(new Date().getFullYear());
+    setAllRaces(a => a ?? { races: profile.races.map(fromSummary), source: 'device' });
+    setWhere('year');
+    if (userId) void loadAllRaces({ userId, clubId }).then(rs => { if (rs && rs.length) setAllRaces({ races: rs, source: 'account' }); });
+  }, [profile, userId, clubId]);
+  const yearSum = useMemo(() => (allRaces ? yearSummary({ year: yearShown, now: Date.now(), all: allRaces.races, source: allRaces.source, career: training.career ?? null, training, worldResults, worldMedals: worldMedals(worldResults) }) : null), [allRaces, yearShown, training, worldResults]);
+  const raceYears = useMemo(() => {
+    const ys = new Set<number>([new Date().getFullYear()]);
+    for (const r of allRaces?.races ?? []) ys.add(new Date(r.at).getFullYear());
+    return [...ys].sort((a, b) => b - a);
+  }, [allRaces]);
+  const nameOfWater = useCallback((id: string) => waters.find(w => w.def.id === id)?.def.name ?? waterName(id), [waters]);
   const homeRegion = useMemo(() => regionOf(venueForClub(clubId) ?? waters.find(w => w.published && w.clubId === clubId)?.def), [clubId, waters]);
   const careerMe = useCallback((c: Career | null) => ({ name: me?.short ?? 'You', sail: sailFor(yardNow.current, c?.cls ?? setup.classId, me).sail }), [me, setup.classId]);
   /** Sail the next race of your race day on the Circuit (with the day done, back to its screen). */
@@ -922,6 +941,13 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     );
   }
 
+  if (where === 'year') {
+    return (
+      <div key={where} className="sim-zoomable h-full overflow-y-auto">
+        <SimYear summary={yearSum} years={raceYears} onYear={setYearShown} setup={setup} waterName={nameOfWater} onBack={() => setWhere('home')} />
+      </div>
+    );
+  }
   if (where === 'world') {
     return (
       <div key={where} className="sim-zoomable h-full overflow-y-auto">
@@ -1029,7 +1055,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onYear={openYear} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setEvFrom('home'); setWhere('event'); }} onCreateEvent={setEvent}
