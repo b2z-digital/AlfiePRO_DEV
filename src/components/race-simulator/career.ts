@@ -314,7 +314,9 @@ export function calendarOf(tier: Tier, redraw = 0, where: Where = {}): CareerEve
 export const seasonOf = (career: Career): CareerEvent[] => {
   const tier = tierOf(career), cal = calendarOf(tier, career.calendar ?? 0, career);
   if (tier === 'club') return cal;
-  return cal.map((e, i) => (e.kind === 'championship' ? withHeats(e, tier, career.day?.event === i && career.day.pick ? career.day.pick : heatPick(career, tier)) : e));
+  const out = cal.map((e, i) => (e.kind === 'championship' ? withHeats(e, tier, career.day?.event === i && career.day.pick ? career.day.pick : heatPick(career, tier)) : e));
+  // Nothing changed (the formats as the calendar has them): the calendar itself.
+  return out.every((e, i) => e === cal[i]) ? cal : out;
 };
 
 // ───────────────────────── How Championships are sailed ─────────────────────────
@@ -334,7 +336,8 @@ export const heatPick = (career: Career, tier: Tier): HeatChoice => (tier === 'c
 /** A Championship as it's to be sailed: in one fleet, or in heats (HMS promoting four; SHRS qualifying for half the rounds, then finals). */
 export function withHeats(e: CareerEvent, tier: Tier, pick: HeatChoice): CareerEvent {
   if (tier === 'club' || e.kind !== 'championship') return e;
-  if (pick === 'fleet') { const { heat: _h, ...rest } = e; void _h; return rest; }
+  if (pick === 'fleet') { if (!e.heat) return e; const { heat: _h, ...rest } = e; void _h; return rest; }
+  if (e.heat?.system === pick) return e;
   const heats = HEAT_COUNT[tier];
   const heat: HeatSpec = pick === 'hms' ? { system: 'hms', heats, promotion: 4 } : { system: 'shrs', heats, qualifying: Math.round(e.races / 2) };
   return { ...e, heat };
