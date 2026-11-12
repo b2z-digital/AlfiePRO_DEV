@@ -17,6 +17,7 @@ import { Rng } from '@/sim/math';
 import { VENUES } from '@/sim/venues';
 import { windAt } from '@/sim/venue';
 import { STANDARD_DROPS, standings, type SeriesRace, type StandingRow } from './series';
+import { WON_COLOURS } from './yacht';
 import { SPREAD, heatOf, heatStandings, heatState, simulateUntil, type HeatLog, type HeatSpec } from './heats';
 
 /** The seasons of the Circuit: the club's, then Regional, National and World, each earned from the one below. */
@@ -132,34 +133,36 @@ export interface CareerEvent {
   character?: WindCharacter;
   /** One of the Circuit's waters, and which of its winds blows each day. */
   water?: string; picks?: number[];
+  /** Game money: the entry fee, and the prize for first, second and third. */
+  fee?: number; prize?: [number, number, number];
 }
 /** The club season: six race days of the pointscore, then the Championship. */
 export const CLUB_SEASON: CareerEvent[] = [
-  { name: 'Pointscore 1', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'medium', character: 'steady' },
-  { name: 'Pointscore 2', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'light', character: 'oscillating' },
-  { name: 'Pointscore 3', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'medium', character: 'puffy' },
-  { name: 'Pointscore 4', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'fresh', character: 'oscillating' },
-  { name: 'Pointscore 5', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'medium', character: 'persistent' },
-  { name: 'Pointscore 6', kind: 'raceday', races: 6, perDay: 6, sail: 3, wind: 'light', character: 'puffy' },
-  { name: 'Club Championship', kind: 'championship', races: 12, perDay: 12, sail: 3, wind: 'medium', character: 'oscillating' },
+  { name: 'Pointscore 1', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'medium', character: 'steady' },
+  { name: 'Pointscore 2', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'light', character: 'oscillating' },
+  { name: 'Pointscore 3', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'medium', character: 'puffy' },
+  { name: 'Pointscore 4', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'fresh', character: 'oscillating' },
+  { name: 'Pointscore 5', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'medium', character: 'persistent' },
+  { name: 'Pointscore 6', kind: 'raceday', races: 6, perDay: 6, sail: 3, prize: [60, 40, 20], wind: 'light', character: 'puffy' },
+  { name: 'Club Championship', kind: 'championship', races: 12, perDay: 12, sail: 3, prize: [200, 120, 60], wind: 'medium', character: 'oscillating' },
 ];
 /** The Regional season: three ranking regattas on the Circuit's waters, then two days at Aurel Lake. */
 export const REGIONAL_SEASON: CareerEvent[] = [
-  { name: 'Lantern Quay Regatta', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-lantern-quay', picks: [0] },
-  { name: 'Heron Reach Regatta', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'light', water: 'circuit-heron-reach', picks: [0] },
-  { name: 'Kestrelwater Regatta', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'fresh', water: 'circuit-kestrelwater', picks: [0] },
-  { name: 'Regional Championship', kind: 'championship', races: 16, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-aurel-lake', picks: [0, 2] },
+  { name: 'Lantern Quay Regatta', kind: 'regatta', fee: 150, prize: [300, 200, 100], races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-lantern-quay', picks: [0] },
+  { name: 'Heron Reach Regatta', kind: 'regatta', fee: 150, prize: [300, 200, 100], races: 8, perDay: 8, sail: 3, wind: 'light', water: 'circuit-heron-reach', picks: [0] },
+  { name: 'Kestrelwater Regatta', kind: 'regatta', fee: 150, prize: [300, 200, 100], races: 8, perDay: 8, sail: 3, wind: 'fresh', water: 'circuit-kestrelwater', picks: [0] },
+  { name: 'Regional Championship', kind: 'championship', fee: 300, prize: [600, 400, 200], races: 16, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-aurel-lake', picks: [0, 2] },
 ];
 /** The National season: two ranking regattas, then three days of Nationals: 32 boats in three heats under HMS. */
 export const NATIONAL_SEASON: CareerEvent[] = [
-  { name: 'Skerry Sound Regatta', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'fresh', water: 'circuit-skerry-sound', picks: [0] },
-  { name: 'Aurel Lake Regatta', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-aurel-lake', picks: [1] },
-  { name: 'National Championship', kind: 'championship', entries: 32, heat: { system: 'hms', heats: 3, promotion: 4 }, races: 18, perDay: 6, sail: 3, wind: 'medium', water: 'circuit-tamarind-lagoon', picks: [0, 1, 0] },
+  { name: 'Skerry Sound Regatta', kind: 'regatta', fee: 300, prize: [600, 400, 200], races: 8, perDay: 8, sail: 3, wind: 'fresh', water: 'circuit-skerry-sound', picks: [0] },
+  { name: 'Aurel Lake Regatta', kind: 'regatta', fee: 300, prize: [600, 400, 200], races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-aurel-lake', picks: [1] },
+  { name: 'National Championship', kind: 'championship', fee: 600, prize: [1200, 800, 400], entries: 32, heat: { system: 'hms', heats: 3, promotion: 4 }, races: 18, perDay: 6, sail: 3, wind: 'medium', water: 'circuit-tamarind-lagoon', picks: [0, 1, 0] },
 ];
 /** The World season: a lead-up regatta, then the AlfiePRO World Championship: 48 boats in four heats under SHRS, qualifying for two days and finals for two. */
 export const WORLD_SEASON: CareerEvent[] = [
-  { name: 'Port Meridian Pre-Worlds', kind: 'regatta', races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-port-meridian', picks: [1] },
-  { name: 'AlfiePRO World Championship', kind: 'championship', entries: 48, heat: { system: 'shrs', heats: 4, qualifying: 12 }, races: 24, perDay: 6, sail: 3, wind: 'medium', water: 'circuit-port-meridian', picks: [0, 1, 0, 2] },
+  { name: 'Port Meridian Pre-Worlds', kind: 'regatta', fee: 600, prize: [1200, 800, 400], races: 8, perDay: 8, sail: 3, wind: 'medium', water: 'circuit-port-meridian', picks: [1] },
+  { name: 'AlfiePRO World Championship', kind: 'championship', fee: 1500, prize: [3000, 2000, 1000], entries: 48, heat: { system: 'shrs', heats: 4, qualifying: 12 }, races: 24, perDay: 6, sail: 3, wind: 'medium', water: 'circuit-port-meridian', picks: [0, 1, 0, 2] },
 ];
 export const SEASONS: Record<Tier, CareerEvent[]> = { club: CLUB_SEASON, state: REGIONAL_SEASON, national: NATIONAL_SEASON, world: WORLD_SEASON };
 /** Boats on the line in a season's regattas, you included (a heat event has its own entries). */
@@ -191,6 +194,8 @@ export interface Career {
   day: CareerDay | null;
   done: DayResult[];
   medals: Medal[];
+  /** Game money (it can go below nothing: an entry you couldn't cover is paid from your next winnings), what you've bought or won, this season's sponsor, and the latest comings and goings. */
+  money?: number; owned?: string[]; sponsor?: Deal; ledger?: Entry[];
   /** Seasons finished: where you came in the pointscore and the Championship. */
   history: { season: number; pointscore: number; championship: number; of: number; tier?: Tier }[];
   at: number;
@@ -206,7 +211,7 @@ export const tierOf = (career: Career): Tier => career.tier ?? 'club';
 export const seasonOf = (career: Career): CareerEvent[] => SEASONS[tierOf(career)];
 
 export function newCareer(cls: ClassId, now: number): Career {
-  return { cls, season: 1, fleet: draw(1), day: null, done: [], medals: [], history: [], at: now };
+  return { cls, season: 1, fleet: draw(1), day: null, done: [], medals: [], history: [], at: now, money: START_MONEY, owned: [], sponsor: deal('club', 1), ledger: [] };
 }
 
 export const fleetOf = (career: Career): CastMember[] => career.fleet.map(castOf).filter((m): m is CastMember => !!m);
@@ -270,7 +275,7 @@ export function prepareRace(career: Career, now: number): Career {
   const { event, index } = eventAt(career);
   if (!event.heat) return career;
   const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now, heat: openHeats(career, event) };
-  const c0 = { ...career, day };
+  const c0 = { ...(career.day ? career : payEntry(career, event, now)), day };
   const log = simulateUntil(event.heat, day.heat!, strengthFor(c0, day.heat!), heatSeed(career, index), st => st.mine, event.races);
   return { ...c0, day: { ...day, heat: log }, at: now };
 }
@@ -282,6 +287,62 @@ export function heatNow(career: Career): { round: number; rounds: number; heat: 
   if (!event.heat || !log) return null;
   const st = heatState(event.heat, log);
   return { round: st.round, rounds: event.races, heat: st.mine ? st.next : st.myHeat, ids: st.next ? heatOf(st, st.next).map(i => log.ids[i]) : [], finals: st.finals, spec: event.heat };
+}
+
+
+// ───────────────────────── Money: sponsors, entries, prizes, the shop ─────────────────────────
+// Game money only: nothing is ever bought with real money, and nothing bought or won makes a boat
+// faster. What can be bought is paint (class-legal on every class: see the career design doc) and,
+// for an IOM, the B rig, the one real piece of kit, which you need to sail a fresh day properly.
+
+export interface Entry { at: number; text: string; amount: number }
+export type GoalId = 'podium' | 'win' | 'champ';
+export interface Goal { id: GoalId; text: string; pay: number }
+export interface Sponsor { id: string; name: string; what: string; goals: Goal[] }
+/** A season's sponsor, and the goals met so far. */
+export interface Deal { sponsor: string; season: number; tier: Tier; met: GoalId[] }
+
+/** The sponsors (invented), one for each season of the Circuit, and what they pay for. */
+export const SPONSORS: Record<Tier, Sponsor> = {
+  club: { id: 'harbourlight', name: 'Harbourlight Chandlery', what: 'the chandlery by the club', goals: [{ id: 'podium', text: 'A podium at a race day', pay: 100 }, { id: 'win', text: 'Win a race', pay: 60 }, { id: 'champ', text: 'Top five in the Club Championship', pay: 200 }] },
+  state: { id: 'fairlead', name: 'Fairlead Sailcloth', what: 'a sailmaker', goals: [{ id: 'podium', text: 'A podium at a ranking regatta', pay: 200 }, { id: 'win', text: 'Win a race', pay: 120 }, { id: 'champ', text: 'Top five at the Regional Championship', pay: 400 }] },
+  national: { id: 'bluewake', name: 'Bluewake Marine', what: 'a national boating brand', goals: [{ id: 'podium', text: 'A podium at a ranking regatta', pay: 350 }, { id: 'win', text: 'Win a heat', pay: 200 }, { id: 'champ', text: 'Top ten at the National Championship', pay: 700 }] },
+  world: { id: 'lodestar', name: 'Lodestar Yachting', what: 'an international yachting house', goals: [{ id: 'podium', text: 'A podium at the Pre-Worlds', pay: 600 }, { id: 'win', text: 'Win a race in the Gold fleet', pay: 400 }, { id: 'champ', text: 'Sail the Worlds finals in Gold', pay: 1200 }] },
+};
+/** How good a Championship finish meets the sponsor's goal. */
+const CHAMP_GOAL: Record<Tier, number> = { club: 5, state: 5, national: 10, world: 12 };
+/** What you start the Circuit with, and the travel grant when you move up to a season. */
+export const START_MONEY = 150;
+export const GRANT: Record<Tier, number> = { club: 0, state: 300, national: 600, world: 1200 };
+
+export interface ShopItem { id: string; name: string; text: string; price: number; classes?: ClassId[]; wonBy?: string }
+export const SHOP: ShopItem[] = [
+  { id: 'deck', name: 'Deck colour', text: 'Paint her deck any colour in the locker, instead of the light deck that goes with her hull.', price: 120, wonBy: 'Your first podium on the Circuit' },
+  { id: 'bottom', name: 'Two-tone hull', text: 'Her lower hull in a colour of its own, under a band of her hull colour at the sheer.', price: 160, wonBy: 'A podium at a Championship' },
+  { id: 'rigB', name: 'IOM B rig', text: 'The smaller rig for a fresh breeze. Without it you sail a fresh day on the A rig, overpowered.', price: 250, classes: ['IOM'] },
+];
+/** A colour that can only be won: the Championship of each season has its own. */
+export const CHAMPION_PAINT: Record<Tier, { name: string; hex: string }> = { club: WON_COLOURS[0], state: WON_COLOURS[1], national: WON_COLOURS[2], world: WON_COLOURS[3] };
+
+export const moneyOf = (c: Career): number => c.money ?? START_MONEY;
+export const owns = (c: Career | null | undefined, id: string): boolean => !!c?.owned?.includes(id);
+/** The colours you've won, to add to the paint locker. */
+export const wonPaints = (c: Career | null | undefined) => TIERS.filter(t => owns(c, `paint:${t}`)).map(t => CHAMPION_PAINT[t]);
+const deal = (tier: Tier, season: number): Deal => ({ sponsor: SPONSORS[tier].id, season, tier, met: [] });
+const book = (c: Career, text: string, amount: number, at: number): Career => ({ ...c, money: moneyOf(c) + amount, ledger: [{ at, text, amount }, ...(c.ledger ?? [])].slice(0, 12) });
+/** This season's sponsor and their goals (a career from before sponsors gets the one for its season). */
+export const dealOf = (c: Career): Deal => (c.sponsor && c.sponsor.season === c.season && c.sponsor.tier === tierOf(c) ? c.sponsor : deal(tierOf(c), c.season));
+
+/** Buy something from the shop: when you have the money, and don't have it already. */
+export function buy(c: Career, id: string, now: number): Career {
+  const it = SHOP.find(s => s.id === id);
+  if (!it || owns(c, id) || moneyOf(c) < it.price) return c;
+  return { ...book(c, it.name, -it.price, now), owned: [...(c.owned ?? []), id] };
+}
+
+/** Pay the entry for the event about to open (nothing on your home water). */
+function payEntry(c: Career, event: CareerEvent, now: number): Career {
+  return event.fee ? book(c, `Entry: ${event.name}`, -event.fee, now) : c;
 }
 
 /** The settings for the next race of the day: your set-up, with the day's fleet (in a heat event, your heat), water, breeze and its own seed. */
@@ -297,6 +358,8 @@ export function careerRace(career: Career, base: RaceSettings): RaceSettings {
     ...(wind ? { venue: event.water, windFrom: wind.from, venueSpot: undefined } : {}),
     cast: others.map(castOf).filter((m): m is CastMember => !!m).map(m => ({ id: m.id, name: m.name, sail: m.sail, hull: m.hull, level: m.level })),
     seed: (career.season * 100003 + index * 1009 + no * 31 + (hn?.heat ? hn.heat.charCodeAt(0) * 7 : 0) + [17, 7001, 9001, 11003][TIERS.indexOf(tierOf(career))]) >>> 0,
+    // An IOM on a fresh day without the B rig: the A rig, overpowered. Otherwise the right rig for the breeze.
+    rig: career.cls === 'IOM' && event.wind === 'fresh' && !owns(career, 'rigB') ? 'A' : undefined,
     crew: undefined, seat: undefined, noPlayer: undefined, windShifts: undefined, lineBias: undefined, flatWind: undefined,
   };
 }
@@ -319,7 +382,8 @@ export function recordRace(career: Career, rows: RowResult[], now: number): Care
   }
   const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now };
   if (day.races.length >= seasonOf(career)[day.event].races) return career;
-  return { ...career, day: { ...day, races: [...day.races, { no: day.races.length + 1, sailed: true, rows }] }, at: now };
+  const paid = career.day ? career : payEntry(career, event, now);
+  return { ...paid, day: { ...day, races: [...day.races, { no: day.races.length + 1, sailed: true, rows }] }, at: now };
 }
 
 export interface DayState {
@@ -415,8 +479,23 @@ export function seasonStandings(career: Career, me: Me): StandingRow[] {
   return standings(sheet(days.map((d, k) => ({ no: k + 1, sailed: true, rows: d.order.map((id, i) => ({ id, place: i + 1, code: null })) })), namer(me)), STANDARD_DROPS);
 }
 
-/** Close a race day that's complete: its result goes in the season, a podium earns a medal, and after the Championship a new season begins. */
-export function finishDay(career: Career, me: Me, now: number): { career: Career; result: DayResult; medal: Medal | null } | null {
+/** What closing an event earned: prize money, sponsor goals met, and anything unlocked. */
+export interface Earned { prize: number; goals: Goal[]; unlocked: string[] }
+export const UNLOCK_NAME = (id: string): string => (id.startsWith('paint:') ? CHAMPION_PAINT[id.slice(6) as Tier]?.name ?? id : SHOP.find(s => s.id === id)?.name ?? id);
+
+/** Did you win a race you sailed in this event (in a World season: in the Gold fleet's finals)? */
+function wonARace(career: Career, event: CareerEvent): boolean {
+  const day = career.day;
+  if (!day) return false;
+  if (event.heat && day.heat) {
+    const me = day.heat.ids.indexOf(ME);
+    return day.heat.sails.some(s => s.me && s.o[0] === me && (tierOf(career) !== 'world' || (s.h === 'A' && s.r > (event.heat!.qualifying ?? 0))));
+  }
+  return tierOf(career) !== 'world' && day.races.some(r => r.sailed && r.rows.find(x => x.id === ME)?.place === 1);
+}
+
+/** Close a race day that's complete: its result goes in the season, a podium earns a medal and prize money, the sponsor pays for any goal met, and after the Championship a new season begins. */
+export function finishDay(career: Career, me: Me, now: number): { career: Career; result: DayResult; medal: Medal | null; earned: Earned } | null {
   if (!career.day || !dayState(career).complete) return null;
   const rows = dayStandings(career, me);
   const mine = rows.find(r => r.userId === ME);
@@ -426,16 +505,34 @@ export function finishDay(career: Career, me: Me, now: number): { career: Career
   const medal: Medal | null = mine.rank <= 3
     ? { kind: mine.rank === 1 ? 'gold' : mine.rank === 2 ? 'silver' : 'bronze', event: event.name, season: career.season, cls: career.cls, at: now, ...(event.kind === 'championship' && mine.rank === 1 ? { trophy: true } : {}) }
     : null;
+  // Money: the prize, then the sponsor's goals met at this event.
   let next: Career = { ...career, day: null, done: [...career.done, result], medals: medal ? [...career.medals, medal] : career.medals, at: now };
+  const prize = mine.rank <= 3 ? event.prize?.[mine.rank - 1] ?? 0 : 0;
+  if (prize) next = book(next, `${ordinalWord(mine.rank)}, ${event.name}`, prize, now);
+  const d = dealOf(career), sp = SPONSORS[d.tier];
+  const metNow = sp.goals.filter(g => !d.met.includes(g.id) && (
+    g.id === 'podium' ? event.kind !== 'championship' && mine.rank <= 3
+      : g.id === 'win' ? wonARace(career, event)
+        : event.kind === 'championship' && mine.rank <= CHAMP_GOAL[d.tier]));
+  for (const g of metNow) next = book(next, `${sp.name}: ${g.text.toLowerCase()}`, g.pay, now);
+  next = { ...next, sponsor: { ...d, met: [...d.met, ...metNow.map(g => g.id)] } };
+  // Prizes that are things: a deck colour for a first podium, a two-tone hull for a Championship podium, the season's own colour for its title.
+  const unlocked: string[] = [];
+  const give = (id: string) => { if (!owns(next, id) && !unlocked.includes(id)) unlocked.push(id); };
+  if (mine.rank <= 3) give('deck');
+  if (event.kind === 'championship' && mine.rank <= 3) give('bottom');
+  if (event.kind === 'championship' && mine.rank === 1) give(`paint:${tier}`);
+  if (unlocked.length) next = { ...next, owned: [...(next.owned ?? []), ...unlocked] };
   if (event.kind === 'championship') {
     const ps = seasonStandings(next, me).find(r => r.userId === ME)?.rank ?? rows.length;
     // A finish this good in the Championship is a place in the season above (taken up with the licence: see moveUp).
     const up = tierAbove(tier);
     const ticket: Tier | undefined = up && mine.rank <= QUALIFY[tier] && TIERS.indexOf(up) > TIERS.indexOf(career.ticket ?? tier) ? up : career.ticket;
-    next = { ...next, season: career.season + 1, fleet: draw(career.season + 1, tier), done: [], ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
+    next = { ...next, season: career.season + 1, fleet: draw(career.season + 1, tier), done: [], sponsor: deal(tier, career.season + 1), ...(ticket ? { ticket } : {}), history: [...career.history, { season: career.season, pointscore: ps, championship: mine.rank, of: rows.length, tier }] };
   }
-  return { career: next, result, medal };
+  return { career: next, result, medal, earned: { prize, goals: metNow, unlocked } };
 }
+const ordinalWord = (n: number) => (n === 1 ? 'First' : n === 2 ? 'Second' : 'Third');
 
 /** Take up a place in the tier above (between events only): a new season there, against its fleet. */
 export function moveUp(career: Career, now: number): Career {
@@ -443,7 +540,9 @@ export function moveUp(career: Career, now: number): Career {
   const tier = career.ticket;
   const { ticket: _used, ...rest } = career;
   void _used;
-  return { ...rest, tier, season: career.season + (career.done.length ? 1 : 0), fleet: draw(career.season + (career.done.length ? 1 : 0), tier), done: [], at: now };
+  const season = career.season + (career.done.length ? 1 : 0);
+  const up: Career = { ...rest, tier, season, fleet: draw(season, tier), done: [], at: now, sponsor: deal(tier, season) };
+  return GRANT[tier] ? book(up, `Travel grant: the ${TIER_NAME[tier]} season`, GRANT[tier], now) : up;
 }
 
 /** Your rival: the skipper next to you in the pointscore (the one above, or below when you lead). Null before a race day is done. */

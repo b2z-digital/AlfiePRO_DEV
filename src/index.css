@@ -595,3 +595,6 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 /* (The light moves across, not the element: the mask that keeps it on the medal's face stays put.) */
 @keyframes sim-medal-sweep { 0% { background-position: 100% 0; opacity: 1; } 90% { opacity: 1; } 100% { background-position: 0% 0; opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .sim-podium, .sim-podium-swing, .sim-podium-sweep, .sim-podium-title, .sim-podium-top { animation: none; } .sim-podium-sweep { display: none; } }
+.sim-podium-earned { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 0; padding: 0; list-style: none; text-align: center; font-size: 14.5px; color: rgba(235, 240, 255, 0.82); animation: sim-podium-rise .6s ease .7s both; }
+.sim-podium-earned b { color: #F2C230; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .sim-podium-earned { animation: none; } }

@@ -36,10 +36,18 @@ export const DECK_COLOURS: Paint[] = [{ name: 'Charcoal', hex: '#262C36' }, ...S
 export const COUNTRIES = ['AUS', 'NZL', 'GBR', 'USA', 'CAN', 'FRA', 'ITA', 'ESP', 'GER', 'NED', 'CRO', 'BRA', 'RSA', 'JPN'];
 
 /** The name of a colour, for anyone who can't see it. */
+/** Colours that can only be won: each season of the AlfiePRO Circuit's Championship has its own (see career.ts). */
+export const WON_COLOURS: Paint[] = [
+  { name: 'Champion gold', hex: '#C9A227' },
+  { name: 'Aurel teal', hex: '#0F8B8D' },
+  { name: 'Tamarind red', hex: '#B3261E' },
+  { name: 'Meridian midnight', hex: '#16204A' },
+];
+
 export function paintName(hex: string | null): string {
   if (!hex) return 'None';
   const h = hex.toUpperCase();
-  return [...SAIL_COLOURS, ...HULL_COLOURS, ...DECK_COLOURS].find(p => p.hex === h)?.name ?? h;
+  return [...SAIL_COLOURS, ...HULL_COLOURS, ...DECK_COLOURS, ...WON_COLOURS].find(p => p.hex === h)?.name ?? h;
 }
 
 const CLASS_IDS = Object.keys(CLASSES) as ClassId[];
@@ -155,7 +163,7 @@ export function sailFor(yard: Yard, cls: ClassId, me: SimIdentity | null): { sai
 
 /** The finish alone, as the race wants it. */
 export function lookOf(y: BoatLook): BoatLook {
-  return { hull: y.hull, jibLuff: y.jibLuff, patch: { ...y.patch }, deckPatch: y.deckPatch, country: y.country };
+  return { hull: y.hull, jibLuff: y.jibLuff, patch: { ...y.patch }, deckPatch: y.deckPatch, country: y.country, ...(y.deck ? { deck: y.deck } : {}), ...(y.bottom ? { bottom: y.bottom } : {}) };
 }
 
 /** A finish out of the paint locker: colours that go together, picked by chance. */

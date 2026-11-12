@@ -83,6 +83,10 @@ export interface BoatLook {
   deckPatch?: string;
   /** The country letters under the sail number. */
   country?: string;
+  /** Her deck painted (not given: the light deck that goes with her hull). Unlocked on the AlfiePRO Circuit. */
+  deck?: string;
+  /** Two-tone: her lower hull in a colour of its own, under a band of the hull colour at the sheer (not given: the hull colour all over). Unlocked on the Circuit. */
+  bottom?: string;
 }
 
 /**

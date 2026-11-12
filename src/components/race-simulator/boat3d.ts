@@ -114,6 +114,8 @@ export interface Pose {
   dive?: number;
   /** Hull; the sail numbers; the deck. */
   color: string; ink: string; deck: string;
+  /** Her bottom, when it's painted a colour of its own (the hull colour when not given). */
+  bottom?: string;
   /** The tape up the jib's luff: the one strip of colour on her sails (their back edges are bare film, as on a real boat). */
   luffTape: string;
   /** The patches at the corners of both sails. */
@@ -552,16 +554,17 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     const lo = ring(side, 'low'), mb = ring(side, 'mb'), de = ring(side, 'de');
     const bi = under(side, 'bilge'), ke = under(side, 'keel');
     for (let k = 0; k < idx.length - 1; k++) {
-      face([ke[k], ke[k + 1], bi[k + 1], bi[k]], p.color, false);
-      face([bi[k], bi[k + 1], lo[k + 1], lo[k]], p.color, false);
-      face([lo[k], lo[k + 1], mb[k + 1], mb[k]], p.color, false);
+      // (A two-tone hull: everything below the middle of her topsides in a colour of its own, the hull colour in a band up to the sheer.)
+      face([ke[k], ke[k + 1], bi[k + 1], bi[k]], p.bottom ?? p.color, false);
+      face([bi[k], bi[k + 1], lo[k + 1], lo[k]], p.bottom ?? p.color, false);
+      face([lo[k], lo[k + 1], mb[k + 1], mb[k]], p.bottom ?? p.color, false);
       face([mb[k], mb[k + 1], de[k + 1], de[k]], p.color, false);
       face([de[k], de[k + 1], crown[k + 1], crown[k]], p.deck, true);
     }
   }
   {
     const kp = under(1, 'keel'), km = under(-1, 'keel');
-    for (let k = 0; k < idx.length - 1; k++) face([km[k], km[k + 1], kp[k + 1], kp[k]], p.color, false);
+    for (let k = 0; k < idx.length - 1; k++) face([km[k], km[k + 1], kp[k + 1], kp[k]], p.bottom ?? p.color, false);
   }
   {
     const t = idx.length - 1;

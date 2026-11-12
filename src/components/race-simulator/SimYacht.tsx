@@ -49,6 +49,20 @@ function Shelf({ label, paints, value, onPick, none }: { label: string; paints: 
   );
 }
 
+/** Paint not yet won: what it is, and where it's won. */
+function Locked({ label, text, onCircuit }: { label: string; text: string; onCircuit?: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-white/[0.16] px-4 py-3">
+      <svg aria-hidden="true" width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="rgba(235,240,255,.6)" strokeWidth="1.6"><rect x="1.5" y="8" width="13" height="9" rx="2" /><path d="M4.5 8V5.5a3.5 3.5 0 017 0V8" /></svg>
+      <span className="min-w-[160px] flex-1">
+        <span className="block text-[13.5px] font-semibold">{label}</span>
+        <span className="block text-[12.5px] leading-snug" style={{ color: C.mute }}>{text}</span>
+      </span>
+      {onCircuit && <Btn small onClick={onCircuit}>The Circuit</Btn>}
+    </div>
+  );
+}
+
 /** The clew of a sail with its patch, drawn from the same outlines the boat uses. */
 function PatchPicture({ style, one, two }: { style: 'solid' | 'fingers'; one: string; two: string | null }) {
   const foot = 0.36, luff = 1.6, win = 0.115;
@@ -121,7 +135,7 @@ function ClassChip({ id, on, onPick }: { id: ClassId; on: boolean; onPick: () =>
   );
 }
 
-export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack, onRace }: {
+export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack, onRace, unlocked = [], won = [], onCircuit }: {
   yard: Yard; me: SimIdentity | null;
   /** The class set up to race: her yacht is on the stage when the screen opens. */
   classId: ClassId;
@@ -131,6 +145,10 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
   onChange: (yard: Yard) => void; onBack: (cls?: ClassId) => void;
   /** Done: race this class. */
   onRace: (cls: ClassId) => void;
+  /** What's been won or bought on the AlfiePRO Circuit ('deck', 'bottom'), and the colours that can only be won. */
+  unlocked?: string[]; won?: Paint[];
+  /** To the Circuit, where locked paint is won or bought. */
+  onCircuit?: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 1280, h: 800 });
@@ -249,7 +267,13 @@ export default function SimYacht({ yard, me, classId, signedIn, onChange, onBack
 
       {part === 'hull' && (
         <>
-          <Shelf label="Hull colour" paints={HULL_COLOURS} value={yacht.hull} onPick={h => h && set({ hull: h })} />
+          <Shelf label="Hull colour" paints={[...HULL_COLOURS, ...won]} value={yacht.hull} onPick={h => h && set({ hull: h })} />
+          {unlocked.includes('deck')
+            ? <Shelf label="Deck colour" paints={[...DECK_COLOURS, ...won]} value={yacht.deck ?? null} none="Light deck" onPick={h => set({ deck: h ?? undefined })} />
+            : <Locked label="Deck colour" text="Won with your first podium on the AlfiePRO Circuit, or bought there." onCircuit={onCircuit} />}
+          {unlocked.includes('bottom')
+            ? <Shelf label="Lower hull colour" paints={[...HULL_COLOURS, ...won]} value={yacht.bottom ?? null} none="Same as the hull" onPick={h => set({ bottom: h ?? undefined })} />
+            : <Locked label="Two-tone hull" text="Her lower hull in a colour of its own. Won with a Championship podium on the Circuit, or bought there." onCircuit={onCircuit} />}
           <Shelf label="Deck patches" paints={DECK_COLOURS} value={yacht.deckPatch ?? '#262C36'} onPick={h => h && set({ deckPatch: h })} />
           <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Deck patches are the film over the hatches in her deck.</p>
         </>
