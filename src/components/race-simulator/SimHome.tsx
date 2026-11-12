@@ -1,7 +1,7 @@
 // Simulator home: set up a quick race, open the Start Trainer, Rules Academy or Scenario Lab, and
 // see your skipper profile (kept on this device for now).
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, LogOut } from 'lucide-react';
+import { ArrowRight, ChevronDown, LogOut } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { SkipperLevel } from '@/sim/types';
 import type { WindCharacter, WindStrength } from '@/sim/wind';
@@ -206,8 +206,47 @@ function Opts({ label, children, cols = 2 }: { label?: string; children: React.R
   );
 }
 
-/** A sheet over the page for one choice: slides up from the bottom on a phone, sits in the middle on a bigger screen. */
-function Sheet({ title, text, icon, onClose, children }: { title: string; text?: React.ReactNode; icon: Pick; onClose: () => void; children: React.ReactNode }) {
+/** The sea states, and what each does to the boat. */
+const WATER: Record<SeaKind, [string, string]> = {
+  flat: ['Flat', 'Glassy water and clear reflections.'],
+  chop: ['Choppy', 'Waves 4 cm high: a little slower upwind, a little surfing downwind.'],
+  rough: ['Rough', 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'],
+};
+
+/** The sea state to race in: flat, choppy or rough (labelled "The sea" inside the water picker). */
+function SeaOpts({ value, onPick, bare }: { value: SeaKind; onPick: (w: SeaKind) => void; bare?: boolean }) {
+  return (
+    <Opts label={bare ? undefined : 'The sea'} cols={3}>
+      {(Object.keys(WATER) as SeaKind[]).map(w => <Opt key={w} on={value === w} onClick={() => onPick(w)} title={WATER[w][0]} text={WATER[w][1]} />)}
+    </Opts>
+  );
+}
+
+/**
+ * A sheet over the page for one choice: slides up from the bottom on a phone, sits in the middle on a
+ * bigger screen. While there's more of it below, the foot fades and a button says what's there and
+ * takes you down to it.
+ */
+function Sheet({ title, text, icon, onClose, more, children }: { title: string; text?: React.ReactNode; icon: Pick; onClose: () => void; /** What's further down, for the button that shows there's more. */ more?: string; children: React.ReactNode }) {
+  const body = useRef<HTMLDivElement | null>(null);
+  const [below, setBelow] = useState(false);
+  const measure = React.useCallback(() => {
+    const el = body.current;
+    if (el) setBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 24);
+  }, []);
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    measure();
+    // The content grows when a choice opens more of it (a water's map and winds): measure again.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    for (const c of Array.from(el.children)) ro.observe(c);
+    const mo = new MutationObserver(() => { for (const c of Array.from(el.children)) ro.observe(c); measure(); });
+    mo.observe(el, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  }, [measure]);
+  const down = () => { const el = body.current; if (el) el.scrollBy({ top: Math.max(160, el.clientHeight * 0.7), behavior: 'smooth' }); };
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', k);
@@ -227,7 +266,12 @@ function Sheet({ title, text, icon, onClose, children }: { title: string; text?:
           </div>
           <Btn primary onClick={onClose} autoFocus>Done</Btn>
         </div>
-        <div className="flex flex-col gap-5 overflow-y-auto px-5 pb-6 pt-4">{children}</div>
+        <div ref={body} onScroll={measure} className="flex flex-col gap-5 overflow-y-auto px-5 pb-6 pt-4">{children}</div>
+        {below && (
+          <div className="sim-sheet-more">
+            <button type="button" onClick={down} className="sim-sheet-more-btn">{more ?? 'More below'}<ChevronDown size={16} aria-hidden="true" /></button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -622,11 +666,6 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     puffy: ['Puffy', 'Gusts and lulls sweep down the course: sail for the dark water.'],
     persistent: ['Persistent shift', 'It goes one way and stays there: get to that side early.'],
   };
-  const WATER: Record<SeaKind, [string, string]> = {
-    flat: ['Flat', 'Glassy water and clear reflections.'],
-    chop: ['Choppy', 'Waves 4 cm high: a little slower upwind, a little surfing downwind.'],
-    rough: ['Rough', 'Waves 10 cm high with whitecaps: she slams upwind and surfs downwind.'],
-  };
   const CLASS_TEXT: Record<ClassId, string> = {
     IOM: 'One metre. The most raced class in the world, with three rigs for the breeze.',
     DF95: '95 cm one-design. Quick, light and lively.',
@@ -711,8 +750,9 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
     { what: 'Boat', value: CLASS_LABEL[s.classId], onPick: () => setPick('boat') },
     { what: 'Fleet', value: `${s.fleetSize} boats`, onPick: () => setPick('fleet') },
     { what: 'Skippers', value: LEVEL_NAME[s.level], onPick: () => setPick('skippers') },
-    { what: 'Water', value: venue ? venue.short : 'Practice pond', onPick: () => setPick('venue') },
+    { what: 'Where', value: venue ? venue.short : 'Practice pond', onPick: () => setPick('venue') },
     { what: 'Wind', value: strengthName, onPick: () => setPick('wind') },
+    { what: 'Sea', value: WATER[s.seaState][0], onPick: () => setPick('water') },
   ];
   // How you're going, in words (the simple way of using it).
   const lastRace = profile.races.find(r => r.mode === 'race' && r.status !== 'racing');
@@ -1057,7 +1097,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
 
       {/* ── The sheets ── */}
       {pick === 'venue' && (
-        <Sheet icon="venue" title="Where you're sailing" text="A real club's water, drawn from the map and seen from its bank, or a sheltered practice pond." onClose={closePick}>
+        <Sheet icon="venue" title="Where you're sailing" text="A real club's water, drawn from the map and seen from its bank, or a sheltered practice pond." onClose={closePick}
+          more={venue ? 'The map, the wind and the sea' : 'The sea'}>
           <Opts>
             {venueList.map(d => <Opt key={d.id} on={s.venue === d.id} onClick={() => set({ venue: d.id, windPick: 0 })} title={d.short} badge={draftIds.has(d.id) ? 'Draft' : mine(d) ? 'Your club' : undefined} text={d.place ? `${d.place}.` : d.name} />)}
             <Opt on={s.venue === 'pond'} onClick={() => set({ venue: 'pond' })} title="Practice pond" text="A sheltered pond lined with trees. The wind blows straight up it." />
@@ -1078,6 +1119,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 <Opt on={s.windDir === 'any'} onClick={() => set({ windDir: 'any' })} title="Any direction" text="Different every race, so you learn the whole of the water." />
               </Opts>
               {windHint && <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{windHint}</p>}
+              <SeaOpts value={s.seaState} onPick={w => set({ seaState: w })} />
               {venue.traits && venue.traits.notes.length > 0 && (
                 <div className="sim-card p-3.5">
                   <Cap>Local knowledge</Cap>
@@ -1088,6 +1130,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               )}
             </>
           )}
+          {!venue && <SeaOpts value={s.seaState} onPick={w => set({ seaState: w })} />}
           {waterAdmin && clubId && (
             <div className="flex flex-col gap-2 rounded-2xl border border-[rgba(77,163,255,0.3)] bg-[rgba(46,123,255,0.07)] p-3.5">
               <Cap>Your club's water · admins</Cap>
@@ -1160,10 +1203,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         </Sheet>
       )}
       {pick === 'water' && (
-        <Sheet icon="water" title="Water" text="Waves slow her upwind and let her surf downwind." onClose={closePick}>
-          <Opts cols={3}>
-            {(Object.keys(WATER) as SeaKind[]).map(w => <Opt key={w} on={s.seaState === w} onClick={() => set({ seaState: w })} title={WATER[w][0]} text={WATER[w][1]} />)}
-          </Opts>
+        <Sheet icon="water" title="Sea state" text="Waves slow her upwind and let her surf downwind." onClose={closePick}>
+          <SeaOpts bare value={s.seaState} onPick={w => set({ seaState: w })} />
         </Sheet>
       )}
       {pick === 'course' && (
