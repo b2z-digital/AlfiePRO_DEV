@@ -192,7 +192,11 @@ export interface RaceNote {
   parts?: { cause: Cause; lengths: number }[]; speedUp?: number; tacks?: number;
 }
 /** A race day under way: the event it's for and the races sailed or simulated so far (a heat event keeps its heats instead), and notes on the races you sailed. */
-export interface CareerDay { event: number; races: DayRace[]; startedAt: number; heat?: HeatLog; notes?: RaceNote[] }
+export interface CareerDay {
+  event: number; races: DayRace[]; startedAt: number; heat?: HeatLog; notes?: RaceNote[];
+  /** How this Championship is sailed, fixed when it opens (a change of mind applies to the next one). */
+  pick?: HeatChoice;
+}
 /** You against one of the cast, over every event you've both finished: days you finished ahead and behind, and the last time. */
 export interface HeadToHead { w: number; l: number; last?: { event: string; season: number; me: number; them: number } }
 /** Alfie's report on an event, written when it ends. */
@@ -232,6 +236,8 @@ export interface Career {
   rivalId?: string;
   /** Alfie's reports on your events, newest first (the last dozen). */
   reports?: Report[];
+  /** How each tier's Championship is sailed: one fleet, or heats under HMS or SHRS (see HEAT_DEFAULT). */
+  heats?: HeatPrefs;
   /** Seasons finished: where you came in the pointscore and the Championship. */
   history: { season: number; pointscore: number; championship: number; of: number; tier?: Tier }[];
   at: number;
@@ -305,7 +311,40 @@ export function calendarOf(tier: Tier, redraw = 0, where: Where = {}): CareerEve
     return { ...e, water, name: `${WATER_NAME[water]} ${tier === 'world' ? 'Pre-Worlds' : 'Regatta'}`, wind: BREEZES[(i + redraw) % BREEZES.length] };
   });
 }
-export const seasonOf = (career: Career): CareerEvent[] => calendarOf(tierOf(career), career.calendar ?? 0, career);
+export const seasonOf = (career: Career): CareerEvent[] => {
+  const tier = tierOf(career), cal = calendarOf(tier, career.calendar ?? 0, career);
+  if (tier === 'club') return cal;
+  return cal.map((e, i) => (e.kind === 'championship' ? withHeats(e, tier, career.day?.event === i && career.day.pick ? career.day.pick : heatPick(career, tier)) : e));
+};
+
+// ───────────────────────── How Championships are sailed ─────────────────────────
+
+/** A Championship in one fleet, or in heats under HMS or SHRS. */
+export type HeatChoice = 'fleet' | 'hms' | 'shrs';
+export type HeatTier = Exclude<Tier, 'club'>;
+export type HeatPrefs = Partial<Record<HeatTier, HeatChoice>>;
+/** As the Circuit has always sailed them: the Regional in one fleet, the Nationals under HMS, the Worlds under SHRS. */
+export const HEAT_DEFAULT: Record<HeatTier, HeatChoice> = { state: 'fleet', national: 'hms', world: 'shrs' };
+/** What each tier's Championship can be sailed as: 32 or 48 boats are always in heats. */
+export const HEAT_OPTIONS: Record<HeatTier, HeatChoice[]> = { state: ['fleet', 'hms', 'shrs'], national: ['hms', 'shrs'], world: ['shrs', 'hms'] };
+/** How many heats each Championship is split into (the Regional's 16 boats: two heats of eight). */
+const HEAT_COUNT: Record<HeatTier, number> = { state: 2, national: 3, world: 4 };
+export const heatPick = (career: Career, tier: Tier): HeatChoice => (tier === 'club' ? 'fleet' : career.heats?.[tier] && HEAT_OPTIONS[tier].includes(career.heats[tier]!) ? career.heats[tier]! : HEAT_DEFAULT[tier]);
+
+/** A Championship as it's to be sailed: in one fleet, or in heats (HMS promoting four; SHRS qualifying for half the rounds, then finals). */
+export function withHeats(e: CareerEvent, tier: Tier, pick: HeatChoice): CareerEvent {
+  if (tier === 'club' || e.kind !== 'championship') return e;
+  if (pick === 'fleet') { const { heat: _h, ...rest } = e; void _h; return rest; }
+  const heats = HEAT_COUNT[tier];
+  const heat: HeatSpec = pick === 'hms' ? { system: 'hms', heats, promotion: 4 } : { system: 'shrs', heats, qualifying: Math.round(e.races / 2) };
+  return { ...e, heat };
+}
+/** Set how a tier's Championship is sailed (one already under way keeps its format). */
+export function setHeats(career: Career, tier: HeatTier, pick: HeatChoice, now: number): Career {
+  // A Championship already opened keeps the format it opened with.
+  const d = career.day, open = d && !d.pick && tierOf(career) === tier && seasonOf(career)[d.event]?.kind === 'championship';
+  return { ...career, ...(open ? { day: { ...d!, pick: heatPick(career, tier) } } : {}), heats: { ...(career.heats ?? {}), [tier]: pick }, at: now };
+}
 /** Won this tier's Championship last season, and racing it again: the title to defend. */
 export const defending = (career: Career): boolean => {
   const last = career.history[career.history.length - 1];
@@ -379,7 +418,7 @@ function openHeats(career: Career, event: CareerEvent): HeatLog {
 export function prepareRace(career: Career, now: number): Career {
   const { event, index } = eventAt(career);
   if (!event.heat) return career;
-  const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now, heat: openHeats(career, event) };
+  const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now, heat: openHeats(career, event), pick: heatPick(career, tierOf(career)) };
   const c0 = { ...(career.day ? career : payEntry(career, event, now)), day };
   const log = simulateUntil(event.heat, day.heat!, strengthFor(c0, day.heat!), heatSeed(career, index), st => st.mine, event.races);
   return { ...c0, day: { ...day, heat: log }, at: now };
@@ -485,7 +524,7 @@ export function recordRace(career: Career, rows: RowResult[], now: number): Care
     const next = simulateUntil(event.heat, after, strengthFor(c2, after), heatSeed(c2, index), s => s.mine || s.round > round, event.races);
     return { ...c2, day: { ...c2.day, heat: next }, at: now };
   }
-  const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now };
+  const day: CareerDay = career.day ?? { event: index, races: [], startedAt: now, ...(event.kind === 'championship' && tierOf(career) !== 'club' ? { pick: heatPick(career, tierOf(career)) } : {}) };
   if (day.races.length >= seasonOf(career)[day.event].races) return career;
   const paid = career.day ? career : payEntry(career, event, now);
   return { ...paid, day: { ...day, races: [...day.races, { no: day.races.length + 1, sailed: true, rows }] }, at: now };

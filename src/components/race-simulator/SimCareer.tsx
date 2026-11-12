@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { Region } from '@/sim/venue';
-import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
+import { HEAT_OPTIONS, heatPick, setHeats, type HeatChoice, type HeatTier, ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
 import { regattaReport } from './report';
 import type { Tape } from './broadcast';
 import type { TrainLink } from './stats';
@@ -22,10 +22,36 @@ import { AlfieOrb, C, Cap, Chip, cx, ordinal } from './ui';
 const SEASON_CLASSES: ClassId[] = ['IOM', 'DF95', 'DF65', '10R', 'M'];
 /** What the season above holds, in a line. */
 const SEASON_LINE: Record<string, string> = {
-  state: 'Three ranking regattas at Lantern Quay, Heron Reach and Kestrelwater, then two days at Aurel Lake for the Regional Championship, in fleets of sixteen.',
-  national: 'Ranking regattas at Skerry Sound and Aurel Lake, then three days at Tamarind Lagoon for the National Championship: 32 boats in three heats, sailed under HMS.',
-  world: 'The Pre-Worlds at Port Meridian, then four days of the AlfiePRO World Championship there: 48 boats in four heats under SHRS, two days of qualifying and two of finals in Gold, Silver, Bronze and Copper fleets.',
+  state: 'Three ranking regattas at Lantern Quay, Heron Reach and Kestrelwater, then two days at Aurel Lake for the Regional Championship, sixteen boats.',
+  national: 'Ranking regattas at Skerry Sound and Aurel Lake, then three days at Tamarind Lagoon for the National Championship: 32 boats in three heats.',
+  world: 'The Pre-Worlds at Port Meridian, then four days of the AlfiePRO World Championship there: 48 boats in four heats.',
 };
+/** How a Championship is sailed, in a few words. */
+const HEAT_SAY: Record<HeatChoice, string> = { fleet: 'The Championship is sailed in one fleet.', hms: 'The Championship is sailed in heats under HMS.', shrs: 'The Championship is sailed in heats under SHRS: qualifying, then finals.' };
+const HEAT_NAME: Record<HeatChoice, string> = { fleet: 'One fleet', hms: 'HMS', shrs: 'SHRS' };
+const HEAT_TIERS: HeatTier[] = ['state', 'national', 'world'];
+
+/** How each tier's Championship is sailed: one fleet (the Regional only), or heats under HMS or SHRS. */
+function HeatFormats({ career, onChange }: { career: Career; onChange: (c: Career) => void }) {
+  return (
+    <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="hf-title">
+      <h2 id="hf-title" className="sim-h3">How Championships are sailed</h2>
+      <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>Many State, National and World events now use SHRS rather than HMS. Choose for each; a Championship already under way keeps its format.</p>
+      {HEAT_TIERS.map(t => (
+        <div key={t} className="flex flex-wrap items-center gap-2">
+          <span className="w-[92px] shrink-0 text-[13.5px] font-semibold">{TIER_NAME[t]}</span>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={`${TIER_NAME[t]} Championship`}>
+            {HEAT_OPTIONS[t].map(o => {
+              const on = heatPick(career, t) === o;
+              return <button key={o} type="button" className="sim-chip-btn" aria-pressed={on} style={on ? { background: '#F1F4FA', color: '#0A1226', borderColor: '#F1F4FA' } : undefined} onClick={() => onChange(setHeats(career, t, o, Date.now()))}>{HEAT_NAME[o]}</button>;
+            })}
+          </div>
+        </div>
+      ))}
+      <p className="m-0 text-[12.5px] leading-snug" style={{ color: C.faint }}>Regional: 16 boats, in two heats of eight when sailed in heats. National: 32 in three heats. World: 48 in four. Run by AlfiePRO's own heat systems.</p>
+    </section>
+  );
+}
 /** How a heat event is run, in a line, for under its sheet. */
 const HEAT_LINE: Record<string, string> = {
   hms: 'Heat racing under HMS, run by AlfiePRO\'s heat system as Race Management runs it: the lowest heat sails first, its top four are promoted to sail the heat above in the same round, and the bottom of each heat drops down for the next. The small letter is the heat a boat finished each round in.',
@@ -358,7 +384,7 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                 <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: '#F2C230' }}>Qualified · top {QUALIFY[TIERS[TIERS.indexOf(career.ticket) - 1]]} in the {TIERS[TIERS.indexOf(career.ticket) - 1] === 'club' ? 'Club' : TIER_NAME[TIERS[TIERS.indexOf(career.ticket) - 1]]} Championship</p>
                 <h2 id="up-title" className="m-0 text-[26px] font-bold leading-tight tracking-tight" style={{ fontFamily: DISPLAY }}>The {TIER_NAME[career.ticket]} season is open to you</h2>
                 <p className="m-0 max-w-[680px] text-[14.5px] leading-snug" style={{ color: C.mute }}>
-                  {SEASON_LINE[career.ticket]}
+                  {SEASON_LINE[career.ticket]} {HEAT_SAY[heatPick(career, career.ticket)]}
                   {licence && !licence.ready ? ` You've earned the place on the water; your ${TIER_NAME[career.ticket]} licence is what's left.` : ' You hold the licence. You can stay for another season where you are first if you\'d rather.'}
                 </p>
                 {licence && !licence.ready && (
@@ -436,6 +462,7 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                   </section>
                 )}
                 <Budget career={career} classLabel={classLabel} onBuy={id => onChange(buy(career, id, Date.now()))} />
+                <HeatFormats career={career} onChange={onChange} />
                 <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="md-title">
                   <h2 id="md-title" className="sim-h3">Medals and titles</h2>
                   <MedalShelf medals={career.medals} />
