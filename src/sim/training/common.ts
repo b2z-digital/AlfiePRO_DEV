@@ -13,6 +13,18 @@ import { dhypot } from '../dmath';
 
 export type SceneKind = 'drill' | 'lesson' | 'lab';
 
+/** Where the sail stick sits for a drill, and how it moves. */
+export interface CardSail { at: 'in' | 'nearly-in' | 'half' | 'out'; move?: 'gusts' | 'to-in' | 'to-out' | 'go' }
+/** What the rudder stick does in a drill. */
+export type CardRudder = 'still' | 'nudge' | 'firm' | 'weave' | 'smooth' | 'hold';
+/** The picture of a drill's idea. */
+export type CardPicture =
+  | { kind: 'upwind'; lower: number; label: string; gusts?: boolean; chop?: boolean }
+  | { kind: 'downwind'; up: number; label: string; weave?: boolean }
+  | { kind: 'tack' } | { kind: 'gybe' } | { kind: 'gate' } | { kind: 'bear-away' }
+  | { kind: 'start'; v: 'ring' | 'back' | 'trigger' | 'pin' | 'boat' | 'port' | 'run' | 'gap' | 'recall'; label: string };
+export interface DrillCard { cues: string[]; sail: CardSail; rudder: CardRudder; picture: CardPicture }
+
 export interface SceneSpec {
   kind: SceneKind;
   id: string;
@@ -21,6 +33,10 @@ export interface SceneSpec {
   brief: string;
   /** How to do it well: shown before you go and when you watch it done. */
   tip: string;
+  /** What to do, step by step in plain words (the card's "More detail", and after a miss). */
+  steps?: string[];
+  /** The one-screen card before you sail: a picture of the idea, the sticks and up to three cues. */
+  card?: DrillCard;
   /** What each stick does in this one, when that's the point of it: shown before you watch it done. */
   sticks?: { sail: string; rudder: string };
   /** Whose job the sail is, whatever you've set: 'auto' trims it for you, 'yours' leaves it on your stick. Unset: as you've set it. */
