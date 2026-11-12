@@ -4,6 +4,7 @@
 import { DRILLS, MODULES } from '@/sim/training';
 import type { Outcome, SceneSpec } from '@/sim/training';
 import { newerYard, type Yard } from './yacht';
+import { newerCareer, type Career } from './career';
 
 const KEY = 'alfie-race-sim-training-v1';
 
@@ -26,6 +27,8 @@ export interface TrainingProgress {
   dismissed?: Record<string, number>;
   /** How you've said you want to use the Academy, and when you said so: 'simple' to sail better, 'full' to race as well. */
   way?: { mode: Way; at: number };
+  /** Your season on the AlfiePRO Circuit (see career.ts). */
+  career?: Career;
   updatedAt: number;
 }
 
@@ -92,6 +95,13 @@ export function chooseWay(mode: Way): TrainingProgress {
   return saveTraining(p);
 }
 
+/** Keep your season on the Circuit. */
+export function saveCareer(career: Career): TrainingProgress {
+  const p = loadTraining();
+  p.career = career;
+  return saveTraining(p);
+}
+
 /** Record an answer to a Rules Academy question (`id` is module/situation). */
 export function recordAnswer(id: string, correct: boolean): TrainingProgress {
   const p = loadTraining();
@@ -144,6 +154,7 @@ export function mergeTraining(a: TrainingProgress, b: TrainingProgress): Trainin
     out.dismissed = { ...(a.dismissed ?? {}) };
     for (const [k, at] of Object.entries(b.dismissed ?? {})) out.dismissed[k] = Math.max(at, out.dismissed[k] ?? 0);
   }
+  if (a.career || b.career) out.career = newerCareer(a.career, b.career);
   // The way of using the Academy that was chosen last.
   if (a.way || b.way) out.way = (b.way?.at ?? 0) > (a.way?.at ?? 0) ? b.way : a.way;
   return out;

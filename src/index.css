@@ -576,3 +576,21 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 @media (prefers-reduced-motion: reduce) { .sim-door, .sim-door-arrow { transition: none; } .sim-door:hover .sim-door-arrow { transform: none; } }
 /* Behind a door the cards sit over the foot of the render: solid enough that the fleet doesn't show through the words. */
 .sim-home-body .sim-card { background: rgba(9, 15, 29, 0.78); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+
+/* ── The end of a race day: the medal comes down on its ribbon, swings to rest, and a light crosses it. ── */
+.sim-podium { position: fixed; inset: 0; z-index: 9995; display: flex; align-items: center; justify-content: center; padding: 24px 16px; overflow-y: auto; background: radial-gradient(ellipse at 50% 30%, rgba(20, 44, 96, 0.82), rgba(4, 8, 18, 0.94) 70%);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); color: #F1F4FA; font-family: 'Instrument Sans', system-ui, sans-serif; animation: sim-podium-in .45s ease both; }
+.sim-podium-inner { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; max-width: 560px; margin: auto; }
+.sim-podium-medal { position: relative; height: 285px; width: 190px; margin-top: -24px; }
+.sim-podium-swing { display: block; transform-origin: 50% 0; animation: sim-medal-drop 1.9s cubic-bezier(.2, .8, .2, 1) both; filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.5)); }
+.sim-podium-sweep { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.55) 50%, transparent 62%); mix-blend-mode: overlay; transform: translateX(-120%); animation: sim-medal-sweep 1.1s ease-out 1.7s both;
+  -webkit-mask-image: radial-gradient(circle 88px at 50% 66.6%, #000 98%, transparent 100%); mask-image: radial-gradient(circle 88px at 50% 66.6%, #000 98%, transparent 100%); }
+.sim-podium-title { margin: 0; text-align: center; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(32px, 5vw, 52px); font-weight: 700; letter-spacing: -0.025em; line-height: 1.02; animation: sim-podium-rise .6s ease .5s both; }
+.sim-podium-top { display: flex; flex-direction: column; width: 100%; max-width: 420px; margin: 8px 0 10px; padding: 6px 16px; list-style: none; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(8, 14, 32, 0.6); animation: sim-podium-rise .6s ease .8s both; }
+.sim-podium-top li { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 14.5px; }
+.sim-podium-top li + li { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+@keyframes sim-podium-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sim-podium-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes sim-medal-drop { 0% { transform: translateY(-90px) rotate(0deg); opacity: 0; } 16% { opacity: 1; } 38% { transform: translateY(0) rotate(9deg); } 56% { transform: rotate(-6deg); } 72% { transform: rotate(3.5deg); } 86% { transform: rotate(-1.5deg); } 100% { transform: rotate(0deg); } }
+@keyframes sim-medal-sweep { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .sim-podium, .sim-podium-swing, .sim-podium-sweep, .sim-podium-title, .sim-podium-top { animation: none; } .sim-podium-sweep { display: none; } }

@@ -28,6 +28,9 @@ export interface RaceSettings {
   crew?: CrewMember[];
   /** Which seat in the crew is sailing on this device. */
   seat?: number;
+  /** A career event: the computer's skippers by name, in boat order after yours. Each carries her own
+   *  number and hull colour, and sails at her own level (not given: the fleet's). */
+  cast?: { name: string; sail: string; hull?: string; level?: SkipperLevel }[];
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length

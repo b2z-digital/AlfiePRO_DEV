@@ -217,6 +217,13 @@ export class Race implements AiHost {
         if (isPlayer) sail = mySail;
         else if (!s.noPlayer && sail === mySail) sail = '01';
       }
+      // A career event: this boat is one of the cast, with her own number (kept clear of yours and the others').
+      const cm = !isPlayer && !isCrew ? s.cast?.[i - (s.noPlayer ? 0 : 1)] : undefined;
+      if (cm) {
+        numbers.delete(sail);
+        sail = clearOf(sailNumber(cm.sail), new Set([...numbers, mySail]));
+        numbers.add(sail);
+      }
       // Start sailing round below the line like a fleet does: half reaching towards the pin on
       // starboard in a nearer lane, half back on port in a farther one, spread along the line.
       const frac = (i + 0.5) / n;
@@ -233,7 +240,7 @@ export class Race implements AiHost {
       const own = isPlayer && !crew && cls.id === 'IOM' && s.rig ? s.rig : null;
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
-        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : persona!.name, color: look?.hull ?? BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona, look,
+        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : cm?.name ?? persona!.name, color: look?.hull ?? cm?.hull ?? BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona, look,
         x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: own ? RIG_POWER[own] : rigPower(cls.id, kn0), rig: cls.id === 'IOM' ? own ?? iomRig(kn0) : undefined, rigDrive: own ? rigDrive(own, kn0) : 1, sheetFelt: 0.6, runPower: own ? RIG_POWER[own] : runPower(kn0), dive: 0, pitch: 0,
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,
@@ -255,7 +262,7 @@ export class Race implements AiHost {
         // starters, tight rounders, shift readers, quick boats; some on it and some not. (Drawn
         // apart from everything else, so the rest of the race is laid out as it always was.)
         persona!.strengths = strengthsFor(persona!, new Rng(s.seed * 131 + i * 7919 + 17));
-        const own = ownLevel(s.level, persona!.strengths);
+        const own = ownLevel(cm?.level ?? s.level, persona!.strengths);
         // (Every fourth skipper of a club fleet is one of its sharp starters.)
         const lv = i % 4 === 1 ? sharpStarter(own) : own;
         persona!.startSense = lv.startSense;

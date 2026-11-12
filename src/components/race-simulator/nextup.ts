@@ -1,8 +1,10 @@
 // "Next up": the one thing the home screen puts in front of you. The first of these that applies:
 // learn to sail (a newcomer), your placement races (not placed yet), the club's real race day in
 // the next few days (rehearse it), a licence that's one requirement short, a club challenge about
-// to close, this week's next session, and otherwise a race. Pure: nothing stored here.
+// to close, your season on the Circuit, this week's next session, and otherwise a race. A race day
+// under way comes straight after placement; the next race day is offered once you've trained this week. Pure: nothing stored here.
 import type { SkipperLevel } from '@/sim/types';
+import { dayState, type Career } from './career';
 import type { Challenge } from './challenges';
 import { offerFirstSail } from './plan';
 import type { Profile } from './profile';
@@ -14,6 +16,8 @@ import type { NextRace } from './rehearse';
 export type NextUp =
   | { kind: 'first-sail' }
   | { kind: 'placement'; sailed: number; of: number }
+  | { kind: 'career-day'; event: string; race: number; of: number; canSimulate: boolean }
+  | { kind: 'career-next'; event: string; season: number; started: boolean }
   | { kind: 'rehearse'; race: NextRace }
   | { kind: 'licence'; req: Requirement; to: SkipperLevel }
   | { kind: 'challenge'; challenge: Challenge; hours: number }
@@ -29,10 +33,14 @@ export function nextUp(a: {
   next: NextRace | null;
   /** Challenges you can see, and the ones you've already sailed. */
   challenges: Challenge[]; sailed?: ReadonlySet<string>;
+  /** Your season on the Circuit: null when not begun, not given when it's out of sight (the simple way of using the Academy). */
+  career?: Career | null;
   now: number;
 }): NextUp {
   if (offerFirstSail(a.profile, a.training)) return { kind: 'first-sail' };
   if (!a.standing.placed) return { kind: 'placement', sailed: a.standing.races, of: PLACED_AFTER };
+  const cs = a.career ? dayState(a.career) : null;
+  if (a.career?.day && cs) return { kind: 'career-day', event: cs.event.name, race: Math.min(cs.raced + 1, cs.event.races), of: cs.event.races, canSimulate: cs.canSimulate };
   if (a.next && a.next.days >= 0 && a.next.days <= REHEARSE_WITHIN) return { kind: 'rehearse', race: a.next };
   if (a.licence && a.licence.reqs.length - a.licence.met === 1) return { kind: 'licence', req: a.licence.reqs.find(r => !r.met)!, to: a.licence.to };
   const closing = a.challenges
@@ -42,6 +50,7 @@ export function nextUp(a: {
     .sort((x, z) => x.hours - z.hours)[0];
   if (closing) return { kind: 'challenge', challenge: closing.c, hours: Math.max(1, Math.round(closing.hours)) };
   const i = a.week.sessions.findIndex(s => !s.done);
+  if (a.career !== undefined && (i < 0 || a.week.done >= 1)) return { kind: 'career-next', event: cs ? cs.event.name : 'Pointscore 1', season: a.career?.season ?? 1, started: !!a.career };
   if (i >= 0) return { kind: 'session', session: a.week.sessions[i], n: i + 1, of: a.week.sessions.length };
   return { kind: 'race' };
 }
