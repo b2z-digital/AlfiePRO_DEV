@@ -30,6 +30,7 @@ import { dayState, seasonOf, type Career } from './career';
 import { MedalShelf } from './SimCareer';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
+import { compassPoint } from './windWords';
 import { todaysCases } from './judge';
 import { GRADE_NAME, passport } from './passport';
 import type { VenueDef } from '@/sim/venue';
@@ -39,7 +40,7 @@ import type { Water } from './waters';
 import type { SimIdentity } from './identity';
 import { Challenge, closesText, isOpen } from './challenges';
 import { challengeLine } from './SimChallenge';
-import { SimEvent, eventLine, eventState, eventStatusText } from './events';
+import { BLOWN_OUT_OPEN, BLOWN_OUT_RACES, SimEvent, eventLine, eventState, eventStatusText } from './events';
 import EventForm, { EventChoice } from './EventForm';
 import type { SimSequence } from './startbox';
 import type { OpenRoom } from './live';
@@ -281,6 +282,43 @@ function RehearseCard({ race, at, onRehearse }: { race: NextRace; at: VenueDef |
   );
 }
 
+/** "Blown out? Race it here" (the club's admins): the race day the weather took, raced on the club's water instead. */
+function BlownOutCard({ day, at, onRace }: { day: NextRace & { cancelled: boolean }; at: VenueDef | null; onRace: (races: number, days: number) => Promise<string | null> }) {
+  const [races, setRaces] = useState<number>(6);
+  const [days, setDays] = useState<number>(2);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const w = rehearseWords(day, at);
+  const breeze = !at ? "On the practice pond (choose your club's water under Where to race it at home)."
+    : day.wind ? `On ${at.name}'s water, in the day's breeze from the ${compassPoint(day.wind.from)}${day.wind.kn > 18 ? ', taken down to a fresh day' : ''}.` : `On ${at.name}'s water, in its usual breeze.`;
+  const go = async () => { setBusy(true); setErr(null); const e = await onRace(races, days); setBusy(false); if (e) setErr(e); };
+  const pick = (label: string, value: number, options: readonly number[], set: (n: number) => void, unit: (n: number) => string) => (
+    <div className="flex flex-col gap-2">
+      <Cap>{label}</Cap>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
+        {options.map(o => <button key={o} type="button" className="sim-chip-btn" aria-pressed={value === o} onClick={() => set(o)} style={value === o ? { background: '#F1F4FA', color: '#0A1226', borderColor: '#F1F4FA' } : undefined}>{unit(o)}</button>)}
+      </div>
+    </div>
+  );
+  return (
+    <section className="sim-glass flex flex-col gap-4 p-5 sm:p-6" aria-labelledby="blown-title">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-[240px] flex-1">
+          <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: '#FFB86B' }}>{day.cancelled ? 'Cancelled' : day.days === 0 ? 'Today' : w.when} · for the club's admins</p>
+          <h2 id="blown-title" className="m-0 mt-1 font-display text-[24px] font-bold leading-tight tracking-tight">Blown out? Race it here</h2>
+          <p className="m-0 mt-1.5 text-[14px] leading-snug" style={{ color: C.mute }}><b className="font-semibold text-[#F1F4FA]">{day.name}</b>{day.classId ? `, ${day.className}` : ''}, as a virtual event for the club's members. {breeze} Everyone sails the same races in their own time; first tries count. The results stay in the Academy: nothing goes on the club's results.</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-x-8 gap-y-4">
+        {pick('Races', races, BLOWN_OUT_RACES, setRaces, n => `${n}`)}
+        {pick('Open for', days, BLOWN_OUT_OPEN, setDays, n => (n === 1 ? 'Today' : `${n} days`))}
+      </div>
+      {err && <p role="alert" className="m-0 text-[13.5px] font-semibold" style={{ color: '#FFB86B' }}>{err}</p>}
+      <div><button type="button" className="sim-btn-lg sim-btn-go" disabled={busy} onClick={() => void go()}>{busy ? 'Setting it up…' : 'Race it here'}</button></div>
+    </section>
+  );
+}
+
 // ───────────────────────── The Sailing Academy ─────────────────────────
 /** Your yacht as you've finished her, and the way into the yard to change her. */
 function YachtCard({ yard, cls, me, onDesign }: { yard: Yard; cls: ClassId; me: SimIdentity | null; onDesign: () => void }) {
@@ -447,7 +485,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, world = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onPlay, career = null, onCareer, onBench, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -464,6 +502,10 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   career?: Career | null; onCareer?: () => void;
   /** The scoring bench (club admins and race officers). */
   onBench?: () => void;
+  /** "Blown out? Race it here" (the club's admins): the race day the weather took, and racing it here. */
+  blownOut?: { day: NextRace & { cancelled: boolean }; at: VenueDef | null; onRace: (races: number, days: number) => Promise<string | null> } | null;
+  /** A virtual event of your club's to sail now (Next up puts it first). */
+  clubEvent?: { event: SimEvent; left: number; hours: number } | null;
   /** The world (the daily race, the World Regatta, the Majors and the tables), once it has races. */
   world?: { line: string; onOpen: () => void } | null;
   /** The boats you've designed (Design your yacht). */
@@ -626,8 +668,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const grad = useMemo(() => levelLicence(st.level, profile, training), [st.level, profile, training]);
   const newcomer = offerFirstSail(profile, training);
   // (In the simple way of using it, licences and challenges stay out of sight.)
-  const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], career: simple || !onCareer ? undefined : career, now: Date.now() }),
-    [profile, training, st, week, simple, grad, next, challenges, career, onCareer]);
+  const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], career: simple || !onCareer ? undefined : career, clubEvent, now: Date.now() }),
+    [profile, training, st, week, simple, grad, next, challenges, career, onCareer, clubEvent]);
   const cs = career ? dayState(career) : null;
   // How much of the window the deck covers, so the render frames the fleet above it.
   const deck = useRef<HTMLDivElement | null>(null);
@@ -655,6 +697,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const upView: { kicker: string; title: string; text: string; button: string; onGo: () => void } =
     up.kind === 'career-day' ? { kicker: `Next up · your race day is under way`, title: `${up.event}: race ${up.race} of ${up.of}`, text: up.canSimulate ? 'Sail the next race, or simulate the rest of the day from the ones you\'ve sailed.' : 'Sail at least three races; after that the rest of the day can be simulated.', button: 'Open the race day', onGo: () => onCareer?.() }
       : up.kind === 'career-next' ? { kicker: up.started ? `Next up · the Circuit, season ${up.season}` : 'Next up · the AlfiePRO Circuit', title: up.started ? up.event : 'Start your club season', text: up.started ? `${cs ? `${cs.event.races} races${cs.days > 1 ? ` over ${cs.days} days` : ''}` : 'Six races'}, scored by AlfiePRO. Sail at least three${cs && cs.days > 1 ? ' a day' : ''}; the rest can be simulated.` : 'Six race days against nine club mates with names, numbers and form of their own, then the Club Championship. A podium earns a medal.', button: up.started ? 'Open the race day' : 'See the season', onGo: () => onCareer?.() }
+      : up.kind === 'club-event' ? { kicker: `Next up · your club${up.hours ? `, closes in ${up.hours < 24 ? `${up.hours} hour${up.hours === 1 ? '' : 's'}` : `${Math.round(up.hours / 24)} day${Math.round(up.hours / 24) === 1 ? '' : 's'}`}` : ''}`, title: up.event.title, text: `${up.left} race${up.left === 1 ? '' : 's'} for you to sail, the same for everyone at the club. Your first try at each counts.`, button: 'Open the event', onGo: () => onEvent?.(up.event) }
       : up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. About ${minutes(s)} minutes each, in the boat and fleet below.`, button: 'Start race', onGo: () => onStart('race', s) }
       : up.kind === 'rehearse' && next ? { kicker: `Next up · your club races ${rehearseWords(up.race, next.at).when.toLowerCase()}`, title: rehearseWords(up.race, next.at).title, text: `${rehearseWords(up.race, next.at).wind} Sail it now, so the shifts and the laylines aren't new on the day.`, button: rehearseWords(up.race, next.at).button, onGo: next.onRehearse }
         : up.kind === 'licence' ? { kicker: `Next up · one step from your ${LEVEL_NAME[up.to]} licence`, title: `${up.req.label}: ${up.req.need}`, text: `You have: ${up.req.have.toLowerCase()}. It's the last thing between you and your ${LEVEL_NAME[up.to]} licence.`, button: up.req.go === 'race' ? 'Start race' : 'Work on it', onGo: () => { const g = up.req.go; if (g === 'race') onStart('race', s); else onOpen(g); } }
@@ -765,6 +808,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
       <div className="sim-home-body flex flex-col gap-7 px-4 pb-16 sm:px-6 lg:px-10 xl:px-16">
         {door === 'race' && (
           <>
+            {blownOut && <BlownOutCard {...blownOut} />}
             {onCareer && (
               <section className="sim-glass flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:p-6" aria-labelledby="circuit-title">
                 <div className="min-w-[240px] flex-1">

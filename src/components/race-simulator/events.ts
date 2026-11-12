@@ -240,3 +240,26 @@ export async function startTry(a: Account, race: EventRace, me: { name: string; 
 }
 
 export { STANDARD_DROPS };
+
+/** How many races, and for how many days, a blown-out race day is raced here. */
+export const BLOWN_OUT_RACES = [4, 6, 8] as const, BLOWN_OUT_OPEN = [1, 2, 3] as const;
+
+/**
+ * "Blown out? Race it here": the club's race day the weather took, as a virtual event for the club's
+ * members. Every race on the club's water in the day's breeze (kept to what a radio yacht races in:
+ * the day that blew it out is sailed as a fresh day), each with its own shifts; all open now and
+ * closing at midnight after `days` days; your first try counts, with the usual drops. It stays in
+ * the Academy: nothing goes on the club's real results.
+ */
+export function blownOutEvent(day: { name: string; date: string }, base: RaceSettings, races: number, days: number, now: Date, seed: () => number): NewEvent {
+  const [y, m, d] = day.date.split('-').map(Number);
+  const when = new Date(y, m - 1, d).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const closes = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+  const title = `${day.name}: raced here`.slice(0, 120);
+  return {
+    clubId: null, title,
+    description: `${day.name} on ${when} was blown out, so it's raced here instead: the club's own water, in the day's breeze, ${races} races. Your first try at each counts. The results stay in the Academy; nothing goes on the club's results.`,
+    tries: 'first', drops: STANDARD_DROPS,
+    races: eventRaceSettings(base, races, false, seed).map(s => ({ settings: s, opens: now, closes })),
+  };
+}

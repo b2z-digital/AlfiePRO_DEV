@@ -49,6 +49,26 @@ export function pickNext(races: CalendarRace[], now: Date): Omit<NextRace, 'wind
   return { id: next.id, name: next.name, date, days, startTime: next.startTime ?? null, venue: next.venue, className: next.raceClass, classId: classFor(next.raceClass) };
 }
 
+/**
+ * A race day the weather took (or might take): today's, or one cancelled in the last two days, not
+ * finished. A race officer can race it here instead ("Blown out? Race it here"). Today's comes first.
+ */
+export function pickBlownOut(races: CalendarRace[], now: Date): (Omit<NextRace, 'wind'> & { cancelled: boolean }) | null {
+  const today = dayOf(now);
+  const back = dayOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - BLOWN_OUT_DAYS));
+  const day = races
+    .filter(r => !r.completed && /^\d{4}-\d{2}-\d{2}/.test(r.date))
+    .filter(r => { const d = r.date.slice(0, 10); return d === today || (r.cancelled && d >= back && d < today); })
+    .sort((a, z) => z.date.slice(0, 10).localeCompare(a.date.slice(0, 10)) || Number(!!z.cancelled) - Number(!!a.cancelled))[0];
+  if (!day) return null;
+  const date = day.date.slice(0, 10);
+  const [y, m, d] = date.split('-').map(Number);
+  const days = Math.round((new Date(y, m - 1, d).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / DAY);
+  return { id: day.id, name: day.name, date, days, startTime: day.startTime ?? null, venue: day.venue, className: day.raceClass, classId: classFor(day.raceClass), cancelled: !!day.cancelled };
+}
+/** How far back a cancelled race day can still be raced here (days). */
+export const BLOWN_OUT_DAYS = 2;
+
 /** The forecast for a day: the middle of its range as the breeze to sail in (kept to what a radio yacht races in). */
 export function windOn(daily: DayWind[], date: string): NextRace['wind'] {
   const d = daily.find(x => x.date === date);
@@ -80,14 +100,18 @@ export function rehearseWords(n: NextRace, at: VenueDef | null): { when: string;
  * rounds) and the weather service, for the venue the rehearsal is sailed on. Null when there's
  * nothing coming up or the calendar couldn't be read.
  */
+async function loadCalendar(): Promise<CalendarRace[]> {
+  const store = await import('@/utils/raceStorage');
+  const [events, series] = await Promise.all([store.getStoredRaceEvents().catch(() => []), store.getStoredRaceSeries().catch(() => [])]);
+  return [
+    ...events.map(e => ({ id: e.id, name: e.eventName || e.roundName || `${e.raceClass} racing`, date: e.date, venue: e.venue, raceClass: String(e.raceClass ?? ''), startTime: e.startTime, completed: e.completed, cancelled: e.cancelled })),
+    ...series.flatMap(s => s.completed ? [] : s.rounds.map((r, k) => ({ id: `${s.id}:${r.id ?? k}`, name: `${s.seriesName}: ${r.name}`, date: r.date, venue: r.venue, raceClass: String(s.raceClass ?? ''), startTime: r.startTime, completed: r.completed, cancelled: r.cancelled }))),
+  ];
+}
+
 export async function loadNextRace(at: VenueDef | null, now = new Date()): Promise<NextRace | null> {
   try {
-    const store = await import('@/utils/raceStorage');
-    const [events, series] = await Promise.all([store.getStoredRaceEvents().catch(() => []), store.getStoredRaceSeries().catch(() => [])]);
-    const races: CalendarRace[] = [
-      ...events.map(e => ({ id: e.id, name: e.eventName || e.roundName || `${e.raceClass} racing`, date: e.date, venue: e.venue, raceClass: String(e.raceClass ?? ''), startTime: e.startTime, completed: e.completed, cancelled: e.cancelled })),
-      ...series.flatMap(s => s.completed ? [] : s.rounds.map((r, k) => ({ id: `${s.id}:${r.id ?? k}`, name: `${s.seriesName}: ${r.name}`, date: r.date, venue: r.venue, raceClass: String(s.raceClass ?? ''), startTime: r.startTime, completed: r.completed, cancelled: r.cancelled }))),
-    ];
+    const races = await loadCalendar();
     const next = pickNext(races, now);
     if (!next) return null;
     let wind: NextRace['wind'] = null;
@@ -95,5 +119,18 @@ export async function loadNextRace(at: VenueDef | null, now = new Date()): Promi
       try { const w = await import('@/utils/weatherAPI'); wind = windOn(await w.getDailyForecast(at.lat, at.lon, at.short), next.date); } catch { wind = null; }
     }
     return { ...next, wind };
+  } catch { return null; }
+}
+
+/** The race day a race officer could race here today (see pickBlownOut), with the day's forecast when there is one. */
+export async function loadBlownOut(at: VenueDef | null, now = new Date()): Promise<(NextRace & { cancelled: boolean }) | null> {
+  try {
+    const day = pickBlownOut(await loadCalendar(), now);
+    if (!day) return null;
+    let wind: NextRace['wind'] = null;
+    if (at && day.days === 0) {
+      try { const w = await import('@/utils/weatherAPI'); wind = windOn(await w.getDailyForecast(at.lat, at.lon, at.short), day.date); } catch { wind = null; }
+    }
+    return { ...day, wind };
   } catch { return null; }
 }

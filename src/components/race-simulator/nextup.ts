@@ -1,11 +1,12 @@
 // "Next up": the one thing the home screen puts in front of you. The first of these that applies:
 // the learn-to-sail path (someone who said they're new to RC sailing), learn to sail (a newcomer), your placement races (not placed yet), the club's real race day in
-// the next few days (rehearse it), a licence that's one requirement short, a club challenge about
+// the next few days (rehearse it; but first, a virtual event of your club's to sail, such as a race day raced here), a licence that's one requirement short, a club challenge about
 // to close, your season on the Circuit, this week's next session, and otherwise a race. A race day
 // under way comes straight after placement; the next race day is offered once you've trained this week. Pure: nothing stored here.
 import type { SkipperLevel } from '@/sim/types';
 import { dayState, type Career } from './career';
 import type { Challenge } from './challenges';
+import type { SimEvent } from './events';
 import { offerFirstSail } from './plan';
 import { learnPath, type LearnPath, type LearnStep } from './learn';
 import type { Profile } from './profile';
@@ -20,6 +21,7 @@ export type NextUp =
   | { kind: 'placement'; sailed: number; of: number }
   | { kind: 'career-day'; event: string; race: number; of: number; canSimulate: boolean }
   | { kind: 'career-next'; event: string; season: number; started: boolean }
+  | { kind: 'club-event'; event: SimEvent; left: number; hours: number }
   | { kind: 'rehearse'; race: NextRace }
   | { kind: 'licence'; req: Requirement; to: SkipperLevel }
   | { kind: 'challenge'; challenge: Challenge; hours: number }
@@ -37,6 +39,8 @@ export function nextUp(a: {
   challenges: Challenge[]; sailed?: ReadonlySet<string>;
   /** Your season on the Circuit: null when not begun, not given when it's out of sight (the simple way of using the Academy). */
   career?: Career | null;
+  /** A virtual event of your club's from the last few days with races still for you to sail (a race day raced here, say). */
+  clubEvent?: { event: SimEvent; left: number; hours: number } | null;
   now: number;
 }): NextUp {
   // New to RC sailing, said so: the learn-to-sail path, in order, until it's done.
@@ -47,6 +51,7 @@ export function nextUp(a: {
   if (!a.standing.placed) return { kind: 'placement', sailed: a.standing.races, of: PLACED_AFTER };
   const cs = a.career ? dayState(a.career) : null;
   if (a.career?.day && cs) return { kind: 'career-day', event: cs.event.name, race: Math.min(cs.raced + 1, cs.event.races), of: cs.event.races, canSimulate: cs.canSimulate };
+  if (a.clubEvent && a.clubEvent.left > 0) return { kind: 'club-event', ...a.clubEvent };
   if (a.next && a.next.days >= 0 && a.next.days <= REHEARSE_WITHIN) return { kind: 'rehearse', race: a.next };
   if (a.licence && a.licence.reqs.length - a.licence.met === 1) return { kind: 'licence', req: a.licence.reqs.find(r => !r.met)!, to: a.licence.to };
   const closing = a.challenges
