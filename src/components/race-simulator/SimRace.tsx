@@ -2,6 +2,8 @@
 // HUD over it (wind, clock, line or course, fleet, coach, boat strip, sticks). Rules moments pause
 // the race in full-coach mode. Keyboard, transmitter and on-screen sticks all steer.
 // The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
+import { DrillCardView } from './drillCard';
+import { usePadGo } from './padGo';
 import { levelName } from './rating';
 import { creditLine } from '@/sim/venue';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -272,7 +274,10 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
   const [paused, setPaused] = useState(false);
   // Watching a drill sailed for you opens with how it's done; the demonstration waits behind it.
   // A demonstration opens on what's asked and how it's done; so does a First sail step you're about to try.
-  const [intro, setIntro] = useState(!!scene?.watch || scene?.group === 'First sail');
+  // The card that says what's asked and how before you go: a demonstration, a First sail step, and a
+  // Scenario Lab drill with step-by-step instructions.
+  const [intro, setIntro] = useState(!!scene?.watch || scene?.group === 'First sail' || !!scene?.spec.card);
+  const [introMore, setIntroMore] = useState(false);
   useEffect(() => { if (!paused) setTookOver(null); }, [paused]);
   const [moment, setMoment] = useState<Incident | null>(null);
   const [banner, setBanner] = useState<Incident | null>(null);
@@ -287,6 +292,8 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
   // Transmitters plugged in: the one you steer with uses its own set-up.
   const pads = usePads();
   const pad = pads.find(x => x.id === mapping.device) ?? pads.find(x => x.transmitter) ?? pads[0] ?? null;
+  // After a drill, any button on the transmitter goes again (no mouse needed).
+  usePadGo(onAgain, null, !!sceneOut && !replay);
   useEffect(() => {
     const saved = pad ? savedFor(pad.id) : null;
     if (saved && saved.device !== mapping.device) setMapping(saved);
@@ -1143,8 +1150,11 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
         {/* Before a demonstration: what's asked, how it's done and what each stick does */}
         {intro && scene && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[rgba(4,8,18,0.62)] backdrop-blur-[2px]" style={phone ? safePad : { padding: 24 }}>
-            <WatchIntro title={scene.spec.title} group={scene.group} brief={scene.spec.brief} goal={scene.spec.goal.text} tip={scene.spec.tip} sticks={scene.spec.sticks}
-              onStart={() => setIntro(false)} onBack={onHome} compact={phone} mine={!scene.watch} onWatch={onSceneWatch} />
+            {scene.spec.card && !scene.watch && !introMore
+              ? <DrillCardView title={scene.spec.title} group={scene.group} goal={scene.spec.goal.text} card={scene.spec.card} pad={!!pad} rudderAxis={mapping.rudderAxis}
+                onStart={() => setIntro(false)} onWatch={onSceneWatch} onMore={() => setIntroMore(true)} onBack={onHome} compact={phone} />
+              : <WatchIntro title={scene.spec.title} group={scene.group} brief={scene.spec.brief} goal={scene.spec.goal.text} tip={scene.spec.tip} steps={scene.spec.steps} sticks={scene.spec.sticks}
+                onStart={() => setIntro(false)} onBack={introMore ? () => setIntroMore(false) : onHome} compact={phone} mine={!scene.watch} onWatch={onSceneWatch} />}
           </div>
         )}
 
@@ -1207,8 +1217,8 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
               best={scene.best} watching={watching}
               onAgain={onAgain} onWatch={scene.spec.solution && onSceneWatch ? onSceneWatch : undefined}
               onNext={onSceneNext} nextLabel={scene.nextLabel} onBack={onHome} backLabel={backLabel}
-              rule={outRule} onRule={outRule ? () => setRuleSheet(outRule) : undefined} onReplay={phone ? startReplay : undefined} />
-            {!phone && <div className="absolute bottom-6 left-1/2 -translate-x-1/2"><Btn small onClick={startReplay}>Replay the last 10 s</Btn></div>}
+              rule={outRule} onRule={outRule ? () => setRuleSheet(outRule) : undefined} onReplay={startReplay}
+              how={scene.spec.steps ? { steps: scene.spec.steps, sticks: scene.spec.sticks } : null} pad={!!pad} />
           </div>
         )}
 

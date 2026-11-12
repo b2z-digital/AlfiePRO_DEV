@@ -8,6 +8,7 @@ import { ruleText } from './rulesText';
 import { AlfieOrb, Btn, C, Cap, Chip, Hud, InfoGlyph, WarnGlyph, clock, cx, ordinal } from './ui';
 import { rudderWords, sailWords, type DemoCue, type Stick } from './demoTalk';
 import { compassPoint, shiftWords } from './windWords';
+import { wordsIn } from '@/sim/training/words';
 
 /** What the race screen shows, refreshed ten times a second from the race. */
 export interface HudState {
@@ -380,14 +381,17 @@ export function DemoCard({ cue, onHide, compact }: { cue: DemoCue | null; onHide
  * Before Alfie sails a drill for you: what's being asked, how it's done, and what each stick does,
  * so you know what to look for. The demonstration waits behind it until you start it.
  */
-export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, onBack, compact, mine, onWatch }: {
+export function WatchIntro({ title, group, brief, goal, tip, steps: plain, sticks, onStart, onBack, compact, mine, onWatch }: {
   title: string; group: string; brief: string; goal: string; tip: string;
+  /** The drill's steps in plain words, when it has them (else the tip, a sentence a step). */
+  steps?: string[];
   sticks?: { sail: string; rudder: string } | null; onStart: () => void; onBack: () => void; compact?: boolean;
-  /** You're about to sail it yourself (a First sail step), with the offer to watch it done first. */
+  /** You're about to sail it yourself, with the offer to watch it done first. */
   mine?: boolean; onWatch?: () => void;
 }) {
   // The drill's advice, a step to a line.
-  const steps = tip.split(/(?<=[.!?])\s+(?=[A-Z"'])/).map(x => x.trim()).filter(Boolean);
+  const steps = plain?.length ? plain : tip.split(/(?<=[.!?])\s+(?=[A-Z"'])/).map(x => x.trim()).filter(Boolean);
+  const words = wordsIn(brief, goal, ...steps, sticks?.sail, sticks?.rudder);
   const row = (name: string, text: string, glyph: React.ReactNode) => (
     <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 py-3">
       <span aria-hidden="true" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(77,163,255,0.14)]">{glyph}</span>
@@ -420,14 +424,30 @@ export function WatchIntro({ title, group, brief, goal, tip, sticks, onStart, on
       </div>
       <div className="flex flex-col gap-2">
         <Cap>On the sticks</Cap>
-        {row('Sail stick', sticks?.sail ?? 'Down to sheet in, up to let the sail out. Right in upwind, out downwind.',
+        {row('Sail stick', sticks?.sail ?? 'Pull it to "in" to sheet in, push to "out" to let the sail out. Right in upwind, out downwind.',
           <svg width="18" height="22" viewBox="0 0 18 22" fill="none"><rect x="5" y="1" width="8" height="20" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="9" cy="16" r="3.2" fill="#4DA3FF" /></svg>)}
         {row('Rudder stick', sticks?.rudder ?? 'Left and right to steer. Small, smooth movements: every big one is a brake.',
           <svg width="22" height="18" viewBox="0 0 22 18" fill="none"><rect x="1" y="5" width="20" height="8" rx="4" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.18)" /><circle cx="11" cy="9" r="3.2" fill="#4DA3FF" /></svg>)}
+        <details className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5">
+          <summary className="cursor-pointer text-[13.5px] font-semibold text-[#A9D2FF]">Which stick is which, and which way?</summary>
+          <ul className="m-0 mt-2 flex list-none flex-col gap-2 p-0 text-[13.5px] leading-[1.45]">
+            <li><b>Sail stick</b> pulls the sail in and lets it out. On a transmitter it's the stick you set up as the sail (usually the left one, up and down): move it to the end you set as "in" to pull the sail in. Keyboard: ↓ in, ↑ out. On screen: the SAIL slider, IN at the bottom, OUT at the top.</li>
+            <li><b>Rudder stick</b> steers. On a transmitter, usually the right one, left and right. Keyboard: ← and →. On screen: the RUDDER slider. Left turns her bow to her own left, right to her own right, whichever way she faces on the screen. Back to the middle, and she sails straight.</li>
+            <li><b>Which way is "away from the wind"?</b> On starboard tack (wind over her right side, sail out on her left), away from the wind is left and towards it is right. On port tack it's the other way round. The boat strip at the bottom of the screen says which tack you're on.</li>
+          </ul>
+        </details>
         <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{mine
           ? "Take your time: you can try it as often as you like, and pause at any time. If you'd rather see it done first, Alfie will sail it and talk you through his sticks."
           : "As he sails, Alfie's sticks show at the bottom of the screen, each with its position in words, and he says what he's doing and why. The stick he's talking about lights up. Pause at any time to read."}</p>
       </div>
+      {words.length > 0 && (
+        <details className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5">
+          <summary className="cursor-pointer text-[13.5px] font-semibold text-[#A9D2FF]">Words used here ({words.length})</summary>
+          <dl className="m-0 mt-2 flex flex-col gap-1.5 text-[13.5px] leading-[1.45]">
+            {words.map(w => <div key={w.word}><dt className="inline font-semibold">{w.word}: </dt><dd className="m-0 inline" style={{ color: C.mute }}>{w.means}</dd></div>)}
+          </dl>
+        </details>
+      )}
       <div className="flex flex-wrap gap-2.5 pt-1">
         <Btn primary onClick={onStart} autoFocus={!compact}>{mine ? 'Start sailing' : 'Watch Alfie sail it'}</Btn>
         {mine && onWatch && <Btn onClick={onWatch}>Watch Alfie do it first</Btn>}
@@ -660,11 +680,15 @@ function Stars({ n }: { n: number }) {
   );
 }
 
-export function SceneResult({ pass, title, text, stars, best, watching, onAgain, onWatch, onNext, nextLabel, onBack, backLabel, onRule, rule, onReplay }: {
+export function SceneResult({ pass, title, text, stars, best, watching, onAgain, onWatch, onNext, nextLabel, onBack, backLabel, onRule, rule, onReplay, how, pad }: {
   pass: boolean; title: string; text: string; stars?: number; best?: string | null; watching: boolean;
+  /** The drill's steps and stick moves, to read again before the next try. */
+  how?: { steps: string[]; sticks?: { sail: string; rudder: string } } | null;
+  /** A transmitter is plugged in: say a button on it goes again. */
+  pad?: boolean;
   onAgain: () => void; onWatch?: () => void; onNext?: () => void; nextLabel?: string; onBack: () => void; backLabel: string;
   onRule?: () => void; rule?: string;
-  /** Replay the last 10 s, from a button here (on a phone, where there's no room for one underneath). */
+  /** Replay the last 10 s. */
   onReplay?: () => void;
 }) {
   return (
@@ -682,6 +706,13 @@ export function SceneResult({ pass, title, text, stars, best, watching, onAgain,
       </div>
       {stars !== undefined && stars > 0 && <div className="flex items-center gap-3"><Stars n={stars} />{best && <span className="text-[13px]" style={{ color: C.mute }}>Your best: {best}</span>}</div>}
       <p className="m-0 text-[14.5px] leading-[1.55]">{text}</p>
+      {how && how.steps.length > 0 && !pass && (
+        <details className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-2.5">
+          <summary className="cursor-pointer text-[13.5px] font-semibold text-[#A9D2FF]">How to do it, step by step</summary>
+          <ol className="m-0 mt-2 flex list-decimal flex-col gap-1.5 pl-5 text-[13.5px] leading-[1.45]">{how.steps.map(x => <li key={x}>{x}</li>)}</ol>
+          {how.sticks && <p className="m-0 mt-2 text-[13.5px] leading-[1.45]" style={{ color: C.mute }}><b className="text-[#F1F4FA]">Sail stick:</b> {how.sticks.sail} <b className="text-[#F1F4FA]">Rudder stick:</b> {how.sticks.rudder}</p>}
+        </details>
+      )}
       <div className="flex flex-wrap gap-2.5">
         <Btn primary onClick={onAgain}>{watching ? 'Now you try' : 'Try again'}</Btn>
         {onWatch && !watching && <Btn onClick={onWatch}>Watch the right way</Btn>}
@@ -690,6 +721,7 @@ export function SceneResult({ pass, title, text, stars, best, watching, onAgain,
         {onReplay && <Btn quiet onClick={onReplay}>Replay the last 10 s</Btn>}
         <Btn quiet onClick={onBack}>{backLabel}</Btn>
       </div>
+      {pad && <p className="m-0 text-[13px] font-semibold" style={{ color: C.mute }}>Press any button on your transmitter to {watching ? 'try it yourself' : 'go again'}.</p>}
     </Hud>
   );
 }
