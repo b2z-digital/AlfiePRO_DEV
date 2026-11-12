@@ -53,7 +53,7 @@ export const StudioHome: React.FC<{ onNew: () => void }> = ({ onNew }) => {
   useEffect(() => {
     let off = false;
     homeData(s.clubId).then(d => !off && setData(d)).catch(e => !off && setErr(e.message));
-    supabase.rpc('whats_on_settings_get', { p_club: s.clubId }).then(({ data: d }) => { if (!off && d) setWo((d as { settings: WhatsOn }).settings); });
+    if (s.kind === 'club') supabase.rpc('whats_on_settings_get', { p_club: s.clubId }).then(({ data: d }) => { if (!off && d) setWo((d as { settings: WhatsOn }).settings); });
     audienceCount(s.clubId, { include: [{ kind: 'builtin', key: 'not_signed_in' }], exclude: [] }).then(r => !off && setNotSignedIn(r.count)).catch(() => null);
     return () => { off = true; };
   }, [s.clubId]);
@@ -153,7 +153,7 @@ export const StudioHome: React.FC<{ onNew: () => void }> = ({ onNew }) => {
         </section>
       </div>
 
-      <section aria-label="Running on their own">
+      {s.kind === 'club' && <section aria-label="Running on their own">
         <div className="es-sh"><h3 className="a-display">Running on their own</h3><span className="es-dim" style={{ fontSize: 12.5 }}>Emails AlfiePRO sends for the club</span><button className="es-link r" onClick={() => navigate('/email-studio/flows')}>All flows</button></div>
         <div className="es-g3">
           <button className="a-card es-rc" onClick={() => navigate('/email-studio/flows')}>
@@ -169,7 +169,7 @@ export const StudioHome: React.FC<{ onNew: () => void }> = ({ onNew }) => {
             <span className="m">Before memberships are due, using your renewal settings</span>
           </button>
         </div>
-      </section>
+      </section>}
 
       <section aria-label="Start from a template">
         <div className="es-sh"><h3 className="a-display">Start from a template</h3><span className="es-dim" style={{ fontSize: 12.5 }}>Made by AlfiePRO, in your club’s colours. Change anything.</span><button className="es-link r" onClick={() => navigate('/email-studio/templates')}>All templates</button></div>

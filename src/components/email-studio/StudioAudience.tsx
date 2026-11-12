@@ -6,7 +6,7 @@ import { supabase } from '../../utils/supabase';
 import { avatarColour, initialsOf } from '../alfie/Kit';
 import { useStudio } from './studioData';
 import {
-  BUILTINS, ago, audienceCount, createCampaign, deleteSegment, fmtDate, homeData, memberActivity, saveSegment, searchMembers,
+  BUILTINS, ago, audienceCount, createCampaign, deleteSegment, fmtDate, homeData, memberActivity, orgClubIds, saveSegment, searchMembers,
   type AudienceCount, type HomeData, type MemberLite, type SegmentRow, type SegmentRule,
 } from './api';
 import { Confirm } from './ui';
@@ -160,13 +160,16 @@ export const StudioAudience: React.FC = () => {
 
   useEffect(() => {
     homeData(s.clubId).then(setHome).catch(() => setHome(null));
-    supabase.from('members').select('membership_level').eq('club_id', s.clubId).is('archived_at', null).limit(2000).then(({ data }) => {
-      const lv = Array.from(new Set((data || []).map(r => String(r.membership_level || '').trim()).filter(Boolean))).sort();
-      setChoices(c => ({ ...c, level: lv }));
-    });
-    supabase.from('member_boats').select('boat_type, members!inner(club_id)').eq('members.club_id', s.clubId).limit(3000).then(({ data }) => {
-      const cl = Array.from(new Set((data || []).map(r => String((r as { boat_type?: string }).boat_type || '').trim()).filter(Boolean))).sort();
-      setChoices(c => ({ ...c, class: cl }));
+    orgClubIds(s.clubId).then(clubs => {
+      if (!clubs.length) return;
+      supabase.from('members').select('membership_level').in('club_id', clubs).is('archived_at', null).limit(5000).then(({ data }) => {
+        const lv = Array.from(new Set((data || []).map(r => String(r.membership_level || '').trim()).filter(Boolean))).sort();
+        setChoices(c => ({ ...c, level: lv }));
+      });
+      supabase.from('member_boats').select('boat_type, members!inner(club_id)').in('members.club_id', clubs).limit(5000).then(({ data }) => {
+        const cl = Array.from(new Set((data || []).map(r => String((r as { boat_type?: string }).boat_type || '').trim()).filter(Boolean))).sort();
+        setChoices(c => ({ ...c, class: cl }));
+      });
     });
     BUILTINS.forEach(b => audienceCount(s.clubId, { include: [{ kind: 'builtin', key: b.key }], exclude: [] }).then(r => setCounts(c => ({ ...c, [b.key]: r.count }))).catch(() => undefined));
   }, [s.clubId]);

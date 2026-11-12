@@ -3,7 +3,7 @@ import { supabase } from '../../utils/supabase';
 import { brandFor, topicsFor, type StudioSettingsRow } from '../../lib/emailStudio/brand';
 import { sampleFeed, sampleReader } from '../../lib/emailStudio/render';
 import type { Brand, Feed, Reader } from '../../lib/emailStudio/types';
-import { fetchFeed, getSettings, listLists, listSegments, type FeedResponse, type SegmentRow } from './api';
+import { fetchFeed, getSettings, listLists, listSegments, setOrgKind, type FeedResponse, type OrgKind, type SegmentRow } from './api';
 
 export interface StudioClub {
   id: string;
@@ -17,6 +17,8 @@ export interface StudioClub {
 
 interface Studio {
   clubId: string;
+  /** club, or a state / national association */
+  kind: OrgKind;
   club: StudioClub | null;
   settings: StudioSettingsRow | null;
   brand: Brand;
@@ -42,7 +44,8 @@ export const useStudio = () => {
   return c;
 };
 
-export const StudioProvider: React.FC<{ clubId: string; children: React.ReactNode }> = ({ clubId, children }) => {
+export const StudioProvider: React.FC<{ clubId: string; kind?: OrgKind; children: React.ReactNode }> = ({ clubId, kind = 'club', children }) => {
+  setOrgKind(clubId, kind);
   const [club, setClub] = useState<StudioClub | null>(null);
   const [settings, setSettings] = useState<StudioSettingsRow | null>(null);
   const [segments, setSegments] = useState<SegmentRow[]>([]);
@@ -53,9 +56,16 @@ export const StudioProvider: React.FC<{ clubId: string; children: React.ReactNod
   const readers = useRef<Record<string, Reader>>({});
 
   const loadClub = useCallback(async () => {
+    if (kind !== 'club') {
+      const { data: a } = await supabase.from(kind === 'state' ? 'state_associations' : 'national_associations')
+        .select('id, name, abbreviation, logo_url, address, city, postcode, email').eq('id', clubId).maybeSingle();
+      setClub(a ? { id: a.id, name: a.name, abbreviation: a.abbreviation || null, logo: a.logo_url || null,
+        address: [a.address, a.city, a.postcode].filter(Boolean).join(', ') || null, contact_email: a.email || null, website_theme: null } : null);
+      return;
+    }
     const { data } = await supabase.from('clubs').select('id, name, abbreviation, logo, address, contact_email, website_theme').eq('id', clubId).maybeSingle();
     setClub((data as StudioClub) || null);
-  }, [clubId]);
+  }, [clubId, kind]);
 
   const reload = useCallback(async (what: ('settings' | 'segments' | 'lists' | 'club')[] = ['settings', 'segments', 'lists', 'club']) => {
     await Promise.all([
@@ -89,6 +99,7 @@ export const StudioProvider: React.FC<{ clubId: string; children: React.ReactNod
     const brand = live?.brand && !settings ? live.brand : brandFor({ name, logo: club?.logo, website_theme: club?.website_theme }, settings);
     return {
       clubId,
+      kind,
       club,
       settings,
       brand,
@@ -106,7 +117,7 @@ export const StudioProvider: React.FC<{ clubId: string; children: React.ReactNod
       reload,
       setSettings,
     };
-  }, [clubId, club, settings, live, feedError, segments, lists, loadFeed, readerFor, reload]);
+  }, [clubId, kind, club, settings, live, feedError, segments, lists, loadFeed, readerFor, reload]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 };

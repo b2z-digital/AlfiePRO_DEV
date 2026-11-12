@@ -5,6 +5,28 @@ import type { StudioSettingsRow } from '../../lib/emailStudio/brand';
 
 export const FROM_EMAIL = 'noreply@alfiepro.com.au';
 
+/* The studio works for a club or a state / national association. The id passed around as clubId is
+   that organisation's id; an association's rows keep it in state_association_id / national_association_id. */
+export type OrgKind = 'club' | 'state' | 'national';
+const orgKinds: Record<string, OrgKind> = {};
+export const setOrgKind = (id: string, kind: OrgKind) => { orgKinds[id] = kind; };
+export const orgKindOf = (id: string): OrgKind => orgKinds[id] || 'club';
+const col = (id: string) => (orgKindOf(id) === 'state' ? 'state_association_id' : orgKindOf(id) === 'national' ? 'national_association_id' : 'club_id');
+/** The clubs whose members an organisation emails (a club is its own). */
+export async function orgClubIds(id: string): Promise<string[]> {
+  const kind = orgKindOf(id);
+  if (kind === 'club') return [id];
+  if (kind === 'state') {
+    const { data } = await supabase.from('clubs').select('id').eq('state_association_id', id);
+    return (data || []).map(c => c.id as string);
+  }
+  const { data: states } = await supabase.from('state_associations').select('id').eq('national_association_id', id);
+  const sids = (states || []).map(s => s.id as string);
+  if (!sids.length) return [];
+  const { data } = await supabase.from('clubs').select('id').in('state_association_id', sids);
+  return (data || []).map(c => c.id as string);
+}
+
 export type AudiencePart =
   | { kind: 'builtin'; key: string; label?: string }
   | { kind: 'segment' | 'list' | 'not_opened' | 'opened_not_clicked' | 'clicked'; id: string; label?: string }
@@ -32,6 +54,8 @@ export interface CampaignRow {
   from_name: string;
   reply_to: string | null;
   club_id: string;
+  state_association_id?: string | null;
+  national_association_id?: string | null;
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | string;
   send_at: string | null;
   sent_at: string | null;
@@ -46,10 +70,10 @@ export interface CampaignRow {
   template_id?: string | null;
 }
 
-const CAMPAIGN_COLS = 'id, name, subject, preview_text, from_name, reply_to, club_id, status, send_at, sent_at, created_at, updated_at, topic, audience, test_sent_at, last_error, total_recipients, total_sent';
+const CAMPAIGN_COLS = 'id, name, subject, preview_text, from_name, reply_to, club_id, state_association_id, national_association_id, status, send_at, sent_at, created_at, updated_at, topic, audience, test_sent_at, last_error, total_recipients, total_sent';
 
 export async function listCampaigns(clubId: string): Promise<CampaignRow[]> {
-  const { data, error } = await supabase.from('marketing_campaigns').select(CAMPAIGN_COLS).eq('club_id', clubId).eq('studio', true)
+  const { data, error } = await supabase.from('marketing_campaigns').select(CAMPAIGN_COLS).eq(col(clubId), clubId).eq('studio', true)
     .order('updated_at', { ascending: false }).limit(200);
   if (error) throw error;
   return (data || []) as CampaignRow[];
@@ -83,7 +107,7 @@ export async function getCampaign(id: string): Promise<{ campaign: CampaignRow; 
 export async function createCampaign(clubId: string, o: { name: string; subject?: string; doc: EmailDoc; fromName: string; replyTo?: string | null; topic?: string; audience?: Audience; previewText?: string }) {
   const { data: u } = await supabase.auth.getUser();
   const { data, error } = await supabase.from('marketing_campaigns').insert({
-    club_id: clubId, name: o.name, subject: o.subject || o.name, preview_text: o.previewText || null, from_name: o.fromName, from_email: FROM_EMAIL,
+    [col(clubId)]: clubId, name: o.name, subject: o.subject || o.name, preview_text: o.previewText || null, from_name: o.fromName, from_email: FROM_EMAIL,
     reply_to: o.replyTo || null, status: 'draft', campaign_type: 'regular', studio: true, topic: o.topic || 'news',
     audience: o.audience || DEFAULT_AUDIENCE, created_by: u?.user?.id ?? null,
   }).select('id').single();
@@ -113,7 +137,7 @@ export async function duplicateCampaign(id: string) {
   const got = await getCampaign(id);
   if (!got) throw new Error('Not found');
   const c = got.campaign;
-  return createCampaign(c.club_id, {
+  return createCampaign(c.club_id || c.state_association_id || c.national_association_id || '', {
     name: `${c.name} (copy)`, subject: c.subject, doc: got.doc as EmailDoc, fromName: c.from_name, replyTo: c.reply_to,
     topic: c.topic || 'news', audience: c.audience || DEFAULT_AUDIENCE, previewText: c.preview_text || '',
   });
@@ -156,16 +180,16 @@ export interface SegmentRule { field: string; op?: string; value?: unknown }
 
 export async function listSegments(clubId: string): Promise<SegmentRow[]> {
   const { data } = await supabase.from('marketing_subscriber_lists').select('id, name, description, filter_criteria, list_type, total_contacts, updated_at')
-    .eq('club_id', clubId).eq('list_type', 'segment').order('name');
+    .eq(col(clubId), clubId).eq('list_type', 'segment').order('name');
   return (data || []) as SegmentRow[];
 }
 export async function listLists(clubId: string): Promise<SegmentRow[]> {
   const { data } = await supabase.from('marketing_subscriber_lists').select('id, name, description, filter_criteria, list_type, total_contacts, updated_at')
-    .eq('club_id', clubId).not('list_type', 'in', '("segment","all_members")').order('name');
+    .eq(col(clubId), clubId).not('list_type', 'in', '("segment","all_members")').order('name');
   return (data || []) as SegmentRow[];
 }
 export async function saveSegment(clubId: string, s: { id?: string; name: string; description?: string; def: { match: 'all' | 'any'; rules: SegmentRule[] }; count?: number }) {
-  const row = { name: s.name, description: s.description || null, filter_criteria: s.def as never, list_type: 'segment', club_id: clubId, total_contacts: s.count ?? null, updated_at: new Date().toISOString() };
+  const row = { name: s.name, description: s.description || null, filter_criteria: s.def as never, list_type: 'segment', [col(clubId)]: clubId, total_contacts: s.count ?? null, updated_at: new Date().toISOString() };
   if (s.id) {
     const { error } = await supabase.from('marketing_subscriber_lists').update(row).eq('id', s.id);
     if (error) throw error;
@@ -232,8 +256,10 @@ export async function saveSettings(clubId: string, s: StudioSettingsRow) {
 /* Members (fill in as, profiles) */
 export interface MemberLite { id: string; first_name: string | null; last_name: string | null; email: string | null; avatar_url?: string | null; membership_status?: string | null; is_financial?: boolean | null; renewal_date?: string | null; membership_level?: string | null; user_id?: string | null; date_joined?: string | null }
 export async function searchMembers(clubId: string, q: string, limit = 12): Promise<MemberLite[]> {
+  const clubs = orgKindOf(clubId) === 'club' ? [clubId] : await orgClubIds(clubId);
+  if (!clubs.length) return [];
   let req = supabase.from('members').select('id, first_name, last_name, email, avatar_url, membership_status, is_financial, renewal_date, membership_level, user_id, date_joined')
-    .eq('club_id', clubId).is('archived_at', null).order('first_name').limit(limit);
+    .in('club_id', clubs).is('archived_at', null).order('first_name').limit(limit);
   const t = q.trim().replace(/[%,()]/g, ' ').trim();
   if (t) req = req.or(`first_name.ilike.%${t}%,last_name.ilike.%${t}%,email.ilike.%${t}%`);
   const { data } = await req;
@@ -244,11 +270,11 @@ export async function searchMembers(clubId: string, q: string, limit = 12): Prom
 export interface SavedTemplate { id: string; name: string; description: string | null; category: string; email_content_json: unknown; updated_at: string }
 export async function listSavedTemplates(clubId: string): Promise<SavedTemplate[]> {
   const { data } = await supabase.from('marketing_email_templates').select('id, name, description, category, email_content_json, updated_at')
-    .eq('club_id', clubId).not('email_content_json', 'is', null).order('updated_at', { ascending: false });
+    .eq(col(clubId), clubId).not('email_content_json', 'is', null).order('updated_at', { ascending: false });
   return ((data || []) as SavedTemplate[]).filter(t => Array.isArray((t.email_content_json as EmailDoc | null)?.blocks));
 }
 export async function saveTemplate(clubId: string, t: { id?: string; name: string; description?: string; category?: string; doc: EmailDoc }) {
-  const row = { name: t.name, description: t.description || null, category: t.category || 'general', email_content_json: t.doc as never, club_id: clubId, html_content: ' ', updated_at: new Date().toISOString() };
+  const row = { name: t.name, description: t.description || null, category: t.category || 'general', email_content_json: t.doc as never, [col(clubId)]: clubId, html_content: ' ', updated_at: new Date().toISOString() };
   if (t.id) {
     const { error } = await supabase.from('marketing_email_templates').update(row).eq('id', t.id);
     if (error) throw error;

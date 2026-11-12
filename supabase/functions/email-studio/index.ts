@@ -1,4 +1,6 @@
 // Email studio: live club content for the builder, test sends, and sending campaigns.
+// Works for clubs and for state / national associations: wherever a club_id is passed it may be an
+// association id (association campaigns keep it in state_association_id / national_association_id).
 //   feed  {club_id, member_id?}            live content + reader + brand for previews (club admins)
 //   test  {club_id, doc, subject, ...}      send a test to up to 10 addresses (club admins)
 //   send  {campaign_id}                      start sending a campaign now (club admins)
@@ -49,16 +51,40 @@ async function callerId(req: Request): Promise<{ service: boolean; userId: strin
   return { service: false, userId: data?.user?.id ?? null };
 }
 
-async function canManage(userId: string | null, clubId: string) {
-  if (!userId || !clubId) return false;
+type OrgKind = 'club' | 'state' | 'national';
+async function orgKind(id: string): Promise<OrgKind | null> {
+  if (!id) return null;
+  const [{ data: c }, { data: s }, { data: n }] = await Promise.all([
+    db.from('clubs').select('id').eq('id', id).maybeSingle(),
+    db.from('state_associations').select('id').eq('id', id).maybeSingle(),
+    db.from('national_associations').select('id').eq('id', id).maybeSingle(),
+  ]);
+  return c ? 'club' : s ? 'state' : n ? 'national' : null;
+}
+/** The organisation a campaign belongs to: its club, else its association. */
+const orgOf = (c: { club_id?: string | null; state_association_id?: string | null; national_association_id?: string | null }) =>
+  String(c.club_id || c.state_association_id || c.national_association_id || '');
+
+async function canManage(userId: string | null, orgId: string) {
+  if (!userId || !orgId) return false;
   const { data: p } = await db.from('profiles').select('is_super_admin').eq('id', userId).maybeSingle();
   if (p?.is_super_admin) return true;
-  const { data } = await db.from('user_clubs').select('role').eq('user_id', userId).eq('club_id', clubId);
+  const kind = await orgKind(orgId);
+  if (kind === 'state') {
+    const { data } = await db.from('user_state_associations').select('role').eq('user_id', userId).eq('state_association_id', orgId);
+    return (data || []).some(r => ['state_admin', 'admin', 'editor'].includes(String(r.role)));
+  }
+  if (kind === 'national') {
+    const { data } = await db.from('user_national_associations').select('role').eq('user_id', userId).eq('national_association_id', orgId);
+    return (data || []).some(r => ['national_admin', 'admin', 'editor'].includes(String(r.role)));
+  }
+  const { data } = await db.from('user_clubs').select('role').eq('user_id', userId).eq('club_id', orgId);
   return (data || []).some(r => ['admin', 'super_admin', 'editor'].includes(String(r.role)));
 }
 
 /* ── Club, settings, brand and live content ───────────────────────────────── */
 interface ClubCtx {
+  kind: OrgKind;
   club: { id: string; name: string; logo: string | null; address: string | null; contact_email: string | null; state_association_id: string | null; website_theme: Record<string, unknown> | null };
   settings: StudioSettingsRow | null;
   brand: Brand;
@@ -85,6 +111,8 @@ async function appUrl() {
 }
 
 async function loadClub(clubId: string): Promise<ClubCtx> {
+  const kind = await orgKind(clubId);
+  if (kind === 'state' || kind === 'national') return loadAssociation(clubId, kind);
   const [{ data: club, error }, { data: settings }, app] = await Promise.all([
     db.from('clubs').select('id, name, logo, address, contact_email, state_association_id, website_theme').eq('id', clubId).single(),
     db.from('email_studio_settings').select('*').eq('club_id', clubId).maybeSingle(),
@@ -93,6 +121,7 @@ async function loadClub(clubId: string): Promise<ClubCtx> {
   if (error || !club) throw new Error('Club not found');
   const feed = await buildFeed(club, app);
   return {
+    kind: 'club',
     club: club as ClubCtx['club'],
     settings: settings as StudioSettingsRow | null,
     brand: brandFor(club as never, settings as StudioSettingsRow | null),
@@ -101,6 +130,95 @@ async function loadClub(clubId: string): Promise<ClubCtx> {
     fromName: (settings?.from_name || club.name || 'AlfiePRO').slice(0, 80),
     replyTo: [settings?.reply_to, club.contact_email].find(e => e && EMAIL_RE.test(String(e).trim()))?.trim() || null,
     footer: settings?.footer_address || club.address || null,
+  };
+}
+
+/** A state or national association: its own news (and the national body's), its championships. */
+async function loadAssociation(id: string, kind: 'state' | 'national'): Promise<ClubCtx> {
+  const table = kind === 'state' ? 'state_associations' : 'national_associations';
+  const [{ data: a, error }, { data: settings }, app] = await Promise.all([
+    db.from(table).select('*').eq('id', id).single(),
+    db.from('email_studio_settings').select('*').eq('club_id', id).maybeSingle(),
+    appUrl(),
+  ]);
+  if (error || !a) throw new Error('Association not found');
+  const address = [a.address, a.city, a.postcode].filter(Boolean).join(', ') || null;
+  const club: ClubCtx['club'] = { id, name: a.name, logo: a.logo_url || null, address, contact_email: a.email || null, state_association_id: null, website_theme: null };
+  const feed = await buildAssociationFeed(id, kind, kind === 'state' ? a.national_association_id : null, club, app);
+  return {
+    kind,
+    club,
+    settings: settings as StudioSettingsRow | null,
+    brand: brandFor(club as never, settings as StudioSettingsRow | null),
+    app,
+    feed,
+    fromName: (settings?.from_name || a.name || 'AlfiePRO').slice(0, 80),
+    replyTo: [settings?.reply_to, a.email].find(e => e && EMAIL_RE.test(String(e).trim()))?.trim() || null,
+    footer: settings?.footer_address || address,
+  };
+}
+
+async function buildAssociationFeed(id: string, kind: 'state' | 'national', national: string | null, org: ClubCtx['club'], app: string): Promise<Feed> {
+  const today = todayIn();
+  const site = `${app}/news`;
+  const or = kind === 'state'
+    ? [`and(club_id.is.null,state_association_id.eq.${id})`, ...(national ? [`and(club_id.is.null,state_association_id.is.null,national_association_id.eq.${national})`] : [])]
+    : [`and(club_id.is.null,state_association_id.is.null,national_association_id.eq.${id})`];
+  const extCats = kind === 'state' ? [`state_${id}`, 'national'] : ['national'];
+  const [arts, pub, ext, vids, last] = await Promise.all([
+    db.from('articles').select('id, title, excerpt, content, cover_image, published_at, club_id, state_association_id')
+      .eq('status', 'published').or(or.join(',')).order('published_at', { ascending: false }).limit(18),
+    db.from('public_events').select('id, event_name, date, end_date, venue, race_class, race_format, is_paid, entry_fee, event_level, state_association_id, national_association_id, approval_status, archived')
+      .gte('date', today).lte('date', addDays(today, 200))
+      .or(kind === 'state' ? `state_association_id.eq.${id},event_level.eq.national` : `national_association_id.eq.${id},event_level.eq.national`)
+      .order('date').limit(40),
+    db.from('external_events').select('id, event_name, event_date, event_end_date, venue, boat_class_mapped, boat_class_raw, source_url, display_category, is_visible, event_status')
+      .in('display_category', extCats).eq('is_visible', true).eq('event_status', 'active').gte('event_date', today).lte('event_date', addDays(today, 200))
+      .order('event_date').limit(40),
+    db.from('alfie_tv_videos').select('id, youtube_id, title, thumbnail_url, thumbnail_high_url, duration_formatted, channel_id, published_at').eq('is_approved', true)
+      .order('published_at', { ascending: false }).limit(6),
+    db.from('marketing_campaigns').select('sent_at').or(`state_association_id.eq.${id},national_association_id.eq.${id}`).is('club_id', null).eq('studio', true).eq('status', 'sent')
+      .order('sent_at', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const news = (arts.data || []).map(a => ({
+    id: a.id, title: a.title,
+    excerpt: (a.excerpt && strip(a.excerpt)) || strip(a.content).slice(0, 200) || null,
+    image: a.cover_image || null, published_at: a.published_at,
+    source: (a.state_association_id ? 'state' : 'national') as 'club' | 'state' | 'national',
+    url: `${site}/${a.id}`,
+  }));
+  const seen = new Set<string>();
+  const key = (d: string, cls: string | null) => `${d}|${String(cls || '').toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  const evs: FeedEvent[] = [];
+  for (const e of (pub.data || []).filter(e => !e.archived && (e.approval_status == null || ['approved', 'state_approved', 'national_approved'].includes(String(e.approval_status))))) {
+    seen.add(key(e.date, e.race_class));
+    evs.push({
+      event_key: `p-${e.id}`, kind: 'event', title: e.event_name || 'Championship', event_date: e.date, end_date: e.end_date || null,
+      venue: e.venue || null, map_url: e.venue ? `https://maps.google.com/?q=${encodeURIComponent(e.venue)}` : null,
+      race_class: e.race_class || null, class_key: null, race_format: e.race_format || null, is_paid: !!e.is_paid, entry_fee: e.entry_fee ?? null,
+      start_time: null, going: 0, url: `${app}/calendar`,
+    } as FeedEvent);
+  }
+  for (const e of ext.data || []) {
+    const cls = e.boat_class_mapped || e.boat_class_raw || null;
+    if (seen.has(key(e.event_date, cls))) continue;
+    seen.add(key(e.event_date, cls));
+    evs.push({
+      event_key: `x-${e.id}`, kind: 'event', title: e.event_name || 'Championship', event_date: e.event_date, end_date: e.event_end_date || null,
+      venue: e.venue || null, map_url: e.venue ? `https://maps.google.com/?q=${encodeURIComponent(e.venue)}` : null,
+      race_class: cls, class_key: null, race_format: null, is_paid: false, entry_fee: null, start_time: null, going: 0, url: e.source_url || `${app}/calendar`,
+    } as FeedEvent);
+  }
+  evs.sort((a, b) => String(a.event_date).localeCompare(String(b.event_date)));
+  const videos = (vids.data || []).map(v => ({
+    id: String(v.id), title: String(v.title || 'Video'), thumb: (v.thumbnail_high_url as string) || (v.thumbnail_url as string) || null,
+    duration: (v.duration_formatted as string) || null, mine: false,
+    url: v.youtube_id ? `${app}/play/${encodeURIComponent(String(v.youtube_id))}?title=${encodeURIComponent(String(v.title || ''))}` : `${app}/alfie-tv`,
+  }));
+  return {
+    club: { id: org.id, name: org.name, address: org.address, appUrl: app, siteUrl: app },
+    news, events: evs.slice(0, 20), results: [], classifieds: [], videos,
+    lastSentAt: last.data?.sent_at ?? null,
   };
 }
 
@@ -228,6 +346,16 @@ async function readerFor(ctx: ClubCtx, memberId: string | null, fallback: { emai
     const { data: m } = await db.from('members')
       .select('id, first_name, last_name, email, user_id, renewal_date, membership_level, membership_level_custom, is_financial, membership_status, archived_at, club_id')
       .eq('id', memberId).maybeSingle();
+    if (m && ctx.kind !== 'club') {
+      // An association's reader: their name and membership; renewals stay with their club
+      return {
+        member_id: m.id, first_name: (m.first_name || '').trim() || 'there', last_name: (m.last_name || '').trim(), email: m.email, user_id: m.user_id,
+        is_member: !m.archived_at && ['active', 'expired', null].includes(m.membership_status),
+        is_financial: !!m.is_financial && m.membership_status !== 'expired', renewal_date: m.renewal_date,
+        membership_level: m.membership_level_custom || m.membership_level || null, boats: [], answers: {}, token: null,
+        renewUrl: `${ctx.app}/membership/${m.club_id}/renew/${m.id}`,
+      };
+    }
     if (m && m.club_id === ctx.club.id) {
       const [{ data: mc }, tok] = await Promise.all([
         db.rpc('whats_on_member_ctx', { p_member: m.id }),
@@ -305,13 +433,14 @@ async function startCampaign(id: string) {
   const { data: c } = await db.from('marketing_campaigns').update({ status: 'sending', sending_started_at: new Date().toISOString(), updated_at: new Date().toISOString(), last_error: null })
     .eq('id', id).in('status', ['draft', 'scheduled']).select('*').maybeSingle();
   if (!c) return null;
-  const { data: people, error } = await db.rpc('email_studio_recipients', { p_club: c.club_id, p_aud: c.audience || { include: [{ kind: 'builtin', key: 'all' }] }, p_topic: c.topic || null });
+  const org = orgOf(c);
+  const { data: people, error } = await db.rpc('email_studio_recipients', { p_club: org, p_aud: c.audience || { include: [{ kind: 'builtin', key: 'all' }] }, p_topic: c.topic || null });
   if (error) {
     await db.from('marketing_campaigns').update({ status: 'draft', last_error: `Could not work out who to send to: ${error.message}` }).eq('id', id);
     throw new Error(error.message);
   }
   const rows = (people || []).map((p: Record<string, unknown>) => ({
-    campaign_id: id, club_id: c.club_id, email: p.email, first_name: p.first_name || null, last_name: p.last_name || null,
+    campaign_id: id, club_id: org, email: p.email, first_name: p.first_name || null, last_name: p.last_name || null,
     member_id: p.member_id || null, user_id: p.user_id || null, status: 'queued',
   }));
   for (let i = 0; i < rows.length; i += 500) {
@@ -328,7 +457,7 @@ async function processCampaign(id: string) {
   if (!c || c.status !== 'sending') return;
   const { data: content } = await db.from('marketing_campaign_content').select('json_structure').eq('campaign_id', id).maybeSingle();
   const doc = normaliseDoc(content?.json_structure);
-  const ctx = await loadClub(c.club_id);
+  const ctx = await loadClub(orgOf(c));
   const fromName = (c.from_name || ctx.fromName).slice(0, 80);
   const replyTo = c.reply_to && EMAIL_RE.test(c.reply_to) ? c.reply_to : ctx.replyTo;
 
@@ -405,7 +534,8 @@ Deno.serve(async req => {
       const ctx = await loadClub(clubId);
       let memberId: string | null = body.member_id || null;
       if (!memberId && who.userId) {
-        const { data: me } = await db.from('members').select('id').eq('club_id', clubId).eq('user_id', who.userId).limit(1).maybeSingle();
+        const { data: me } = await db.from('members').select('id').eq('user_id', who.userId).order('club_id', { ascending: true })
+          .or(ctx.kind === 'club' ? `club_id.eq.${clubId}` : `club_id.not.is.null`).limit(1).maybeSingle();
         memberId = me?.id ?? null;
       }
       const reader = await readerFor(ctx, memberId, {}, false);
@@ -422,7 +552,8 @@ Deno.serve(async req => {
       if (!doc.blocks.length) return json({ error: 'The email is empty' }, 400);
       let testMember: string | null = body.member_id || null;
       if (!testMember && who.userId) {
-        const { data: me } = await db.from('members').select('id').eq('club_id', clubId).eq('user_id', who.userId).limit(1).maybeSingle();
+        const { data: me } = await db.from('members').select('id').eq('user_id', who.userId).order('club_id', { ascending: true })
+          .or(ctx.kind === 'club' ? `club_id.eq.${clubId}` : `club_id.not.is.null`).limit(1).maybeSingle();
         testMember = me?.id ?? null;
       }
       const reader = await readerFor(ctx, testMember, { first_name: 'Sam', last_name: 'Sample' }, false);
@@ -443,7 +574,8 @@ Deno.serve(async req => {
         }
       }
       if (body.campaign_id && failed.length < to.length) {
-        await db.from('marketing_campaigns').update({ test_sent_at: new Date().toISOString() }).eq('id', body.campaign_id).eq('club_id', clubId);
+        await db.from('marketing_campaigns').update({ test_sent_at: new Date().toISOString() }).eq('id', body.campaign_id)
+          .or(`club_id.eq.${clubId},state_association_id.eq.${clubId},national_association_id.eq.${clubId}`);
       }
       if (failed.length === to.length) return json({ error: 'The test could not be sent. Please try again in a minute.' }, 502);
       return json({ sent: to.length - failed.length, failed });
@@ -451,8 +583,8 @@ Deno.serve(async req => {
 
     if (action === 'send') {
       const id = String(body.campaign_id || '');
-      const { data: c } = await db.from('marketing_campaigns').select('id, club_id, status').eq('id', id).maybeSingle();
-      if (!c || !(await canManage(who.userId, c.club_id))) return json({ error: 'Not allowed' }, 403);
+      const { data: c } = await db.from('marketing_campaigns').select('id, club_id, state_association_id, national_association_id, status').eq('id', id).maybeSingle();
+      if (!c || !(await canManage(who.userId, orgOf(c)))) return json({ error: 'Not allowed' }, 403);
       if (c.status === 'sent') return json({ error: 'This email has already been sent' }, 400);
       let recipients = 0;
       if (c.status !== 'sending') {

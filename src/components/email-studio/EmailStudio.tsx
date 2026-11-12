@@ -97,15 +97,15 @@ const Shell: React.FC<{ tab: StudioTab }> = ({ tab }) => {
           <span className="es-mark"><SendIcon /></span>
           <div className="min-w-0">
             <h1 className="a-display">Email studio</h1>
-            <div className="sub">Newsletters, campaigns and automatic emails for {s.club?.name || 'your club'}</div>
+            <div className="sub">{s.kind === 'club' ? `Newsletters, campaigns and automatic emails for ${s.club?.name || 'your club'}` : `Emails to the members of ${s.club?.name || 'the association'}’s clubs`}</div>
           </div>
           <div className="act">
-            <button className="a-btn" onClick={() => navigate(STUDIO_ROUTES.flows)}><Workflow size={16} />Flows</button>
+            {s.kind === 'club' && <button className="a-btn" onClick={() => navigate(STUDIO_ROUTES.flows)}><Workflow size={16} />Flows</button>}
             <button className="a-btn a-btn-p" onClick={() => setCreating(true)}><Plus size={16} />New campaign</button>
           </div>
         </header>
         <nav className="es-tabs" aria-label="Email studio sections">
-          {TABS.map(t => (
+          {TABS.filter(t => s.kind === 'club' || t.id !== 'flows').map(t => (
             <button key={t.id} className={`es-tab${t.id === tab ? ' on' : ''}`} aria-current={t.id === tab ? 'page' : undefined} onClick={() => navigate(STUDIO_ROUTES[t.id])}>
               {t.icon}{t.label}
             </button>
@@ -125,11 +125,13 @@ const Shell: React.FC<{ tab: StudioTab }> = ({ tab }) => {
 
 /** Communications › Email studio (clubs). Mounted at /email-studio/*. */
 export const EmailStudio: React.FC = () => {
-  const { currentClub } = useAuth();
-  const clubId = currentClub?.clubId;
+  const { currentClub, currentOrganization } = useAuth();
+  // State and national associations email the members of their clubs
+  const assoc = currentOrganization && (currentOrganization.type === 'state' || currentOrganization.type === 'national') ? currentOrganization : null;
+  const clubId = assoc ? assoc.id : currentClub?.clubId;
   if (!clubId) return null;
   return (
-    <StudioProvider clubId={clubId} key={clubId}>
+    <StudioProvider clubId={clubId} kind={assoc ? assoc.type : 'club'} key={clubId}>
       <Routes>
         <Route index element={<Shell tab="home" />} />
         <Route path="campaigns" element={<Shell tab="campaigns" />} />

@@ -56,6 +56,7 @@ const SendCalendar: React.FC<{ campaigns: CampaignRow[] }> = ({ campaigns }) => 
   const [woSends, setWoSends] = useState<string[]>([]);
   useEffect(() => { s.loadFeed(); }, [s]);
   useEffect(() => {
+    if (s.kind !== 'club') return;
     supabase.rpc('whats_on_settings_get', { p_club: s.clubId }).then(({ data }) => setWo(data as never));
     supabase.from('whats_on_sends').select('sent_at').eq('club_id', s.clubId).neq('kind', 'test').order('sent_at', { ascending: false }).limit(60)
       .then(({ data }) => setWoSends((data || []).map(d => d.sent_at as string)));
