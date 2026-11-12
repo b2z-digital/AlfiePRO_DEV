@@ -22,7 +22,7 @@ import { offerFirstSail } from './plan';
 import { nextUp } from './nextup';
 import { SYLLABUS, levelLicence, weekPlan } from './programme';
 import { LEVEL_NAME, cleanSailing, levelName, standing } from './rating';
-import { Brand, DOOR_NAME, DoorBack, DoorCard, LevelCard, LicenceCard, NextUpCard, WayAsk, WaySwitch, WeekCard, type Door } from './SimDoors';
+import { Brand, DOOR_NAME, DoorBack, DoorCard, LevelCard, LicenceCard, NextUpCard, SetupChips, WayAsk, WaySwitch, WayToggle, WeekCard, type Door } from './SimDoors';
 import { CAUSE_WORDS } from './ledger';
 import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
@@ -612,14 +612,21 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const up = useMemo(() => nextUp({ profile, training, standing: st, week, licence: simple ? null : grad, next: next?.race ?? null, challenges: simple ? [] : challenges ?? [], now: Date.now() }),
     [profile, training, st, week, simple, grad, next, challenges]);
   const go = (d: Door) => { onDoor?.(d); window.scrollTo({ top: 0 }); document.querySelector('.sim-page')?.parentElement?.scrollTo({ top: 0 }); };
-  const raceLine = `${CLASS_LABEL[s.classId]}, ${s.fleetSize} boats, ${LEVEL_NAME[s.level]} skippers, ${venue ? venue.short : 'the practice pond'}. About ${minutes(s)} minutes.`;
   const upView: { kicker: string; title: string; text: string; button: string; onGo: () => void } =
-    up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. ${raceLine}`, button: 'Start race', onGo: () => onStart('race', s) }
+    up.kind === 'placement' ? { kicker: 'Next up · find your level', title: up.sailed === 0 ? 'Three races find your level' : `Placement race ${up.sailed + 1} of ${up.of}`, text: `After three races you're placed, Club, Regional, National or World, and your training follows. About ${minutes(s)} minutes each, in the boat and fleet below.`, button: 'Start race', onGo: () => onStart('race', s) }
       : up.kind === 'rehearse' && next ? { kicker: `Next up · your club races ${rehearseWords(up.race, next.at).when.toLowerCase()}`, title: rehearseWords(up.race, next.at).title, text: `${rehearseWords(up.race, next.at).wind} Sail it now, so the shifts and the laylines aren't new on the day.`, button: rehearseWords(up.race, next.at).button, onGo: next.onRehearse }
         : up.kind === 'licence' ? { kicker: `Next up · one step from your ${LEVEL_NAME[up.to]} licence`, title: `${up.req.label}: ${up.req.need}`, text: `You have: ${up.req.have.toLowerCase()}. It's the last thing between you and your ${LEVEL_NAME[up.to]} licence.`, button: up.req.go === 'race' ? 'Start race' : 'Work on it', onGo: () => { const g = up.req.go; if (g === 'race') onStart('race', s); else onOpen(g); } }
           : up.kind === 'challenge' ? { kicker: `Next up · closes in ${up.hours < 24 ? `${up.hours} hour${up.hours === 1 ? '' : 's'}` : 'a day or so'}`, title: up.challenge.title, text: `Your club's challenge: the same race for everyone, with a leaderboard. ${challengeLine(up.challenge)}`, button: 'Open the challenge', onGo: () => onChallenge?.(up.challenge) }
             : up.kind === 'session' ? { kicker: simple ? "Today's session" : `Next up · session ${up.n} of ${up.of} this week`, title: practiceLink(up.session.link).label.replace(/^(Start Trainer|Scenario): /, ''), text: `${up.session.why} About five minutes.`, button: 'Start the session', onGo: () => onLink?.(practiceLink(up.session.link)) }
-              : { kicker: simple ? "This week's sessions are done" : 'Next up', title: 'Go racing', text: `${focus ? `${focusWords(focus).title}. ` : ''}${raceLine}`, button: 'Start race', onGo: () => onStart('race', s) };
+              : { kicker: simple ? "This week's sessions are done" : 'Next up', title: 'Go racing', text: `${focus ? `${focusWords(focus).title}. ` : ''}About ${minutes(s)} minutes, in the boat and fleet below.`, button: 'Start race', onGo: () => onStart('race', s) };
+  // The race as set up, each part a way into its picker (so the boat can be changed right where a race is offered).
+  const chips = [
+    { what: 'Boat', value: CLASS_LABEL[s.classId], onPick: () => setPick('boat') },
+    { what: 'Fleet', value: `${s.fleetSize} boats`, onPick: () => setPick('fleet') },
+    { what: 'Skippers', value: LEVEL_NAME[s.level], onPick: () => setPick('skippers') },
+    { what: 'Water', value: venue ? venue.short : 'Practice pond', onPick: () => setPick('venue') },
+    { what: 'Wind', value: strengthName, onPick: () => setPick('wind') },
+  ];
   // How you're going, in words (the simple way of using it).
   const lastRace = profile.races.find(r => r.mode === 'race' && r.status !== 'racing');
   const going = [
@@ -641,13 +648,16 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
         <div className="sim-home-hero-body px-4 sm:px-6 lg:px-10 xl:px-16">
           {door === 'home' ? (
             <>
-              <Brand />
+              <div className="sim-front-top">
+                <Brand />
+                {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
+              </div>
               <h1 className="sr-only">Sailing Academy</h1>
               <div className="sim-front">
                 {!training.way && onWay && <WayAsk onChoose={onWay} />}
                 {up.kind === 'first-sail' && onLink
                   ? <FirstSailCard done={id => !!training.lab[id]?.won} onGo={id => onLink({ kind: 'lab', id, label: 'First sail' })} onDismiss={onDismiss ? () => onDismiss('first-sail') : undefined} />
-                  : <NextUpCard big={simple} {...upView} />}
+                  : <NextUpCard big={simple} {...upView}>{(up.kind === 'placement' || up.kind === 'race') && <SetupChips items={chips} />}</NextUpCard>}
                 {simple ? (
                   <div className="sim-front-row">
                     <section className="sim-glass flex flex-col gap-2 p-5 sm:p-6" aria-labelledby="going-title">
@@ -655,7 +665,15 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                       {going.map(l => <p key={l} className="m-0 text-[16px] leading-snug">{l}</p>)}
                     </section>
                     <div className="flex flex-col gap-3">
-                      <button type="button" className="sim-glass sim-quiet" onClick={() => onStart('race', s)}><span>A practice race</span><span>{CLASS_LABEL[s.classId]}, {s.fleetSize} boats, about {minutes(s)} minutes</span></button>
+                      {up.kind !== 'placement' && up.kind !== 'race' && (
+                      <div className="sim-glass flex flex-col gap-1 p-5" style={{ borderRadius: 20 }}>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="min-w-0 flex-1"><span className="block text-[17px] font-bold">A practice race</span><span className="block text-[14px]" style={{ color: C.mute }}>About {minutes(s)} minutes. Press a part to change it.</span></span>
+                          <button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onStart('race', s)}>Start race</button>
+                        </div>
+                        <SetupChips items={chips} />
+                      </div>
+                      )}
                       <button type="button" className="sim-glass sim-quiet" onClick={() => go('train')}><span>Your programme and the library</span><span>{week.done} of {week.sessions.length} sessions done this week</span></button>
                       <button type="button" className="sim-glass sim-quiet" onClick={() => go('you')}><span>You and your yacht</span><span>{yachtFor(yard, s.classId)?.name ?? CLASS_LABEL[s.classId]}, sail {sailFor(yard, s.classId, me).sail}</span></button>
                       <button type="button" className="sim-link self-start text-[13.5px]" onClick={() => go('race')}>Set up the race, or race with others</button>

@@ -3,7 +3,7 @@
 // week's programme, the licence to the next level, and your level. They sit as glass panels over
 // the live render of the fleet, the way Design your yacht sits over its stage.
 import React from 'react';
-import { ArrowRight, Check, ChevronLeft } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronLeft } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import type { SkipperLevel } from '@/sim/types';
 import { practiceLink } from './playbook';
@@ -34,6 +34,29 @@ export function Brand({ onHome }: { onHome?: () => void }) {
   return onHome
     ? <button type="button" onClick={onHome} aria-label="Sailing Academy home" className="sim-brand cursor-pointer border-0 bg-transparent p-0 text-left">{inner}</button>
     : <div className="sim-brand">{inner}</div>;
+}
+
+/** The two ways of using the Academy, always in reach at the top of its front. */
+export function WayToggle({ way, onChoose }: { way: Way; onChoose: (w: Way) => void }) {
+  return (
+    <div className="sim-way-toggle" role="group" aria-label="How you use the Academy">
+      <button type="button" aria-pressed={way === 'simple'} onClick={() => onChoose('simple')}>Sail better</button>
+      <button type="button" aria-pressed={way === 'full'} onClick={() => onChoose('full')}>Race</button>
+    </div>
+  );
+}
+
+/** The race as it's set up, each part a button that opens its picker: your boat first. */
+export function SetupChips({ items }: { items: { what: string; value: string; onPick: () => void }[] }) {
+  return (
+    <div className="sim-chips" role="group" aria-label="Your race, as set up. Press a part to change it.">
+      {items.map(i => (
+        <button key={i.what} type="button" className="sim-chip-btn" onClick={i.onPick} title={`Change ${i.what.toLowerCase()}`}>
+          <small>{i.what}</small>{i.value}<ChevronDown size={15} aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** Back to the front of the Academy, from inside a door. */

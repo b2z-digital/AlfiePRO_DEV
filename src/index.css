@@ -507,13 +507,22 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 /* ── Sailing Academy: the layered home. Glass panels over the live render of the fleet. ── */
 .sim-glass { box-sizing: border-box; border-radius: 26px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.66); color: #F1F4FA;
   -webkit-backdrop-filter: blur(20px) saturate(1.15); backdrop-filter: blur(20px) saturate(1.15); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
-.sim-home-front { align-items: stretch; min-height: clamp(620px, calc(100vh - 8px), 960px); }
+.sim-home-front { align-items: stretch; min-height: max(620px, 100vh); min-height: max(620px, 100dvh); }
 .sim-home-front .sim-home-media { height: 100%; -webkit-mask-image: linear-gradient(180deg, #000 86%, transparent 100%); mask-image: linear-gradient(180deg, #000 86%, transparent 100%); }
 .sim-home-front .sim-home-scrim { background: linear-gradient(180deg, rgba(6, 11, 22, 0.5) 0%, rgba(6, 11, 22, 0) 22%, rgba(6, 11, 22, 0) 40%, rgba(6, 11, 22, 0.72) 100%); }
 .sim-home-front .sim-home-hero-body { display: flex; flex-direction: column; padding-top: 28px; padding-bottom: 40px; }
 .sim-brand { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding: 8px 16px 8px 10px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.6);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-.sim-front { display: flex; flex-direction: column; gap: 16px; margin-top: auto; padding-top: clamp(120px, 24vh, 280px); }
+.sim-front { display: flex; flex-direction: column; gap: 16px; margin-top: auto; padding-top: clamp(28px, 6vh, 96px); }
+.sim-front-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.sim-way-toggle { display: inline-flex; padding: 4px; gap: 2px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.6); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.sim-way-toggle button { height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: rgba(235, 240, 255, 0.78); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sim-way-toggle button[aria-pressed='true'] { background: #F1F4FA; color: #0A1226; }
+.sim-way-toggle button:focus-visible, .sim-chip-btn:focus-visible { outline: 2px solid rgba(77, 163, 255, 0.95); outline-offset: 2px; }
+.sim-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.sim-chip-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07); color: #F1F4FA; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.sim-chip-btn:hover { background: rgba(46, 123, 255, 0.22); border-color: rgba(156, 203, 255, 0.6); }
+.sim-chip-btn small { font-size: 12px; font-weight: 500; color: rgba(235, 240, 255, 0.62); }
 .sim-next { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; padding: 24px 28px; max-width: 980px; }
 .sim-next-title { margin: 6px 0 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(24px, 2.5vw, 34px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; }
 .sim-next-text { margin: 8px 0 0; max-width: 620px; font-size: 15px; line-height: 1.45; color: rgba(235, 240, 255, 0.78); }
