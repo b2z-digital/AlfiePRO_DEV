@@ -34,6 +34,7 @@ import { focusWords, raceFocus } from './focus';
 import { rehearseWords, type NextRace } from './rehearse';
 import { compassPoint } from './windWords';
 import { todaysCases } from './judge';
+import { RO_NAME, roLevel } from './ro';
 import { GRADE_NAME, passport } from './passport';
 import type { VenueDef } from '@/sim/venue';
 import type { TrainLink } from './stats';
@@ -533,7 +534,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
 
 export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, tapes = [], onWatchTape, onDeleteTape, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
-  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht') => void;
+  training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'ro') => void;
   /** "Don't show this again", for a card on this screen. */
   onDismiss?: (card: string) => void;
   /** Which part of the Academy is open: the front, or behind one of its three doors. */
@@ -610,6 +611,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   // You be the judge: today's five cases (the first is the call of the day), and how many you've called today.
   const judgeToday = useMemo(() => todaysCases(localDay()), []);
   const calledToday = (id: string) => { const r = training.judge?.[id]; return r && localDay(new Date(r.at)) === localDay() ? r : null; };
+  const roHeld = roLevel(training.ro);
   const callToday = calledToday(judgeToday[0].id);
   const judgedToday = judgeToday.filter(c => calledToday(c.id)).length;
   const [s, setS] = useState<Setup>(setup);
@@ -875,6 +877,14 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
                 <button type="button" className="sim-btn-lg sim-btn-go" onClick={world.onOpen}>Open the world</button>
               </section>
             )}
+            <section className="sim-card flex flex-wrap items-center gap-x-6 gap-y-3 p-5 sm:p-6" aria-labelledby="ro-title">
+              <div className="min-w-[240px] flex-1">
+                <Cap>Race officer</Cap>
+                <h2 id="ro-title" className="m-0 mt-1 font-display text-[20px] font-bold leading-tight tracking-tight">{roHeld ? `You're a ${RO_NAME[roHeld]}` : 'Run the racing instead of sailing it'}</h2>
+                <p className="m-0 mt-1.5 text-[13.5px] leading-snug" style={{ color: C.mute }}>Set the course for the wind on the day and call the start line. Pass each duty to step up from club to World standard.</p>
+              </div>
+              <Btn onClick={() => onOpen('ro')}>{training.ro ? 'Carry on' : 'Take the duties'}</Btn>
+            </section>
             {next && <RehearseCard {...next} race={next.race} />}
             {onBench && (
               <section className="sim-card flex flex-wrap items-center gap-x-6 gap-y-3 p-5" aria-labelledby="bench-title">

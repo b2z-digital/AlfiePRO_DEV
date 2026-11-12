@@ -30,12 +30,14 @@ import SimAcademy from './SimAcademy';
 import SimPlaybook from './SimPlaybook';
 import SimPassport from './SimPassport';
 import SimJudge from './SimJudge';
+import SimRO from './SimRO';
+import { recordDuty } from './ro';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, clearProfile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
 import { loadBlownOut, loadNextRace, type NextRace } from './rehearse';
-import { TrainingProgress, chooseWay, dismissCard, resetTraining, saveCareer, saveComfort, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
+import { TrainingProgress, chooseWay, dismissCard, resetTraining, saveCareer, saveComfort, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge, saveRo } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import SimYacht from './SimYacht';
@@ -143,7 +145,7 @@ function PageNote({ text, onClose }: { text: string; onClose: () => void }) {
   );
 }
 
-type Where = 'home' | 'career' | 'bench' | 'world' | 'year' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
+type Where = 'home' | 'career' | 'bench' | 'world' | 'year' | 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'ro' | 'yacht' | 'race' | 'debrief' | 'challenge' | 'live' | 'event';
 
 /** The race of a challenge, sailed by you: the same race as everyone's, under your own name and number. */
 function challengeSettings(c: Challenge, me: SimIdentity | null, autoTrim: boolean, yard: Yard | null): RaceSettings {
@@ -1048,6 +1050,9 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       </div>,
       document.body,
     );
+  }
+  if (where === 'ro') {
+    return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimRO record={training.ro} onBack={() => setWhere('home')} onRecord={(duty, lv, score) => trainingChanged(saveRo(recordDuty(loadTraining().ro, duty, lv, score, Date.now())))} /></div>;
   }
   if (where === 'judge') {
     return <div key={where} className="sim-zoomable h-full overflow-y-auto"><SimJudge training={training} onBack={() => setWhere('home')} onLink={openLink} onCall={(id, points) => trainingChanged(recordJudge(id, points))} /></div>;

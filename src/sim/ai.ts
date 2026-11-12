@@ -267,6 +267,8 @@ export class Skipper implements Helm {
     return null;
   }
 
+  /** Seconds early this skipper means to cross the line (set for a race officer's drill: she'll be over). */
+  eager = 0;
   constructor(public b: Boat, public lv: LevelParams, public persona: Persona, private rng: Rng, public idx: number) {
     this.meanTwd = b.twd;
     this.feltTwd = b.twd;
@@ -600,7 +602,7 @@ export class Skipper implements Helm {
     const turnT = turnDeg / Math.max(10, b.cls.maxRot * 0.7 * auth);
     const react = this.lv.reaction * (1.3 - 0.6 * this.persona.consistency);
     const ttl = react + 0.5 * turnT + timeToCover(D, b.spd, vT, accelTau(tws));
-    const margin = 0.15 + this.lv.startMargin * (0.5 + 0.5 * this.persona.startEarly);
+    const margin = 0.15 + this.lv.startMargin * (0.5 + 0.5 * this.persona.startEarly) - this.eager;
     const setupT = Math.min(pre.setupT, Math.max(8, h.gunT - 4));
 
     // ── Over the line, or too close with time to spare ──
