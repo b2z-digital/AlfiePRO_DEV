@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
-import { CLUB_SEASON, FLEET, ME, castOf, dayStandings, dayState, finishDay, fleetOf, medalCount, newCareer, rival, seasonStandings, simulateRest, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
+import { ME, QUALIFY, TIER_FLEET, castOf, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
+import type { LevelLicence, Requirement } from './programme';
 import { scoreText, type StandingRow } from './series';
 import { Brand, DoorBack } from './SimDoors';
 import SimHero from './SimHero';
@@ -14,7 +15,7 @@ import { C, Cap, Chip, cx, ordinal } from './ui';
 const SEASON_CLASSES: ClassId[] = ['IOM', 'DF95', 'DF65', '10R', 'M'];
 const DISPLAY = "'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif";
 const WIND: Record<CareerEvent['wind'], string> = { light: 'Light breeze', medium: 'Medium breeze', fresh: 'Fresh breeze' };
-const CHARACTER: Record<CareerEvent['character'], string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging one way' };
+const CHARACTER: Record<NonNullable<CareerEvent['character']>, string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging one way' };
 const METAL: Record<MedalKind, { hi: string; mid: string; lo: string; name: string }> = {
   gold: { hi: '#FFF1B8', mid: '#F2C230', lo: '#A8770A', name: 'Gold' },
   silver: { hi: '#FFFFFF', mid: '#C9D2DE', lo: '#7C8898', name: 'Silver' },
@@ -65,7 +66,7 @@ export function MedalShelf({ medals }: { medals: Medal[] }) {
       {titles.map(t => (
         <span key={`${t.season}-${t.event}`} className="inline-flex items-center gap-2">
           <PennantArt size={34} />
-          <span className="flex flex-col leading-tight"><b className="text-[14px] font-bold">Club Champion</b><span className="text-[12px]" style={{ color: C.mute }}>Season {t.season}</span></span>
+          <span className="flex flex-col leading-tight"><b className="text-[14px] font-bold">{t.event.replace('Championship', 'Champion')}</b><span className="text-[12px]" style={{ color: C.mute }}>Season {t.season}</span></span>
         </span>
       ))}
     </div>
@@ -110,7 +111,7 @@ function Sheet({ rows, me, races, sailed }: { rows: StandingRow[]; me: Me; races
   );
 }
 
-interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean }
+interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; qualified: boolean }
 
 /** The end of a race day: on a podium, the medal comes down on its ribbon; either way, where you came. */
 function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }) {
@@ -119,7 +120,7 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [onDone]);
-  const title = end.medal?.trophy ? 'Club Champion' : end.medal ? `${METAL[end.medal.kind].name} at ${end.event.name}` : `${ordinal(end.rank)} at ${end.event.name}`;
+  const title = end.medal?.trophy ? end.event.name.replace('Championship', 'Champion') : end.medal ? `${METAL[end.medal.kind].name} at ${end.event.name}` : `${ordinal(end.rank)} at ${end.event.name}`;
   return (
     <div className="sim-podium" role="dialog" aria-modal="true" aria-label={title}>
       <div className="sim-podium-inner">
@@ -133,7 +134,7 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
         <h2 className="sim-podium-title">{title}</h2>
         <p className="m-0 max-w-[520px] text-center text-[15.5px] leading-snug" style={{ color: C.mute }}>
           {end.net} point{end.net === 1 ? '' : 's'} net{end.rows[0] && end.rows[0].userId !== ME ? `; ${end.rows[0].name} won the day ${end.rows[0].net === end.net ? 'on countback' : `on ${end.rows[0].net}`}` : end.rows[1] ? `; ${end.rows[1].name} was second on ${end.rows[1].net}` : ''}.
-          {end.newSeason ? ' The season is over, and a new one begins.' : ''}
+          {end.qualified ? ' That finish qualifies you for the Regional season.' : end.newSeason ? ' The season is over, and a new one begins.' : ''}
         </p>
         <ol className="sim-podium-top">
           {end.rows.slice(0, 3).map(r => <li key={r.userId}><b className="tabular-nums">{r.rank}</b><Who id={r.userId} me={me} name={r.name} sail={r.sail} /><span className="ml-auto tabular-nums">{r.net}</span></li>)}
@@ -144,8 +145,10 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
   );
 }
 
-export default function SimCareer({ career, me, setup, classLabel, onChange, onSail, onBack }: {
+export default function SimCareer({ career, me, setup, classLabel, licence, onLicence, onChange, onSail, onBack }: {
   career: Career | null; me: Me; setup: Setup; classLabel: (c: ClassId) => string;
+  /** The licence that takes a Club skipper up to the Regional season, and the way to work on one of its requirements. */
+  licence: LevelLicence | null; onLicence: (go: Requirement['go']) => void;
   onChange: (c: Career) => void;
   /** Sail the next race of the day. */
   onSail: () => void;
@@ -156,23 +159,33 @@ export default function SimCareer({ career, me, setup, classLabel, onChange, onS
   const [cls, setCls] = useState<ClassId>(setup.classId);
   const st = useMemo(() => (career ? dayState(career) : null), [career]);
   const day = useMemo(() => (career?.day ? dayStandings(career, me) : []), [career, me]);
-  const season = useMemo(() => (career ? seasonStandings(career, me) : []), [career, me]);
+  const standing = useMemo(() => (career ? seasonStandings(career, me) : []), [career, me]);
   const rv = useMemo(() => (career ? rival(career, me) : null), [career, me]);
-  const heroSetup = useMemo(() => (career ? { ...setup, classId: career.cls, fleetSize: FLEET, level: 'club' as const } : setup), [setup, career]);
+  // The window on the water: the fleet racing where the next event is.
+  const heroSetup = useMemo((): Setup => {
+    if (!career || !st) return setup;
+    const w = st.event.water;
+    return { ...setup, classId: career.cls, fleetSize: TIER_FLEET[tierOf(career)], level: tierOf(career), windStrength: st.event.wind, ...(w ? { venue: w, windDir: 'usual' as const, windPick: st.event.picks?.[Math.min(st.day, (st.event.picks?.length ?? 1) - 1)] ?? 0, spots: {} } : {}) };
+  }, [setup, career, st]);
+  const wind = st ? eventWind(st.event, st.day) : null;
 
-  /** Close the day (simulating what's left of it first), and show how it ended. */
+  /** Simulate what's left of today; with the event's last race on the sheet, close it and show how it ended. */
   const close = (c: Career) => {
     const full = dayState(c).complete ? c : simulateRest(c, Date.now());
+    if (!dayState(full).complete) { onChange(full); return; }
     const rows = dayStandings(full, me);
     const fin = finishDay(full, me, Date.now());
     if (!fin) return;
-    const event = CLUB_SEASON[fin.result.event];
+    const event = seasonOf(c)[fin.result.event];
     const newSeason = fin.career.season !== c.season;
-    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, nextName: newSeason ? `season ${fin.career.season}` : CLUB_SEASON[Math.min(fin.career.done.length, CLUB_SEASON.length - 1)].name });
+    const season = seasonOf(fin.career);
+    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: !!fin.career.ticket && !c.ticket, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name });
     onChange(fin.career);
   };
 
-  const days = CLUB_SEASON.filter(e => e.kind === 'raceday').length;
+  const season = career ? seasonOf(career) : [], tier = career ? tierOf(career) : 'club';
+  const days = season.filter(e => e.kind !== 'championship').length;
+  const doneDays = career ? career.done.filter(d => season[d.event].kind !== 'championship').length : 0;
   return (
     <div className="sim-page min-h-full text-[14px] text-[#F1F4FA]" style={{ fontFamily: "'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
       <section className="sim-home-hero">
@@ -180,7 +193,7 @@ export default function SimCareer({ career, me, setup, classLabel, onChange, onS
         <div className="sim-home-hero-body px-4 sm:px-6 lg:px-10 xl:px-16">
           <div className="flex flex-wrap items-center gap-3"><DoorBack onHome={onBack} /><Brand /></div>
           <h1 className="sim-home-title">The AlfiePRO Circuit</h1>
-          <p className="sim-home-sub">{career ? `Season ${career.season} · Club pointscore · ${classLabel(career.cls)}` : 'A club season against a fleet of skippers with names, numbers and form of their own.'}</p>
+          <p className="sim-home-sub">{career ? `Season ${career.season} · ${tier === 'club' ? 'Club pointscore' : 'Regional season'} · ${classLabel(career.cls)}` : 'A club season against a fleet of skippers with names, numbers and form of their own.'}</p>
         </div>
       </section>
 
@@ -206,26 +219,48 @@ export default function SimCareer({ career, me, setup, classLabel, onChange, onS
           </section>
         ) : (
           <>
+            {career.ticket === 'state' && !career.day && (
+              <section className="sim-glass flex flex-col gap-3 p-5 sm:p-7" aria-labelledby="up-title" style={{ borderColor: 'rgba(242,194,48,0.45)' }}>
+                <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: '#F2C230' }}>Qualified · top {QUALIFY.club} in the Club Championship</p>
+                <h2 id="up-title" className="m-0 text-[26px] font-bold leading-tight tracking-tight" style={{ fontFamily: DISPLAY }}>The Regional season is open to you</h2>
+                <p className="m-0 max-w-[680px] text-[14.5px] leading-snug" style={{ color: C.mute }}>
+                  Three ranking regattas at Lantern Quay, Heron Reach and Kestrelwater, then two days at Aurel Lake for the Regional Championship, in fleets of sixteen.
+                  {licence && !licence.ready ? ' You\'ve earned the place on the water; your Regional licence is what\'s left.' : ' You hold the licence. You can stay for another club season first if you\'d rather.'}
+                </p>
+                {licence && !licence.ready && (
+                  <ul className="m-0 flex list-none flex-col p-0">
+                    {licence.reqs.map(r => (
+                      <li key={r.id} className="flex flex-wrap items-center gap-3 border-t border-white/[0.07] py-2.5 text-[14px]">
+                        <span className="min-w-[200px] flex-1"><b className="font-semibold">{r.label}: {r.have}</b><span className="block text-[12.5px]" style={{ color: C.mute }}>{r.met ? 'Done' : `Takes ${r.need}`}</span></span>
+                        {!r.met && <button type="button" className="sim-chip-btn" onClick={() => onLicence(r.go)}>{r.go === 'race' ? 'Race' : 'Work on it'}</button>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {(!licence || licence.ready) && <div><button type="button" className="sim-btn-lg sim-btn-go" onClick={() => onChange(moveUp(career, Date.now()))}>Start the Regional season<ArrowRight size={18} aria-hidden="true" /></button></div>}
+              </section>
+            )}
             <section className="sim-glass flex flex-col gap-4 p-5 sm:p-7" aria-labelledby="day-title">
               <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
                 <div className="min-w-[240px] flex-1">
-                  <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>{st.event.kind === 'championship' ? 'The title event' : `Race day ${st.index + 1} of ${days}`} · {career.day ? 'under way' : 'next'}</p>
+                  <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>{st.event.kind === 'championship' ? 'The title event' : `${st.event.kind === 'regatta' ? 'Ranking regatta' : 'Race day'} ${st.index + 1} of ${days}`}{st.days > 1 ? ` · day ${st.day + 1} of ${st.days}` : ''} · {career.day ? 'under way' : 'next'}</p>
                   <h2 id="day-title" className="m-0 mt-1 text-[30px] font-bold leading-none tracking-tight" style={{ fontFamily: DISPLAY }}>{st.event.name}</h2>
                   <p className="m-0 mt-2 text-[14.5px] leading-snug" style={{ color: C.mute }}>
-                    {WIND[st.event.wind]}, {CHARACTER[st.event.character]}. {st.event.races} races, {FLEET} boats. Sail at least {st.event.sail === 3 ? 'three' : st.event.sail}; the rest can be simulated from how those went.
+                    {wind ? `${wind.water}, ${wind.place.toLowerCase()}. ${wind.name}: ${WIND[st.event.wind].toLowerCase()}, ${CHARACTER[wind.character]}.` : `${WIND[st.event.wind]}, ${CHARACTER[st.event.character ?? 'oscillating']}.`} {st.days > 1 ? `${st.event.perDay} races a day over ${st.days} days` : `${st.event.races} races`}, {TIER_FLEET[tier]} boats. Sail at least {st.event.sail === 3 ? 'three' : st.event.sail}{st.days > 1 ? ' a day' : ''}; the rest can be simulated from how those went.
+                    {wind?.note ? <span className="mt-1 block" style={{ color: C.faint }}>Local knowledge: {wind.note}</span> : null}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  {st.canSimulate && <button type="button" className="sim-btn-lg" onClick={() => close(career)}>Simulate the last {st.left === 1 ? 'race' : st.left}</button>}
+                  {st.canSimulate && <button type="button" className="sim-btn-lg" onClick={() => close(career)}>Simulate {st.days > 1 ? "today's" : 'the'} last {st.leftToday === 1 ? 'race' : st.leftToday}</button>}
                   {st.left > 0
-                    ? <button type="button" className="sim-btn-lg sim-btn-go" onClick={onSail}>{career.day ? `Sail race ${st.raced + 1}` : 'Start the race day'}<ArrowRight size={18} aria-hidden="true" /></button>
+                    ? <button type="button" className="sim-btn-lg sim-btn-go" onClick={onSail}>{!career.day ? (st.event.kind === 'raceday' ? 'Start the race day' : `Start the ${st.event.kind === 'regatta' ? 'regatta' : 'Championship'}`) : st.days > 1 && st.raced > 0 && st.raced % st.event.perDay === 0 ? `Start day ${st.day + 1}: race ${st.raced + 1}` : `Sail race ${st.raced + 1}`}<ArrowRight size={18} aria-hidden="true" /></button>
                     : <button type="button" className="sim-btn-lg sim-btn-go" onClick={() => close(career)}>See how the day ended<ArrowRight size={18} aria-hidden="true" /></button>}
                 </div>
               </div>
               {career.day ? (
                 <>
-                  <Sheet rows={day} me={me} races={st.event.races} sailed={Array.from({ length: st.event.races }, (_, k) => career.day!.races[k]?.sailed)} />
-                  <p className="m-0 text-[12.5px] leading-snug" style={{ color: C.faint }}>Scored by AlfiePRO's results engine: low point, a race dropped (in brackets) once four count and two once eight do. {st.sailed < st.event.sail ? `Sail ${st.event.sail - st.sailed} more to be able to simulate the rest.` : ''}</p>
+                  <Sheet rows={day} me={me} races={Math.min(st.event.races, (st.day + 1) * st.event.perDay)} sailed={Array.from({ length: st.event.races }, (_, k) => career.day!.races[k]?.sailed)} />
+                  <p className="m-0 text-[12.5px] leading-snug" style={{ color: C.faint }}>Scored by AlfiePRO's results engine: low point, a race dropped (in brackets) once four count and two once eight do{st.event.races >= 16 ? ', three once sixteen do' : ''}. {st.leftToday > 0 && st.sailedToday < st.event.sail ? `Sail ${st.event.sail - st.sailedToday} more ${st.days > 1 ? 'today ' : ''}to be able to simulate the rest.` : ''}</p>
                 </>
               ) : (
                 <ul className="m-0 grid list-none gap-x-6 gap-y-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
@@ -237,11 +272,11 @@ export default function SimCareer({ career, me, setup, classLabel, onChange, onS
             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
               <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="ps-title">
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 id="ps-title" className="sim-h3 min-w-0 flex-1">The pointscore</h2>
-                  <Chip tone="blue">{season.length ? `${career.done.filter(d => CLUB_SEASON[d.event].kind === 'raceday').length} of ${days} race days` : 'Not started'}</Chip>
+                  <h2 id="ps-title" className="sim-h3 min-w-0 flex-1">{tier === 'club' ? 'The pointscore' : 'The ranking'}</h2>
+                  <Chip tone="blue">{standing.length ? `${doneDays} of ${days} ${tier === 'club' ? 'race days' : 'regattas'}` : 'Not started'}</Chip>
                 </div>
-                {season.length ? <Sheet rows={season} me={me} races={career.done.filter(d => CLUB_SEASON[d.event].kind === 'raceday').length} />
-                  : <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>Finish a race day and the season's table starts here: each day counts as one race, with a day dropped once four count.</p>}
+                {standing.length ? <Sheet rows={standing} me={me} races={doneDays} />
+                  : <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{tier === 'club' ? "Finish a race day and the season's table starts here: each day counts as one race, with a day dropped once four count." : 'Finish a regatta and the ranking starts here: each regatta counts as one race.'}</p>}
               </section>
               <div className="flex min-w-0 flex-col gap-5">
                 {rv && (
@@ -254,7 +289,7 @@ export default function SimCareer({ career, me, setup, classLabel, onChange, onS
                 <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="md-title">
                   <h2 id="md-title" className="sim-h3">Medals and titles</h2>
                   <MedalShelf medals={career.medals} />
-                  {career.history.length > 0 && <p className="m-0 text-[13px]" style={{ color: C.mute }}>{career.history.map(h => `Season ${h.season}: ${ordinal(h.pointscore)} in the pointscore, ${ordinal(h.championship)} in the Championship`).join('. ')}.</p>}
+                  {career.history.length > 0 && <p className="m-0 text-[13px]" style={{ color: C.mute }}>{career.history.map(h => `Season ${h.season}${h.tier === 'state' ? ' (Regional)' : ''}: ${ordinal(h.pointscore)} in the ${h.tier === 'state' ? 'ranking' : 'pointscore'}, ${ordinal(h.championship)} in the Championship`).join('. ')}.</p>}
                 </section>
                 <p className="m-0 text-[12.5px] leading-snug" style={{ color: C.faint }}>The skippers and their clubs are invented. Nothing here appears in your club's real results.</p>
               </div>

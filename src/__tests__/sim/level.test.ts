@@ -135,7 +135,8 @@ describe('The programme', () => {
 
 describe('Next up', () => {
   const sailor: TrainingProgress = { ...none, lab: Object.fromEntries(FIRST.map(m => [m.id, { won: true, tries: 1, at: 1 }])) };
-  const three = prof(race('club', 4), race('club', 5), race('club', 3));
+  // (Mid-fleet in three club races: placed, and still a Club skipper.)
+  const three = prof(race('club', 6), race('club', 7), race('club', 6));
   const args = (profile: Profile, training: TrainingProgress, o: Partial<Parameters<typeof nextUp>[0]> = {}) => {
     const st = standing(profile);
     return { profile, training, standing: st, week: weekPlan(profile, training, NOW, st), licence: levelLicence(st.level, profile, training), next: null, challenges: [], now: NOW, ...o };

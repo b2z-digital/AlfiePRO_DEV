@@ -64,6 +64,8 @@ export interface VenueDef {
   landmarks: { name: string; at: V2 }[];
   /** The map data's licence credit, shown wherever the venue is drawn. */
   credit: string;
+  /** An invented water of the AlfiePRO Circuit: not a real place, and not from a map. */
+  invented?: boolean;
   /** Half the side of the square the water was cut to (venues built from the map): shore edges along it are open water. */
   cut?: number;
   /** The clubs whose home water this is, and the venue it was built from (ids in the app's database). */
@@ -84,6 +86,9 @@ export interface VenueLook {
   /** Houses on the far shores. */
   houses: number;
 }
+
+/** The line shown wherever a venue is drawn: its map credit, or that it's invented. */
+export const creditLine = (def: VenueDef): string => (def.invented ? 'An invented water of the AlfiePRO Circuit' : `Map data ${def.credit}`);
 
 /** The winds a venue gets, the usual one first (just its usual breeze when the club hasn't said more). */
 export function windsOf(def: VenueDef): VenueWind[] {

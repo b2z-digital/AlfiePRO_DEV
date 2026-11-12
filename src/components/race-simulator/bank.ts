@@ -2,6 +2,7 @@
 // turning to follow their boat. A small perspective renderer on the 2D canvas: the sky and the far
 // banks, the pond with its puffs, ripples and waves, the buoys and the start line, and every boat
 // in 3D, heeled to the wind and moving on the waves, with mainsail and jib set to her sheet.
+import { creditLine } from '@/sim/venue';
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
 import { DEFAULT_LOOK } from '@/sim/look';
@@ -435,7 +436,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
       label(ctx, nextAt.name.replace(/^the /, ''), Math.max(60, Math.min(w - 60, ax)), ay + (ay > h / 2 ? -28 : 28), '#CFE5FF', 12);
     }
   }
-  if (race.venue && v.credit !== false) drawCredit(ctx, `Map data ${race.venue.def.credit}`, w, h);
+  if (race.venue && v.credit !== false) drawCredit(ctx, creditLine(race.venue.def), w, h);
 }
 
 /**

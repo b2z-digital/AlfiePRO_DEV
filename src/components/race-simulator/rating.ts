@@ -17,7 +17,14 @@ export const FLEET_RATING: Record<SkipperLevel, number> = { club: 900, state: 12
 export const LEVEL_FROM: Record<SkipperLevel, number> = { club: 0, state: 1100, national: 1400, world: 1700 };
 /** Where everyone starts, the races it takes to be placed, and the races that move the rating fast. */
 export const START_RATING = 1000, PLACED_AFTER = 3, FAST_RACES = 5;
-const K_FAST = 200, K = 48, FLOOR = 600, CEILING = 2400;
+const K_FAST = 400, K = 110, FLOOR = 600, CEILING = 2400;
+/**
+ * How many rating points make the odds of beating a boat ten to one. Set from the computer's
+ * skippers as measured: over twenty twelve-boat races with three boats at each level (the second
+ * tuning, 12 Nov 2026), a level beat the level below it 62% of the time (64%, 60%, 62%), two below
+ * 71% and three below 80%. With the levels 300 points apart, 1,400 gives 62%, 73% and 81%.
+ */
+export const SCALE = 1400;
 
 export const levelOf = (rating: number): SkipperLevel => (rating >= LEVEL_FROM.world ? 'world' : rating >= LEVEL_FROM.national ? 'national' : rating >= LEVEL_FROM.state ? 'state' : 'club');
 
@@ -31,7 +38,7 @@ export function beat(r: RaceSummary): number {
 }
 
 /** The share of a fleet at `fleet` rating that a skipper rated `mine` should beat. */
-export const expected = (mine: number, fleet: number): number => 1 / (1 + 10 ** ((fleet - mine) / 400));
+export const expected = (mine: number, fleet: number): number => 1 / (1 + 10 ** ((fleet - mine) / SCALE));
 
 export interface Standing {
   rating: number;

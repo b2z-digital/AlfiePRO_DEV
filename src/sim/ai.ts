@@ -49,12 +49,28 @@ export const LEVELS: Record<SkipperLevel, LevelParams> = {
 };
 
 /**
+ * The second tuning (races set up from 12 Nov 2026: `tune: 2`). In fleets of mixed levels the first
+ * tuning's Regional and National skippers finished level, and a World skipper only about four places
+ * in twelve ahead of a Club one; a rating needs each level to beat the one below. World is as it was.
+ * Below it, each level steers and trims a little looser, turns a little slower and leaves more at the
+ * marks and the laylines than it did, most at Club. Still nobody is given speed.
+ */
+export const LEVELS2: Record<SkipperLevel, LevelParams> = {
+  club: { ...LEVELS.club, noise: 7, trimNoise: 0.24, tackRudder: 0.52, layMargin: 9, layClear: 1.05, roundIn: 2.15, roundOut: 1.35, shiftThr: 4.5, minTack: 4.5, startSigma: 1.1 },
+  state: { ...LEVELS.state, noise: 4.2, trimNoise: 0.135, tackRudder: 0.66, layMargin: 5.6, layClear: 0.72, roundIn: 1.88, roundOut: 1.05, shiftThr: 5.8, minTack: 5.5 },
+  national: { ...LEVELS.national, noise: 2.7, trimNoise: 0.088, tackRudder: 0.78, layMargin: 3.9, layClear: 0.52, roundIn: 1.72, roundOut: 0.9, shiftThr: 7 },
+  world: { ...LEVELS.world },
+};
+/** The levels for a race's tuning. */
+export const levelsFor = (tune?: number): Record<SkipperLevel, LevelParams> => (tune === 2 ? LEVELS2 : LEVELS);
+
+/**
  * A club fleet's sharp starters: every club has two or three who start like state sailors (they
  * read the line, fight for the end that pays and are on it at the gun), while the rest of their
  * sailing is club sailing.
  */
-export function sharpStarter(lv: LevelParams): LevelParams {
-  const st = LEVELS.state;
+export function sharpStarter(lv: LevelParams, tune?: number): LevelParams {
+  const st = levelsFor(tune).state;
   return lv.startSense >= st.startSense ? lv : { ...lv, startSense: 0.75, startSigma: st.startSigma, lineSigma: st.lineSigma, startMargin: st.startMargin };
 }
 
@@ -75,9 +91,10 @@ const NO_STRENGTHS: Strengths = { start: 0, speed: 0, tactics: 0, marks: 0, rule
  * past the ends of the ladder it's a little over half a step more of the same. Nobody is given
  * speed: a "fast" skipper steers straighter and trims closer, which is all a fast skipper is.
  */
-export function ownLevel(level: SkipperLevel, s: Strengths): LevelParams {
-  const i = LEVEL_ORDER.indexOf(level), base = LEVELS[level], out = { ...base };
-  const up = i < 3 ? LEVELS[LEVEL_ORDER[i + 1]] : null, down = i > 0 ? LEVELS[LEVEL_ORDER[i - 1]] : null;
+export function ownLevel(level: SkipperLevel, s: Strengths, tune?: number): LevelParams {
+  const L = levelsFor(tune);
+  const i = LEVEL_ORDER.indexOf(level), base = L[level], out = { ...base };
+  const up = i < 3 ? L[LEVEL_ORDER[i + 1]] : null, down = i > 0 ? L[LEVEL_ORDER[i - 1]] : null;
   for (const area of Object.keys(AREAS) as (keyof Strengths)[]) {
     const v = clamp(s[area], -1.4, 1.4);
     if (!v) continue;

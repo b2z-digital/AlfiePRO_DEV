@@ -28,6 +28,9 @@ export interface RaceSettings {
   crew?: CrewMember[];
   /** Which seat in the crew is sailing on this device. */
   seat?: number;
+  /** Which tuning of the computer's skippers the race was set up with, kept with the race so a replay or a
+   *  ghost sails as it did. Not set: the first. 2: the four levels sit further apart (see LEVELS2 in ai.ts). */
+  tune?: number;
   /** A career event: the computer's skippers by name, in boat order after yours. Each carries her own
    *  number and hull colour, and sails at her own level (not given: the fleet's). */
   cast?: { name: string; sail: string; hull?: string; level?: SkipperLevel }[];

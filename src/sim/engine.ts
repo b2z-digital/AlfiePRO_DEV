@@ -3,7 +3,7 @@
 // collisions → start/rounding/finish progress → referee → recording.
 
 import { cleanLook, clearOf, sailNumber } from './look';
-import { AiHost, Helm, LEVELS, PERSONAS, Perceived, Skipper, ownLevel, sharpStarter, strengthsFor } from './ai';
+import { AiHost, Helm, PERSONAS, levelsFor, Perceived, Skipper, ownLevel, sharpStarter, strengthsFor } from './ai';
 import { CLASSES, RIG_POWER, bestSheet, iomRig, overpowerEase, rigDrive, rigPower, runPower, vmgAngles } from './classes';
 import { Clearing, sailClear, startClearing } from './clear';
 import { Course, buildCourse, fromCourse, initialProgress, toCourse } from './course';
@@ -262,9 +262,9 @@ export class Race implements AiHost {
         // starters, tight rounders, shift readers, quick boats; some on it and some not. (Drawn
         // apart from everything else, so the rest of the race is laid out as it always was.)
         persona!.strengths = strengthsFor(persona!, new Rng(s.seed * 131 + i * 7919 + 17));
-        const own = ownLevel(cm?.level ?? s.level, persona!.strengths);
+        const own = ownLevel(cm?.level ?? s.level, persona!.strengths, s.tune);
         // (Every fourth skipper of a club fleet is one of its sharp starters.)
-        const lv = i % 4 === 1 ? sharpStarter(own) : own;
+        const lv = i % 4 === 1 ? sharpStarter(own, s.tune) : own;
         persona!.startSense = lv.startSense;
         const sk = new Skipper(b, lv, persona!, new Rng(s.seed * 31 + i * 977), i);
         if (s.forgetfulSkippers && this.rng.chance(lv.forget * 2)) this.forgot.add(b.id);
@@ -575,7 +575,7 @@ export class Race implements AiHost {
       const b = this.boats[c.boat];
       const persona = { ...(PERSONAS.find(p => p.key === 'steady') ?? PERSONAS[0]) };
       b.persona = persona;
-      this.skippers[c.boat] = new Skipper(b, LEVELS[this.settings.level], persona, new Rng(this.settings.seed * 31 + c.boat * 977), c.boat);
+      this.skippers[c.boat] = new Skipper(b, levelsFor(this.settings.tune)[this.settings.level], persona, new Rng(this.settings.seed * 31 + c.boat * 977), c.boat);
     }
   }
 
