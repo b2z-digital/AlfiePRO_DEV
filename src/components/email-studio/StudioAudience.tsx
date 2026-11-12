@@ -10,6 +10,9 @@ import {
   type AudienceCount, type HomeData, type MemberLite, type SegmentRow, type SegmentRule,
 } from './api';
 import { Confirm } from './ui';
+
+/** Current as the Members pages count it: financial, and the renewal date hasn't passed. */
+const isCurrent = (m: MemberLite) => !!m.is_financial && (!m.renewal_date || m.renewal_date >= new Date().toLocaleDateString('en-CA'));
 import { toneStyle } from './StudioHome';
 import { emptyDoc } from '../../lib/emailStudio/catalog';
 
@@ -104,7 +107,7 @@ const Profile: React.FC<{ m: MemberLite; onClose: () => void }> = ({ m, onClose 
             <div className="a-display es-ink" style={{ fontSize: 19, fontWeight: 600 }}>{name}</div>
             <div className="es-dim" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email || 'No email address'}</div>
             <div className="es-chips" style={{ marginTop: 8, gap: 6 }}>
-              <span className={`es-pill ${m.membership_status === 'active' ? 'es-live' : 'es-draft'}`}>{m.membership_status === 'active' ? 'Current member' : m.membership_status === 'expired' ? 'Lapsed' : m.membership_status || 'Member'}</span>
+              <span className={`es-pill ${isCurrent(m) ? 'es-live' : 'es-draft'}`}>{isCurrent(m) ? 'Current member' : 'Lapsed'}</span>
               {m.membership_level && <span className="es-pill">{m.membership_level}</span>}
               <span className={`es-pill ${m.user_id ? 'es-auto' : ''}`}>{m.user_id ? 'Uses AlfiePRO' : 'Not signed in yet'}</span>
             </div>
@@ -288,7 +291,7 @@ export const StudioAudience: React.FC = () => {
               <button key={m.id} type="button" className="es-person" onClick={() => setOpen(m)}>
                 <span className="es-av" style={{ background: avatarColour(m.id) }}>{initialsOf(m.first_name, m.last_name)}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>{`${m.first_name || ''} ${m.last_name || ''}`.trim() || m.email}<small style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email || 'No email address'}</small></span>
-                {!m.email ? <span className="es-pill es-bad">No email</span> : m.membership_status === 'active' ? null : <span className="es-pill es-draft">{m.membership_status === 'expired' ? 'Lapsed' : m.membership_status}</span>}
+                {!m.email ? <span className="es-pill es-bad">No email</span> : isCurrent(m) ? null : <span className="es-pill es-draft">Lapsed</span>}
                 {m.user_id && <span className="es-pill es-auto">AlfiePRO</span>}
               </button>
             ))}
