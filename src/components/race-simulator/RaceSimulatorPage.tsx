@@ -19,7 +19,7 @@ import SimBench from './SimBench';
 import SimWorld from './SimWorld';
 import { alpha2 } from './flags';
 import { standing } from './rating';
-import { clubName, isWorld, listWorld, myResults, mySkipper, saveSkipper, skippersOf, stopAppearing, syncSkipperStats, worldNow, worldTable, type Skipper, type WorldEvent, type WorldResult } from './world';
+import { clubName, clubTable, isWorld, listWorld, myResults, worldMedals, mySkipper, saveSkipper, skippersOf, stopAppearing, syncSkipperStats, worldNow, worldTable, type Skipper, type WorldEvent, type WorldResult } from './world';
 import { FLEET_NAME } from './heats';
 import { levelLicence } from './programme';
 import { ME, TIERS, abandonRace, wonPaints, careerRace, heatNow, prepareRace, dayStandings, dayState, newCareer, raceRows, recordRace, type Career } from './career';
@@ -490,9 +490,10 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   // What the world's tables show beside your name: your level and rating once placed, and your medals.
   const worldStats = useMemo(() => {
     const st = standing(profile, !!training.newcomer);
-    const medals = training.career?.medals ?? [];
-    return { rating: st.placed ? st.rating : null, level: st.placed ? st.level : null, medals: medals.length, titles: medals.filter(m => m.trophy).length };
-  }, [profile, training.newcomer, training.career]);
+    // Medals from the Circuit and the world (a World Regatta or Major podium); titles: Circuit Championships and Majors won.
+    const medals = training.career?.medals ?? [], wm = worldMedals(worldResults);
+    return { rating: st.placed ? st.rating : null, level: st.placed ? st.level : null, medals: medals.length + wm.length, titles: medals.filter(m => m.trophy).length + wm.filter(m => m.trophy).length };
+  }, [profile, training.newcomer, training.career, worldResults]);
   useEffect(() => { if (userId && skipper) void syncSkipperStats({ userId, clubId }, skipper, worldStats); }, [userId, clubId, skipper, worldStats]);
   // The world's card in the Race door: shown once the world has races (they open only when it's switched on).
   const worldCard = useMemo(() => {
@@ -896,7 +897,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       <div key={where} className="h-full overflow-y-auto">
         <SimWorld setup={setup} cls={setup.classId} events={world ?? []} skipper={userId ? skipper : undefined} signedIn={!!userId}
           ownName={me?.name ?? null} club={clubId ? { id: clubId, name: worldClub } : null} country={alpha2(lookFor(yard, setup.classId).country)}
-          results={worldResults} loadTable={worldTable} loadFlags={skippersOf}
+          results={worldResults} loadTable={worldTable} loadClubs={clubTable} loadFlags={skippersOf}
           onAppear={async a => {
             if (!userId) return 'Sign in to AlfiePRO first.';
             const r = await saveSkipper({ userId, clubId }, a, worldStats);

@@ -33,7 +33,7 @@ export interface RaceSettings {
   tune?: number;
   /** A career event: the computer's skippers by name, in boat order after yours. Each carries her own
    *  number and hull colour, and sails at her own level (not given: the fleet's). */
-  cast?: { id?: string; name: string; sail: string; hull?: string; level?: SkipperLevel }[];
+  cast?: { id?: string; name: string; sail: string; hull?: string; level?: SkipperLevel; /** Her country's sail letters ("NOR"). */ country?: string }[];
   laps: number;
   length: CourseLength;
   sequenceSeconds: number;    // start sequence length
@@ -134,6 +134,8 @@ export interface Boat {
   persona?: Persona;
   /** Her own finish, when her skipper has designed one (the player, or someone in a live race). */
   look?: BoatLook;
+  /** The country letters on her sail, when she's one of a career's cast (otherwise her look's, or AUS). */
+  country?: string;
 
   // dynamics
   x: number; y: number;

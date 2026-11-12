@@ -240,7 +240,7 @@ export class Race implements AiHost {
       const own = isPlayer && !crew && cls.id === 'IOM' && s.rig ? s.rig : null;
       if (persona && i >= personas.length) persona.startEnd = Math.max(0.05, Math.min(0.95, persona.startEnd + this.rng.range(-0.15, 0.15)));
       const b: Boat = {
-        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : cm?.name ?? persona!.name, color: look?.hull ?? cm?.hull ?? BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona, look,
+        id: `b${i}`, sail, name: isCrew ? crew![i].name : isPlayer ? s.player?.name || 'You' : cm?.name ?? persona!.name, color: look?.hull ?? cm?.hull ?? BOAT_COLORS[i % BOAT_COLORS.length], isPlayer, human: isPlayer || isCrew, cls, persona, look, ...(cm?.country ? { country: cm.country } : {}),
         x: p.x, y: p.y, hdg, spd: 0.3 * cls.hullSpeed, rot: 0, rudder: 0, sheet: 0.6, heel: 0, heelRate: 0, luffUp: 0, rigPower: own ? RIG_POWER[own] : rigPower(cls.id, kn0), rig: cls.id === 'IOM' ? own ?? iomRig(kn0) : undefined, rigDrive: own ? rigDrive(own, kn0) : 1, sheetFelt: 0.6, runPower: own ? RIG_POWER[own] : runPower(kn0), dive: 0, pitch: 0,
         twd: c.axis, tws: this.wind.baseTws, twa: n180(c.axis - hdg), tack: n180(c.axis - hdg) >= 0 ? 'stbd' : 'port', targetSpd: 0, shadow: 0,
         tackingSince: null, lastHtwT: -99, lastTackFrom: null, lastGybeT: -99,

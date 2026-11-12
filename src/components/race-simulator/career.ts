@@ -435,7 +435,7 @@ export function careerRace(career: Career, base: RaceSettings): RaceSettings {
     ...base, classId: career.cls, fleetSize: others.length + 1, level: tierOf(career),
     windStrength: event.wind, windCharacter: wind?.character ?? event.character ?? 'oscillating', windKnots: undefined,
     ...(wind ? { venue: event.water, windFrom: wind.from, venueSpot: undefined } : {}),
-    cast: others.map(castOf).filter((m): m is CastMember => !!m).map(m => ({ id: m.id, name: m.name, sail: m.sail, hull: m.hull, level: m.level })),
+    cast: others.map(castOf).filter((m): m is CastMember => !!m).map(m => ({ id: m.id, name: m.name, sail: m.sail, hull: m.hull, level: m.level, country: m.country })),
     seed: (career.season * 100003 + index * 1009 + no * 31 + (hn?.heat ? hn.heat.charCodeAt(0) * 7 : 0) + [17, 7001, 9001, 11003][TIERS.indexOf(tierOf(career))]) >>> 0,
     // An IOM on a fresh day without the B rig: the A rig, overpowered. Otherwise the right rig for the breeze.
     rig: career.cls === 'IOM' && event.wind === 'fresh' && !owns(career, 'rigB') ? 'A' : undefined,

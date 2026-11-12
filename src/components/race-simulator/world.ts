@@ -39,7 +39,38 @@ export interface TableRow {
   rating: number | null; level: SkipperLevel | null; medals: number; titles: number;
 }
 
-export interface WorldResult { event_id: string; kind: WorldKind; class_id: ClassId; place: number; of_n: number; points: number; closed_at: string }
+export interface WorldResult { event_id: string; kind: WorldKind; class_id: ClassId; place: number; of_n: number; points: number; closed_at: string; /** The event's title ("The Perth Major"). */ title?: string | null }
+
+/** A club's line in the club-against-club table. */
+export interface ClubRow { pos: number; club_id: string; club_name: string; points: number; weeks: number; skippers: number; best_week: number }
+
+/** A medal won in the world: a podium in a World Regatta or a Major (the daily race gives none); winning a Major is a title too. */
+export interface WorldMedal { kind: 'gold' | 'silver' | 'bronze'; event: string; cls: ClassId; at: number; major: boolean; trophy: boolean; eventId: string }
+
+/** Your world medals from your results, newest first. */
+export function worldMedals(results: WorldResult[] | null | undefined): WorldMedal[] {
+  return (results ?? [])
+    .filter(r => r.kind !== 'daily' && r.place >= 1 && r.place <= 3)
+    .map(r => ({
+      kind: r.place === 1 ? 'gold' : r.place === 2 ? 'silver' : 'bronze',
+      event: r.title ?? KIND_NAME[r.kind], cls: r.class_id, at: Date.parse(r.closed_at),
+      major: r.kind === 'major', trophy: r.kind === 'major' && r.place === 1, eventId: r.event_id,
+    }) as WorldMedal)
+    .sort((a, b) => b.at - a.at);
+}
+
+/** The periods the club table is shown for (UTC, as the world's weeks are): last week's regattas, this month, last month (its winner: the club of the month), and the last twelve months. */
+export type ClubPeriod = 'week' | 'month' | 'lastMonth' | 'year';
+export function clubPeriod(p: ClubPeriod, now = Date.now()): { from: number; to: number } {
+  const d = new Date(now);
+  const month = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  const nextMonth = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  // A week's World Regattas close on the Monday after, and are scored then: last week's are those scored since this Monday.
+  if (p === 'week') { const m = isoWeek(now).monday; return { from: m, to: m + 7 * 86400000 }; }
+  if (p === 'month') return { from: month, to: nextMonth };
+  if (p === 'lastMonth') return { from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1), to: month };
+  return { from: now - 365 * 86400000, to: now + 86400000 };
+}
 
 export const KIND_NAME: Record<WorldKind, string> = { daily: 'Daily race', regatta: 'World Regatta', major: 'Major' };
 /** World points for first place, before the size of the field is counted (as in the database). */
@@ -196,6 +227,16 @@ export async function worldTable(o: { cls: ClassId | null; country?: string | nu
   } catch { return null; }
 }
 
+/** Club against club: each club's best five World Regatta results a week, added up over the period. */
+export async function clubTable(o: { from: number; to: number; cls: ClassId | null; limit?: number }): Promise<ClubRow[] | null> {
+  try {
+    const supabase = await db();
+    const { data, error } = await supabase.rpc('sim_club_table', { p_from: new Date(o.from).toISOString(), p_to: new Date(o.to).toISOString(), p_class: o.cls, p_limit: o.limit ?? 100 });
+    if (error) return null;
+    return ((data ?? []) as ClubRow[]).map(r => ({ ...r, pos: Number(r.pos), points: Number(r.points), weeks: Number(r.weeks), skippers: Number(r.skippers), best_week: Number(r.best_week) }));
+  } catch { return null; }
+}
+
 /** The name of a club you're in (to offer showing it with your name). */
 export async function clubName(clubId: string): Promise<string | null> {
   try {
@@ -205,12 +246,13 @@ export async function clubName(clubId: string): Promise<string | null> {
   } catch { return null; }
 }
 
-/** Your own world results, newest first. */
-export async function myResults(a: Account, limit = 30): Promise<WorldResult[] | null> {
+/** Your own world results, newest first, with each event's title (enough to count your world medals). */
+export async function myResults(a: Account, limit = 400): Promise<WorldResult[] | null> {
   try {
     const supabase = await db();
-    const { data, error } = await supabase.from('sim_world_results').select('event_id, kind, class_id, place, of_n, points, closed_at').eq('user_id', a.userId).order('closed_at', { ascending: false }).limit(limit);
+    const { data, error } = await supabase.from('sim_world_results').select('event_id, kind, class_id, place, of_n, points, closed_at, sim_events(title)').eq('user_id', a.userId).order('closed_at', { ascending: false }).limit(limit);
     if (error) return null;
-    return (data ?? []) as WorldResult[];
+    type Row = Omit<WorldResult, 'title'> & { sim_events: { title: string } | { title: string }[] | null };
+    return ((data ?? []) as unknown as Row[]).map(({ sim_events: ev, ...r }) => ({ ...r, title: (Array.isArray(ev) ? ev[0]?.title : ev?.title) ?? null }));
   } catch { return null; }
 }
