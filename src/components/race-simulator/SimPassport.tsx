@@ -1,5 +1,6 @@
 // The skill passport: each part of racing, what you've been giving away and which way it's going,
 // and a grade for how you stand against the fleets you race.
+import { levelName } from './rating';
 import { useState } from 'react';
 import { CAUSE_WORDS, per, rate, type Cause } from './ledger';
 import { focusPlay, focusWords, ledgerRaces, raceFocus } from './focus';
@@ -175,7 +176,7 @@ export default function SimPassport({ profile, onBack, onLink, onPlay }: { profi
                       const v = rate(r.ledger!);
                       return (
                         <tr key={r.at} className="border-t border-white/[0.06]">
-                          <td className="py-2 pr-3">{day(r.at)} <span style={{ color: C.faint }}>· {r.level}, {r.fleet} boats</span></td>
+                          <td className="py-2 pr-3">{day(r.at)} <span style={{ color: C.faint }}>· {levelName(r.level)}, {r.fleet} boats</span></td>
                           {pp.skills.map(s => <td key={s.part} className="py-2 pr-3 text-right">{n1(Math.round(v[s.part as Cause] * 10) / 10)}</td>)}
                           <td className="py-2 text-right font-semibold">{n1(Math.round(v.total * 10) / 10)}</td>
                         </tr>

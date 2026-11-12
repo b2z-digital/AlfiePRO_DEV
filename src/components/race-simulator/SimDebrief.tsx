@@ -1,5 +1,6 @@
 // After the race: where you finished and how places changed by mark, a replay of the whole race
 // with your track and the winner's, three things to work on, your rules incidents, and the numbers.
+import { levelName } from './rating';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Race } from '@/sim/engine';
 import type { RaceSummary, TrainLink } from './stats';
@@ -320,7 +321,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
   const pct = (v: number | null) => (v === null ? '–' : `${Math.round(v * 100)}%`);
 
   return (
-    <Page onBack={onHome} title={sum.mode === 'start' ? 'Start report' : 'Race debrief'} text={`${sum.title} · ${sum.cls} · ${sum.level[0].toUpperCase()}${sum.level.slice(1)} skippers · ${sum.wind}`}
+    <Page onBack={onHome} title={sum.mode === 'start' ? 'Start report' : 'Race debrief'} text={`${sum.title} · ${sum.cls} · ${levelName(sum.level)} skippers · ${sum.wind}`}
       side={<Btn primary onClick={onAgain}>{sum.mode === 'start' ? 'Try another start' : challenge ? challenge.againLabel ?? 'Sail it again' : 'Race again'}</Btn>}>
 
         {challenge && (

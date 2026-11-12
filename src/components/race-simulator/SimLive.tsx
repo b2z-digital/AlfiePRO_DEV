@@ -1,5 +1,6 @@
 // A live race room: the code to share, the race the host has set up, who's in and who's ready, and
 // the host's Start. Everyone's screen goes to the race together when the host starts it.
+import { levelName } from './rating';
 import { useEffect, useReducer, useState } from 'react';
 import { VENUES } from '@/sim/venues';
 import { CLASSES } from '@/sim/classes';
@@ -22,7 +23,7 @@ function details(s: RoomSettings): string[] {
     `${wind}, ${s.windCharacter}`,
     cap(sea),
     `${s.laps} lap${s.laps === 1 ? '' : 's'}, ${s.length} course`,
-    `${s.fleetSize} boats, AI skippers at ${cap(s.level)} level`,
+    `${s.fleetSize} boats, AI skippers at ${levelName(s.level)} level`,
     `${s.sequenceSeconds >= 120 ? `${Math.round(s.sequenceSeconds / 60)} minute` : `${s.sequenceSeconds} second`} start`,
   ];
 }

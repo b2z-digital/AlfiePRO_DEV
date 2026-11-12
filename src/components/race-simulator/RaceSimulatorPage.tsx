@@ -12,6 +12,7 @@ import { CLASSES, type ClassId } from '@/sim/classes';
 import type { Outcome, SceneSpec } from '@/sim/training';
 import { DRILLS, FIRST, LAB, LAB_GROUPS, MODULES, findDrill, findMoment, findScene } from '@/sim/training';
 import SimHome, { DEFAULT_SETUP, Setup } from './SimHome';
+import type { Door } from './SimDoors';
 import SimRace, { ActiveScene, SimView } from './SimRace';
 import SimDebrief, { TrainLink } from './SimDebrief';
 import SimTrainer from './SimTrainer';
@@ -24,7 +25,7 @@ import type { RaceSummary } from './stats';
 import { Profile, loadProfile, mergeRaces, saveRace } from './profile';
 import { focusResult, raceFocus, type Focus } from './focus';
 import { loadNextRace, type NextRace } from './rehearse';
-import { TrainingProgress, dismissCard, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
+import { TrainingProgress, chooseWay, dismissCard, loadTraining, recordAnswer, recordScene, saveTraining, recordJudge } from './progress';
 import { Account, clearRaces, pullRaces, pushRace, syncTraining } from './sync';
 import { SimIdentity, loadIdentity } from './identity';
 import SimYacht from './SimYacht';
@@ -157,6 +158,8 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
 export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimulatorPageProps) {
   void darkMode; // the simulator is always on the water: one dark look
   const [where, setWhere] = useState<Where>('home');
+  // Which of the Academy's doors is open (it's kept while you're off in a race or a drill).
+  const [door, setDoor] = useState<Door>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
   const [run, setRun] = useState<{
     /** The one thing this race is for (a race you set up yourself, once you have a ledger to pick it from). */
@@ -764,7 +767,7 @@ export default function RaceSimulatorPage({ darkMode, account = null }: RaceSimu
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
-        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
+        training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} onWay={w => trainingChanged(chooseWay(w))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}
         events={userId ? events : null} onEvent={e => { setOpenEv(e); setWhere('event'); }} onCreateEvent={setEvent}
