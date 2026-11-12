@@ -92,6 +92,8 @@ export interface SimRaceProps {
   raceTitle?: string;
   /** The starting signal: a first try at an event race starts here. */
   onGun?: () => void;
+  /** You've finished (the results are up), whether or not you go on to the debrief: a Circuit race is put on the day's sheet here. Once a race. */
+  onResult?: (race: Race) => void;
   /** The one thing this race is for: shown and said as it opens. */
   focus?: Focus | null;
   /** Scenes: a result to record, watch the right way, the next one. */
@@ -130,7 +132,7 @@ function urgency(c: Cue, T: number): number {
   return 1;
 }
 
-export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, raceTitle, onGun, focus = null }: SimRaceProps) {
+export default function SimRace({ settings, scene, mode, coach, onCoachChange, view, onViewChange, onHome, onDebrief, onAgain, onSceneResult, onSceneWatch, onSceneNext, resume, ghost, sequence = null, live, liveCode, raceTitle, onGun, onResult, focus = null }: SimRaceProps) {
   const built = useMemo(() => {
     if (!scene) return null;
     const b = buildScene(scene.spec.scene(scene.seed), scene.seed, scene.watch ? scene.spec.solution : undefined);
@@ -383,6 +385,10 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
 
   // Called once, at the gun.
   const gunRef = useRef(onGun);
+  // Called once, when the results first come up.
+  const resultRef = useRef(onResult);
+  resultRef.current = onResult;
+  const reported = useRef(false);
   const handleEvents = useCallback(() => {
     const p = race.player;
     const evs = race.events;
@@ -565,6 +571,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
             const mine = p ? race.results().find(r => r.boat === p) : null;
             const title = mode === 'start' ? 'Start report' : mine && mine.status === 'finished' ? `You finished ${ordinal(mine.place)}` : 'Results';
             setResults({ rows: resultRows(), live: !race.ended && mode === 'race', title });
+            if (mode === 'race' && !reported.current) { reported.current = true; resultRef.current?.(race); }
             if (race.ended || startDone) st.ended = true;
           }
         }

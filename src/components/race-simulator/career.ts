@@ -429,6 +429,21 @@ export function recordRace(career: Career, rows: RowResult[], now: number): Care
   return { ...paid, day: { ...day, races: [...day.races, { no: day.races.length + 1, sailed: true, rows }] }, at: now };
 }
 
+/**
+ * You left a race after the gun, before the finish: it counts, as a DNF for you, and the rest of the
+ * fleet finishes as they would have (each by her strength, with a race's luck). So walking away from
+ * a bad race can't take it back. `castIds`: the race's other boats (its cast), in boat order.
+ */
+export function abandonRace(career: Career, castIds: string[], now: number): Career {
+  const st = dayState(career);
+  if (career.day && st.left === 0) return career;
+  const salt = (career.day?.races.length ?? 0) + (career.day?.heat?.sails.length ?? 0);
+  const rng = new Rng((career.season * 7919 + st.index * 131 + salt * 17 + 424243) >>> 0);
+  const order = castIds.filter(id => id !== ME).map(id => ({ id, v: castStrength(id) + rng.gauss() * SPREAD })).sort((a, z) => z.v - a.v);
+  const rows: RowResult[] = [{ id: ME, place: null, code: 'DNF' }, ...order.map((x, k) => ({ id: x.id, place: k + 1, code: null }))];
+  return recordRace(career, rows, now);
+}
+
 export interface DayState {
   event: CareerEvent; index: number;
   /** Races you've sailed in the event, races on its sheet, and races still to go in it. */
