@@ -365,8 +365,11 @@ export function idMarks(cls: ClassId, kind: 'main' | 'jib', luffLen: number, cho
     if (!fits()) for (const hh of R.num >= 0.1 && R.numLow < 0.09 ? [0.088, R.numLow] : [R.numLow]) { h = hh; if (fits()) break; }
     out.push({ what: 'number', side: 'stbd', text, h, space: R.space, z: base + 1.5 * h + rows }, { what: 'number', side: 'port', text, h, space: R.space, z: base + 0.5 * h });
     if (kind === 'main' && country) {
-      let hl = R.letters, under = R.letterRows, between = R.letterRows;
+      // A clear gap between the numbers and the letters under them: twice the usual where the sail has room.
+      let hl = R.letters, under = 2 * R.letterRows, between = R.letterRows;
       const ok = () => base - under - between - 2 * hl >= low;
+      if (!ok()) under = 1.5 * R.letterRows;
+      if (!ok()) under = R.letterRows;
       if (!ok()) under = R.letterRowsMin;
       if (!ok()) between = R.letterRowsMin;
       if (!ok()) hl = R.lettersLow;
@@ -732,7 +735,8 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
         const ux = (pu.x - p0.x) / 100, uy = (pu.y - p0.y) / 100;
         const vx = -(pv.x - p0.x) / 100, vy = -(pv.y - p0.y) / 100;
         ctx.fillStyle = p.ink;
-        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.22) * shown;
+        // (Showing through from the other face: faint, so the near side's marks read cleanly.)
+        ctx.globalAlpha = p.alpha * (vis ? 0.92 : 0.12) * shown;
         ctx.font = `800 100px ${FONT}`;
         ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
         let x = (-wide / 2 + lead) * fitK;
