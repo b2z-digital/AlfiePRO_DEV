@@ -101,6 +101,7 @@ Thank you.
               .from('members')
               .select('id, first_name, last_name, email, avatar_url, user_id, club_id, club')
               .in('club_id', clubIds)
+              .is('archived_at', null)
               .order('first_name', { ascending: true });
 
             if (error) throw error;
@@ -176,6 +177,7 @@ Thank you.
           .from('members')
           .select('id, first_name, last_name, email, avatar_url, user_id')
           .eq('club_id', clubId)
+          .is('archived_at', null)
           .order('first_name', { ascending: true });
 
         if (error) throw error;
