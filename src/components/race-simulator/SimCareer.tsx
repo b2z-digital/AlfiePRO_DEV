@@ -7,6 +7,7 @@ import type { ClassId } from '@/sim/classes';
 import type { Region } from '@/sim/venue';
 import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
 import { regattaReport } from './report';
+import type { Tape } from './broadcast';
 import type { TrainLink } from './stats';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
@@ -130,7 +131,7 @@ function Sheet({ rows, me, races, sailed, heats }: { rows: StandingRow[]; me: Me
   );
 }
 
-interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null; earned: Earned; report: Report }
+interface Ending { /** When the event's day began (its kept races are from then on). */ startedAt?: number; event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null; earned: Earned; report: Report }
 
 /** What you and your rival remember: your record, and the last time you met. */
 function RivalMemory({ name, record, season }: { name: string; record: HeadToHead; season: number }) {
@@ -162,7 +163,7 @@ function ReportBody({ report, onLink, compact }: { report: Report; onLink?: (l: 
 
 /** The end of a race day: on a podium, the medal comes down on its ribbon; either way, where you came. */
 // The report's practice link is on the Circuit screen behind the podium, so here it only reads.
-function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }) {
+function DayEnd({ end, me, onDone, tape, onWatch }: { end: Ending; me: Me; onDone: () => void; /** Your best race of the event, kept as a tape, to watch as a broadcast. */ tape?: Tape | null; onWatch?: (t: Tape) => void }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' || e.key === 'Enter') onDone(); };
     window.addEventListener('keydown', key);
@@ -198,7 +199,10 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
           <p className="m-0 mb-2 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: C.blueSoft }}><AlfieOrb size={18} />Alfie's report</p>
           <ReportBody report={end.report} />
         </section>
-        <button type="button" className="sim-btn-lg sim-btn-go" autoFocus onClick={onDone}>On to {end.nextName}<ArrowRight size={18} aria-hidden="true" /></button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {tape && onWatch && <button type="button" className="sim-btn-lg" onClick={() => onWatch(tape)}>Watch {tape.kind === 'title' ? 'the final' : 'your race'} as a broadcast</button>}
+          <button type="button" className="sim-btn-lg sim-btn-go" autoFocus onClick={onDone}>On to {end.nextName}<ArrowRight size={18} aria-hidden="true" /></button>
+        </div>
       </div>
     </div>
   );
@@ -265,7 +269,9 @@ function Budget({ career, classLabel, onBuy }: { career: Career; classLabel: (c:
   );
 }
 
-export default function SimCareer({ career, me, home, setup, classLabel, licence, onLicence, onLink, onChange, onSail, onBack }: {
+export default function SimCareer({ career, me, home, setup, classLabel, licence, onLicence, onLink, onChange, onSail, onBack, tapes, onWatchTape }: {
+  /** Races kept as tapes (podiums), and watching one as a broadcast. */
+  tapes?: Tape[]; onWatchTape?: (t: Tape) => void;
   career: Career | null; me: Me; setup: Setup; classLabel: (c: ClassId) => string;
   /** Your home state, from your club's water: where a new Regional season is sailed (null: nothing to go on). */
   home?: Region | null;
@@ -307,7 +313,7 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
     const newSeason = fin.career.season !== c.season;
     const season = seasonOf(fin.career);
     const report = regattaReport(full, fin.career, rows, fin.result, fin.medal);
-    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, earned: fin.earned, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name, report });
+    setEnd({ startedAt: full.day?.startedAt, event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, earned: fin.earned, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name, report });
     onChange(keepReport(fin.career, report));
   };
 
@@ -441,7 +447,8 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
           </>
         )}
       </div>
-      {end && <DayEnd end={end} me={me} onDone={() => setEnd(null)} />}
+      {end && <DayEnd end={end} me={me} onDone={() => setEnd(null)} onWatch={onWatchTape}
+        tape={(tapes ?? []).filter(tp => tp.event === end.event.name && tp.at >= (end.startedAt ?? 0)).sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || b.at - a.at)[0] ?? null} />}
     </div>
   );
 }
