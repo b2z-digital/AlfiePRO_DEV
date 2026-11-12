@@ -471,7 +471,7 @@ function poseOf(race: Race, b: Boat, bx: number, by: number, bh: number, spd: nu
     // Diving, she pivots about a point well forward: the bow goes under a little and the stern lifts a lot.
     heel, pitch: live ? b.pitch : 0, heave: live ? Math.sin(-b.pitch * DEG) * b.cls.loa * 0.2 : 0, dive: live ? b.dive : 0,
     sd: set.sd, boom: set.boom, jib: set.jib, luff: set.luff,
-    color: b.color, ink: b.isPlayer ? '#14327A' : '#151A22', deck: t.deck,
+    color: b.color, ink: b.isPlayer ? '#14327A' : '#151A22', deck: b.look?.deck ?? t.deck, bottom: b.look?.bottom,
     // Her own finish when she has one; your boat before you've designed her is the blue she always was.
     ...(b.look ? { luffTape: b.look.jibLuff, patch: b.look.patch, hatch: b.look.deckPatch }
       : b.isPlayer ? { luffTape: DEFAULT_LOOK.jibLuff, patch: DEFAULT_LOOK.patch }

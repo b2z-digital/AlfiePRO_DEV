@@ -98,7 +98,7 @@ export default function YachtStage({ cls, look, sail, part = 'all', inset, still
         cls: W.cls, rig: 'A', x: 0, y: 0, hdg: 0,
         heel: 9 + Math.sin(t * 0.9) * 1.6, pitch: Math.sin(t * 0.7 + 1) * 1.1, heave: Math.sin(t * 1.1) * 0.006,
         sd: -1, boom: 13, jib: 15, luff: 0,
-        color: hull, luffTape: W.look.jibLuff, patch: W.look.patch, hatch: W.look.deckPatch, ink: '#14327A', deck: tr.deck,
+        color: hull, luffTape: W.look.jibLuff, patch: W.look.patch, hatch: W.look.deckPatch, ink: '#14327A', deck: W.look.deck ?? tr.deck, bottom: W.look.bottom,
         sail: W.sail, country: W.look.country ?? 'AUS', spd: 0, hullSpeed: 1, isPlayer: true, alpha: 1,
       };
       // The camera looks at a point on her centreline from `dist` away, round at `yaw`, down by `pitch`.

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
-import { ME, QUALIFY, TIERS, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
+import { ME, QUALIFY, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type Me, type Medal, type MedalKind } from './career';
 import type { LevelLicence, Requirement } from './programme';
 import { FLEET_NAME } from './heats';
 import { scoreText, type StandingRow } from './series';
@@ -123,7 +123,7 @@ function Sheet({ rows, me, races, sailed, heats }: { rows: StandingRow[]; me: Me
   );
 }
 
-interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null }
+interface Ending { event: CareerEvent; rank: number; of: number; net: number; medal: Medal | null; rows: StandingRow[]; nextName: string; newSeason: boolean; /** The season above it opens: its name. */ qualified: string | null; earned: Earned }
 
 /** The end of a race day: on a podium, the medal comes down on its ribbon; either way, where you came. */
 function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }) {
@@ -148,12 +148,80 @@ function DayEnd({ end, me, onDone }: { end: Ending; me: Me; onDone: () => void }
           {end.net} point{end.net === 1 ? '' : 's'} net{end.rows[0] && end.rows[0].userId !== ME ? `; ${end.rows[0].name} won the day ${end.rows[0].net === end.net ? 'on countback' : `on ${end.rows[0].net}`}` : end.rows[1] ? `; ${end.rows[1].name} was second on ${end.rows[1].net}` : ''}.
           {end.qualified ? ` That finish qualifies you for the ${end.qualified} season.` : end.newSeason ? ' The season is over, and a new one begins.' : ''}
         </p>
+        {(end.earned.prize > 0 || end.earned.goals.length > 0 || end.earned.unlocked.length > 0) && (
+          <ul className="sim-podium-earned" aria-label="What it earned">
+            {end.earned.prize > 0 && <li><b>{money(end.earned.prize)}</b> prize money</li>}
+            {end.earned.goals.map(g => <li key={g.id}><b>{money(g.pay)}</b> from your sponsor: {g.text.toLowerCase()}</li>)}
+            {end.earned.unlocked.map(u => <li key={u}><b>Won</b> {UNLOCK_NAME(u)}{u.startsWith('paint:') ? ', a colour only champions have' : ''}: in Design your yacht</li>)}
+          </ul>
+        )}
         <ol className="sim-podium-top">
           {end.rows.slice(0, 3).map(r => <li key={r.userId}><b className="tabular-nums">{r.rank}</b><Who id={r.userId} me={me} name={r.name} sail={r.sail} /><span className="ml-auto tabular-nums">{r.net}</span></li>)}
         </ol>
         <button type="button" className="sim-btn-lg sim-btn-go" autoFocus onClick={onDone}>On to {end.nextName}<ArrowRight size={18} aria-hidden="true" /></button>
       </div>
     </div>
+  );
+}
+
+const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString()}`;
+
+/** Your money on the Circuit: the balance, this season's sponsor and their goals, the shop, and the latest comings and goings. */
+function Budget({ career, classLabel, onBuy }: { career: Career; classLabel: (c: ClassId) => string; onBuy: (id: string) => void }) {
+  const cash = moneyOf(career), d = dealOf(career), sp = SPONSORS[d.tier];
+  const items = SHOP.filter(it => !it.classes || it.classes.includes(career.cls));
+  return (
+    <section className="sim-card flex flex-col gap-4 p-5" aria-labelledby="budget-title">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 id="budget-title" className="sim-h3 min-w-0 flex-1">Your budget</h2>
+        <span className="text-[24px] font-bold tabular-nums" style={{ fontFamily: DISPLAY, color: cash < 0 ? '#FF9F9F' : '#F1F4FA' }}>{money(cash)}</span>
+      </div>
+      {cash < 0 && <p className="m-0 -mt-2 text-[12.5px] leading-snug" style={{ color: '#FFB4B4' }}>An entry you couldn't cover: your next winnings pay it off first.</p>}
+      <div className="flex flex-col gap-1.5">
+        <Cap>Sponsor · {sp.name}</Cap>
+        <p className="m-0 text-[12.5px]" style={{ color: C.faint }}>Invented: {sp.what}, for this season. Pays for each goal met.</p>
+        <ul className="m-0 flex list-none flex-col p-0">
+          {sp.goals.map(g => {
+            const met = d.met.includes(g.id);
+            return (
+              <li key={g.id} className="flex items-center gap-2.5 border-t border-white/[0.06] py-2 text-[13.5px]">
+                <span aria-hidden="true" className={cx('flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold', met ? 'bg-[rgba(126,226,168,0.2)] text-[#7EE2A8]' : 'bg-white/[0.08] text-white/40')}>{met ? '✓' : ''}</span>
+                <span className="min-w-0 flex-1" style={{ color: met ? C.mute : undefined }}>{g.text}</span>
+                <span className="tabular-nums font-semibold" style={{ color: met ? C.faint : '#F1F4FA' }}>{money(g.pay)}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Cap>For your boat</Cap>
+        <p className="m-0 text-[12.5px]" style={{ color: C.faint }}>Paint and kit every class allows. Nothing here makes a boat faster.</p>
+        <ul className="m-0 flex list-none flex-col p-0">
+          {items.map(it => {
+            const have = owns(career, it.id);
+            return (
+              <li key={it.id} className="flex flex-wrap items-center gap-3 border-t border-white/[0.06] py-2.5">
+                <span className="min-w-[180px] flex-1">
+                  <span className="block text-[14px] font-semibold">{it.name}{it.classes ? ` (${it.classes.map(classLabel).join(', ')})` : ''}</span>
+                  <span className="block text-[12.5px] leading-snug" style={{ color: C.mute }}>{it.text}{it.wonBy && !have ? ` Or win it: ${it.wonBy.toLowerCase()}.` : ''}</span>
+                </span>
+                {have ? <span className="text-[13px] font-semibold text-[#7EE2A8]">Yours</span>
+                  : <button type="button" className="sim-chip-btn" disabled={cash < it.price} style={cash < it.price ? { opacity: 0.45, cursor: 'not-allowed' } : undefined} onClick={() => onBuy(it.id)}>Buy {money(it.price)}</button>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {(career.ledger?.length ?? 0) > 0 && (
+        <details className="text-[13px]">
+          <summary className="cursor-pointer font-semibold" style={{ color: C.blueSoft }}>Comings and goings</summary>
+          <ul className="m-0 mt-2 flex list-none flex-col gap-1 p-0">
+            {career.ledger!.slice(0, 8).map((e, k) => <li key={k} className="flex gap-3"><span className="min-w-0 flex-1" style={{ color: C.mute }}>{e.text}</span><span className="tabular-nums" style={{ color: e.amount < 0 ? '#FFB4B4' : '#7EE2A8' }}>{e.amount < 0 ? '−' : '+'}${Math.abs(e.amount).toLocaleString()}</span></li>)}
+          </ul>
+        </details>
+      )}
+      <p className="m-0 text-[12px]" style={{ color: C.faint }}>Game money only. Nothing is ever bought with real money.</p>
+    </section>
   );
 }
 
@@ -193,7 +261,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
     const event = seasonOf(c)[fin.result.event];
     const newSeason = fin.career.season !== c.season;
     const season = seasonOf(fin.career);
-    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name });
+    setEnd({ event, rank: fin.result.rank, of: rows.length, net: fin.result.net, medal: fin.medal, rows, newSeason, qualified: fin.career.ticket && fin.career.ticket !== c.ticket ? TIER_NAME[fin.career.ticket] : null, earned: fin.earned, nextName: newSeason ? `season ${fin.career.season}` : season[Math.min(fin.career.done.length, season.length - 1)].name });
     onChange(fin.career);
   };
 
@@ -272,7 +340,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
                 <div className="flex flex-wrap items-center gap-2.5">
                   {st.canSimulate && <button type="button" className="sim-btn-lg" onClick={() => close(career)}>Simulate {st.days > 1 ? "today's" : 'the'} last {st.leftToday === 1 ? 'race' : st.leftToday}</button>}
                   {st.left > 0
-                    ? <button type="button" className="sim-btn-lg sim-btn-go" onClick={onSail}>{!career.day ? (st.event.kind === 'raceday' ? 'Start the race day' : `Start the ${st.event.kind === 'regatta' ? 'regatta' : 'Championship'}`) : hn ? `Sail round ${hn.round}${hn.heat ? `, ${hn.finals ? `${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}` : ''}` : st.days > 1 && st.raced > 0 && st.raced % st.event.perDay === 0 ? `Start day ${st.day + 1}: race ${st.raced + 1}` : `Sail race ${st.raced + 1}`}<ArrowRight size={18} aria-hidden="true" /></button>
+                    ? <button type="button" className="sim-btn-lg sim-btn-go" onClick={onSail}>{!career.day ? (st.event.kind === 'raceday' ? 'Start the race day' : `Start the ${st.event.kind === 'regatta' ? 'regatta' : 'Championship'}${st.event.fee ? ` · entry ${money(st.event.fee)}` : ''}`) : hn ? `Sail round ${hn.round}${hn.heat ? `, ${hn.finals ? `${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}` : ''}` : st.days > 1 && st.raced > 0 && st.raced % st.event.perDay === 0 ? `Start day ${st.day + 1}: race ${st.raced + 1}` : `Sail race ${st.raced + 1}`}<ArrowRight size={18} aria-hidden="true" /></button>
                     : <button type="button" className="sim-btn-lg sim-btn-go" onClick={() => close(career)}>See how the day ended<ArrowRight size={18} aria-hidden="true" /></button>}
                 </div>
               </div>
@@ -306,6 +374,7 @@ export default function SimCareer({ career, me, setup, classLabel, licence, onLi
                     <p className="m-0 text-[13.5px] leading-snug" style={{ color: C.mute }}>{rv.gap === 0 ? 'Level with you' : `${rv.gap} point${rv.gap === 1 ? '' : 's'} ${rv.ahead ? 'ahead of' : 'behind'} you`} in the {tier === 'club' ? 'pointscore' : 'ranking'}. {rv.skipper.country}, sail {rv.skipper.sail}.</p>
                   </section>
                 )}
+                <Budget career={career} classLabel={classLabel} onBuy={id => onChange(buy(career, id, Date.now()))} />
                 <section className="sim-card flex flex-col gap-3 p-5" aria-labelledby="md-title">
                   <h2 id="md-title" className="sim-h3">Medals and titles</h2>
                   <MedalShelf medals={career.medals} />

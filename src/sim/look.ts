@@ -23,6 +23,8 @@ export function cleanLook(x: unknown, base: BoatLook = DEFAULT_LOOK): BoatLook |
     patch: { style: p.style === 'solid' ? 'solid' : 'fingers', one, two },
     deckPatch: hex(o.deckPatch, base.deckPatch ?? '#262C36'),
     country: country.length === 3 ? country : base.country,
+    ...(typeof o.deck === 'string' && HEX.test(o.deck) ? { deck: o.deck.toUpperCase() } : {}),
+    ...(typeof o.bottom === 'string' && HEX.test(o.bottom) ? { bottom: o.bottom.toUpperCase() } : {}),
   };
 }
 
