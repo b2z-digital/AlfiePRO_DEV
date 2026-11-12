@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { Region } from '@/sim/venue';
-import { dayWeatherOf, raceConditions, ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
+import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
 import { regattaReport } from './report';
 import type { Tape } from './broadcast';
 import type { TrainLink } from './stats';
@@ -18,6 +18,7 @@ import { Brand, DoorBack } from './SimDoors';
 import SimHero from './SimHero';
 import type { Setup } from './SimHome';
 import { AlfieOrb, C, Cap, Chip, cx, ordinal } from './ui';
+import { dayWeatherOf, raceConditions } from './career';
 import { KIND_SAY, conditionsLine, trendLine, type DayWeather, type RaceConditions } from './conditions';
 
 const SEASON_CLASSES: ClassId[] = ['IOM', 'DF95', 'DF65', '10R', 'M'];
