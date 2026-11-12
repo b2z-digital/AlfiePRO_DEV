@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import type { ClassId } from '@/sim/classes';
 import type { Region } from '@/sim/venue';
-import { ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
+import { dayWeatherOf, raceConditions, ME, QUALIFY, defending, SHOP, SPONSORS, TIERS, UNLOCK_NAME, buy, dealOf, moneyOf, owns, type Earned, TIER_FLEET, TIER_NAME, castOf, dayHeats, heatNow, dayStandings, dayState, eventWind, finishDay, fleetOf, keepReport, medalCount, moveUp, newCareer, rival, seasonOf, seasonStandings, simulateRest, tierOf, type Career, type CareerEvent, type HeadToHead, type Me, type Medal, type MedalKind, type Report } from './career';
 import { regattaReport } from './report';
 import type { Tape } from './broadcast';
 import type { TrainLink } from './stats';
@@ -18,6 +18,7 @@ import { Brand, DoorBack } from './SimDoors';
 import SimHero from './SimHero';
 import type { Setup } from './SimHome';
 import { AlfieOrb, C, Cap, Chip, cx, ordinal } from './ui';
+import { KIND_SAY, conditionsLine, trendLine, type DayWeather, type RaceConditions } from './conditions';
 
 const SEASON_CLASSES: ClassId[] = ['IOM', 'DF95', 'DF65', '10R', 'M'];
 /** What the season above holds, in a line. */
@@ -32,7 +33,6 @@ const HEAT_LINE: Record<string, string> = {
   shrs: 'Structured Heat Racing (SHRS), run by AlfiePRO\'s heat system: qualifying heats reshuffled each round by the movement tables, then finals in Gold, Silver, Bronze and Copper fleets that stay together. The small letter is the heat or fleet (A Gold, B Silver, C Bronze, D Copper).',
 };
 const DISPLAY = "'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif";
-const WIND: Record<CareerEvent['wind'], string> = { light: 'Light breeze', medium: 'Medium breeze', fresh: 'Fresh breeze' };
 const CHARACTER: Record<NonNullable<CareerEvent['character']>, string> = { steady: 'steady', oscillating: 'shifty', puffy: 'gusty', persistent: 'swinging one way' };
 const METAL: Record<MedalKind, { hi: string; mid: string; lo: string; name: string }> = {
   gold: { hi: '#FFF1B8', mid: '#F2C230', lo: '#A8770A', name: 'Gold' },
@@ -211,6 +211,27 @@ function DayEnd({ end, me, onDone, tape, onWatch }: { end: Ending; me: Me; onDon
 const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString()}`;
 
 /** Your money on the Circuit: the balance, this season's sponsor and their goals, the shop, and the latest comings and goings. */
+const WIND_TINT: Record<RaceConditions['wind'], string> = { light: '#7CC4FF', medium: '#4DA3FF', fresh: '#FF9F43' };
+const WIND_SHORT: Record<RaceConditions['wind'], string> = { light: 'Light', medium: 'Medium', fresh: 'Fresh' };
+const SEA_SHORT: Record<RaceConditions['sea'], string> = { flat: 'flat', chop: 'chop', rough: 'rough' };
+/** The day's weather race by race: what each race is sailed in, the next one picked out. */
+function DayForecast({ weather, first, next, word }: { weather: DayWeather; first: number; next: number | null; word: string }) {
+  return (
+    <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="The forecast, race by race">
+      {weather.races.map((r, k) => {
+        const no = first + k, isNext = no === next, done = next !== null ? no < next : true;
+        return (
+          <li key={no} className={cx('flex min-w-[64px] flex-col items-center rounded-xl border px-2 py-1.5 text-center', isNext ? 'border-[#F1F4FA] bg-white/[0.08]' : 'border-white/[0.08] bg-white/[0.03]', done && !isNext && 'opacity-55')}>
+            <span className="text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: C.faint }}>{word} {no}</span>
+            <span className="mt-0.5 flex items-center gap-1 text-[13px] font-semibold"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: WIND_TINT[r.wind] }} />{WIND_SHORT[r.wind]}</span>
+            <span className="text-[11.5px]" style={{ color: C.mute }}>{SEA_SHORT[r.sea]}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function Budget({ career, classLabel, onBuy }: { career: Career; classLabel: (c: ClassId) => string; onBuy: (id: string) => void }) {
   const cash = moneyOf(career), d = dealOf(career), sp = SPONSORS[d.tier];
   const items = SHOP.filter(it => !it.classes || it.classes.includes(career.cls));
@@ -301,6 +322,10 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
     return { ...setup, classId: career.cls, fleetSize: TIER_FLEET[tierOf(career)], level: tierOf(career) as Setup['level'], windStrength: st.event.wind, ...(w ? { venue: w, windDir: 'usual' as const, windPick: st.event.picks?.[Math.min(st.day, (st.event.picks?.length ?? 1) - 1)] ?? 0, spots: {} } : {}) };
   }, [setup, career, st]);
   const wind = st ? eventWind(st.event, st.day) : null;
+  // Today's weather, race by race, and the next race's.
+  const nextNo = st && st.left > 0 ? (hn ? hn.round : st.raced + 1) : null;
+  const today = career && st ? dayWeatherOf(career, st.day, setup.venue) : null;
+  const nextCond = career && nextNo !== null ? raceConditions(career, nextNo, setup.venue) : null;
 
   /** Simulate what's left of today; with the event's last race on the sheet, close it and show how it ended. */
   const close = (c: Career) => {
@@ -380,8 +405,9 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                   <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>{st.event.kind === 'championship' ? 'The title event' : `${st.event.kind === 'regatta' ? 'Ranking regatta' : 'Race day'} ${st.index + 1} of ${days}`}{st.days > 1 ? ` · day ${st.day + 1} of ${st.days}` : ''} · {career.day ? 'under way' : 'next'}</p>
                   <h2 id="day-title" className="m-0 mt-1 text-[30px] font-bold leading-none tracking-tight" style={{ fontFamily: DISPLAY }}>{st.event.name}</h2>
                   <p className="m-0 mt-2 text-[14.5px] leading-snug" style={{ color: C.mute }}>
-                    {wind ? `${wind.water}, ${wind.place.toLowerCase()}. ${wind.name}: ${WIND[st.event.wind].toLowerCase()}, ${CHARACTER[wind.character]}.` : `${WIND[st.event.wind]}, ${CHARACTER[st.event.character ?? 'oscillating']}.`} {st.days > 1 ? `${st.event.perDay} ${st.event.heat ? 'rounds' : 'races'} a day over ${st.days} days` : `${st.event.races} races`}, {st.event.entries ?? TIER_FLEET[tier]} boats{st.event.heat ? ` in ${st.event.heat.heats} heats under ${st.event.heat.system.toUpperCase()}` : ''}. Sail at least {st.event.sail === 3 ? 'three' : st.event.sail}{st.days > 1 ? ' a day' : ''}; the rest can be simulated from how those went.
+                    {wind ? `${wind.water}, ${wind.place.toLowerCase()}. ${wind.name}, ${CHARACTER[wind.character]}.` : `The breeze ${CHARACTER[st.event.character ?? 'oscillating']}.`} {st.days > 1 ? `${st.event.perDay} ${st.event.heat ? 'rounds' : 'races'} a day over ${st.days} days` : `${st.event.races} races`}, {st.event.entries ?? TIER_FLEET[tier]} boats{st.event.heat ? ` in ${st.event.heat.heats} heats under ${st.event.heat.system.toUpperCase()}` : ''}. Sail at least {st.event.sail === 3 ? 'three' : st.event.sail}{st.days > 1 ? ' a day' : ''}; the rest can be simulated from how those went.
                     {wind?.note ? <span className="mt-1 block" style={{ color: C.faint }}>Local knowledge: {wind.note}</span> : null}
+                    {today && <span className="mt-1 block" style={{ color: C.faint }}>{KIND_SAY[today.kind]}</span>}
                     {hn && (
                       <span className="mt-2 block font-semibold text-[#F1F4FA]">
                         Round {hn.round} of {hn.rounds}{hn.finals ? ' · finals' : st.event.heat?.system === 'shrs' ? ' · qualifying' : ''}: you're in {hn.finals ? `the ${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}{hn.ids.length ? `, ${hn.ids.length} boats` : ''}.
@@ -396,6 +422,15 @@ export default function SimCareer({ career, me, home, setup, classLabel, licence
                     : <button type="button" className="sim-btn-lg sim-btn-go" onClick={() => close(career)}>See how the day ended<ArrowRight size={18} aria-hidden="true" /></button>}
                 </div>
               </div>
+              {today && (
+                <div className="flex flex-col gap-2">
+                  <p className="m-0 text-[13.5px] font-semibold">
+                    {st.days > 1 ? `Day ${st.day + 1}'s weather` : "The day's weather"}{trendLine(today) ? <span className="font-normal" style={{ color: C.mute }}> · {trendLine(today)}</span> : null}
+                    {nextCond && <span className="ml-1 font-normal" style={{ color: C.mute }}> · next, {st.event.heat ? 'round' : 'race'} {nextNo}: <b className="text-[#F1F4FA]">{conditionsLine(nextCond)}</b></span>}
+                  </p>
+                  <DayForecast weather={today} first={st.day * st.event.perDay + 1} next={nextNo} word={st.event.heat ? 'Round' : 'Race'} />
+                </div>
+              )}
               {career.day ? (
                 <>
                   <Sheet rows={day} me={me} races={st.event.heat ? st.raced : Math.min(st.event.races, (st.day + 1) * st.event.perDay)} sailed={st.event.heat ? undefined : Array.from({ length: st.event.races }, (_, k) => career.day!.races[k]?.sailed)} heats={heats} />

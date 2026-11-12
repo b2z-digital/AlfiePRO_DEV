@@ -22,6 +22,7 @@ import { STANDARD_DROPS, standings, type SeriesRace, type StandingRow } from './
 import type { Cause } from './ledger';
 import type { TrainLink } from './stats';
 import { WON_COLOURS } from './yacht';
+import { dayWeather, kindOf, type DayWeather, type RaceConditions } from './conditions';
 import { SPREAD, heatOf, heatStandings, heatState, simulateUntil, type HeatLog, type HeatSpec } from './heats';
 
 /** The seasons of the Circuit: the club's, then Regional, National and World, each earned from the one below. */
@@ -451,20 +452,38 @@ function payEntry(c: Career, event: CareerEvent, now: number): Career {
 }
 
 /** The settings for the next race of the day: your set-up, with the day's fleet (in a heat event, your heat), water, breeze and its own seed. */
+/**
+ * The weather on a day of the event you're in (0 is its first day): its own breeze, building or
+ * easing through the day as the water allows (see conditions.ts). `venue`: the water a club season is
+ * sailed on (an event on the Circuit's waters has its own).
+ */
+export function dayWeatherOf(career: Career, dayNo: number, venue?: string | null): DayWeather {
+  const { event, index } = eventAt(career);
+  const seed = (career.season * 7919 + index * 104729 + dayNo * 1299709 + TIERS.indexOf(tierOf(career)) * 15485863 + 77) >>> 0;
+  return dayWeather(seed, kindOf(event.water ?? venue), event.perDay, event.wind);
+}
+/** The conditions for race (or round) `no` of the event you're in, counting from 1. */
+export function raceConditions(career: Career, no: number, venue?: string | null): RaceConditions {
+  const { event } = eventAt(career);
+  const d = Math.floor((no - 1) / event.perDay);
+  return dayWeatherOf(career, d, venue).races[(no - 1) % event.perDay];
+}
+
 export function careerRace(career: Career, base: RaceSettings): RaceSettings {
   const { event, index } = eventAt(career);
   const hn = heatNow(career);
   const no = hn ? hn.round : (career.day?.races.length ?? 0) + 1;
   const wind = eventWind(event, Math.floor((no - 1) / event.perDay));
+  const cond = raceConditions(career, no, base.venue);
   const others = hn ? hn.ids.filter(id => id !== ME) : career.fleet.slice(0, TIER_FLEET[tierOf(career)] - 1);
   return {
     ...base, classId: career.cls, fleetSize: others.length + 1, level: tierOf(career),
-    windStrength: event.wind, windCharacter: wind?.character ?? event.character ?? 'oscillating', windKnots: undefined,
+    windStrength: cond.wind, seaState: cond.sea, windCharacter: wind?.character ?? event.character ?? 'oscillating', windKnots: undefined,
     ...(wind ? { venue: event.water, windFrom: wind.from, venueSpot: undefined } : {}),
     cast: others.map(castOf).filter((m): m is CastMember => !!m).map(m => ({ id: m.id, name: m.name, sail: m.sail, hull: m.hull, level: m.level, country: m.country })),
     seed: (career.season * 100003 + index * 1009 + no * 31 + (hn?.heat ? hn.heat.charCodeAt(0) * 7 : 0) + [17, 7001, 9001, 11003][TIERS.indexOf(tierOf(career))]) >>> 0,
     // An IOM on a fresh day without the B rig: the A rig, overpowered. Otherwise the right rig for the breeze.
-    rig: career.cls === 'IOM' && event.wind === 'fresh' && !owns(career, 'rigB') ? 'A' : undefined,
+    rig: career.cls === 'IOM' && cond.wind === 'fresh' && !owns(career, 'rigB') ? 'A' : undefined,
     crew: undefined, seat: undefined, noPlayer: undefined, windShifts: undefined, lineBias: undefined, flatWind: undefined,
   };
 }

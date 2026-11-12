@@ -30,6 +30,7 @@ import SimAcademy from './SimAcademy';
 import SimPlaybook from './SimPlaybook';
 import SimPassport from './SimPassport';
 import SimJudge from './SimJudge';
+import { conditionsLine } from './conditions';
 import SimLab from './SimLab';
 import type { RaceSummary } from './stats';
 import { Profile, clearProfile, loadProfile, mergeRaces, saveRace } from './profile';
@@ -638,7 +639,10 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       const seq = chosenSequence(list, setup.startSeq, setup.sequenceSeconds);
       const base = toSettings({ ...setup, classId: career.cls }, 'race', null, me, seq, yardNow.current);
       const day = dayState(career), hn = heatNow(career);
-      setRun({ settings: careerRace(career, base), mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), career: true, title: hn ? `${day.event.name} · Round ${hn.round} of ${hn.rounds}, ${hn.finals ? `${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}` : `${day.event.name} · Race ${day.raced + 1} of ${day.event.races}` });
+      const cs = careerRace(career, base);
+      // The race's conditions in its title, so you see them before the start.
+      const cond = conditionsLine({ wind: cs.windStrength, sea: cs.seaState ?? 'flat' });
+      setRun({ settings: cs, mode: 'race', key: Date.now(), sequence: seq, focus: raceFocus(loadProfile()), career: true, title: `${hn ? `${day.event.name} · Round ${hn.round} of ${hn.rounds}, ${hn.finals ? `${FLEET_NAME[hn.heat as 'A'] ?? hn.heat} fleet` : `heat ${hn.heat}`}` : `${day.event.name} · Race ${day.raced + 1} of ${day.event.races}`} · ${cond}` });
       setRunView(setup.view);
       setWhere('race');
     });
