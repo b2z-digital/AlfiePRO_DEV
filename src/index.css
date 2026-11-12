@@ -504,56 +504,75 @@ button:hover > .sim-set-icon { border-color: rgba(77, 163, 255, 0.55); backgroun
 .sim-btn-go { padding: 0 26px; border-color: transparent; background: linear-gradient(180deg, #2A93FF, #0A78F0); color: #fff; font-weight: 700; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 8px 22px rgba(10, 132, 255, 0.38); }
 .sim-btn-go:hover { background: linear-gradient(180deg, #40A0FF, #1384FF); }
 
-/* ── Sailing Academy: the layered home. Glass panels over the live render of the fleet. ── */
+/* ── Sailing Academy: the layered home. The live render fills the window; one glass deck sits at its
+   foot, the full width of the page, with what's next across the top and the ways in beneath it. Sizes
+   follow the window, so it reads the same on a phone, a laptop and a large monitor. ── */
 .sim-glass { box-sizing: border-box; border-radius: 26px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.66); color: #F1F4FA;
   -webkit-backdrop-filter: blur(20px) saturate(1.15); backdrop-filter: blur(20px) saturate(1.15); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
-.sim-home-front { align-items: stretch; min-height: clamp(620px, calc(100vh - 8px), 960px); }
-.sim-home-front .sim-home-media { height: 100%; -webkit-mask-image: linear-gradient(180deg, #000 86%, transparent 100%); mask-image: linear-gradient(180deg, #000 86%, transparent 100%); }
-.sim-home-front .sim-home-scrim { background: linear-gradient(180deg, rgba(6, 11, 22, 0.5) 0%, rgba(6, 11, 22, 0) 22%, rgba(6, 11, 22, 0) 40%, rgba(6, 11, 22, 0.72) 100%); }
-.sim-home-front .sim-home-hero-body { display: flex; flex-direction: column; padding-top: 28px; padding-bottom: 40px; }
+.sim-home-front { align-items: stretch; min-height: max(560px, 100vh); min-height: max(560px, 100dvh); }
+.sim-home-front .sim-home-media { height: 100%; -webkit-mask-image: none; mask-image: none; }
+/* The foot of the render darkens into the page, so the deck belongs to the water it sits on. */
+.sim-home-front .sim-home-scrim { background: linear-gradient(180deg, rgba(6, 11, 22, 0.42) 0%, rgba(6, 11, 22, 0) 16%, rgba(6, 11, 22, 0) 46%, rgba(6, 11, 22, 0.55) 72%, #060B16 100%); }
+.sim-home-front .sim-home-hero-body { display: flex; flex-direction: column; padding-top: clamp(16px, 2.4vh, 28px); padding-bottom: clamp(16px, 3vh, 36px); }
 .sim-brand { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; padding: 8px 16px 8px 10px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.6);
   -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-.sim-front { display: flex; flex-direction: column; gap: 16px; margin-top: auto; padding-top: clamp(120px, 24vh, 280px); }
-.sim-next { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; padding: 24px 28px; max-width: 980px; }
-.sim-next-title { margin: 6px 0 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(24px, 2.5vw, 34px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; }
-.sim-next-text { margin: 8px 0 0; max-width: 620px; font-size: 15px; line-height: 1.45; color: rgba(235, 240, 255, 0.78); }
-.sim-next-go { height: 54px; padding: 0 26px; font-size: 16.5px; }
-.sim-next-big .sim-next-title { font-size: clamp(27px, 2.9vw, 40px); }
-.sim-next-big .sim-next-text { font-size: 17px; }
-.sim-next-big .sim-next-go { height: 62px; padding: 0 32px; font-size: 19px; border-radius: 18px; }
-.sim-doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.sim-door { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 172px; padding: 22px 24px; overflow: hidden; text-align: left; font-family: inherit; cursor: pointer; transition: background .16s ease, border-color .16s ease, transform .16s ease; }
-.sim-door:hover { background: rgba(14, 24, 52, 0.78); border-color: rgba(156, 203, 255, 0.5); transform: translateY(-2px); }
-.sim-door:focus-visible, .sim-way:focus-visible, .sim-quiet:focus-visible, .sim-door-back:focus-visible, .sim-link:focus-visible { outline: 2px solid rgba(77, 163, 255, 0.95); outline-offset: 2px; }
-.sim-door-title { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(26px, 2.4vw, 34px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.sim-front { display: flex; flex-direction: column; gap: 12px; margin-top: auto; padding-top: clamp(20px, 5vh, 72px); }
+.sim-front-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.sim-way-toggle { display: inline-flex; padding: 4px; gap: 2px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(8, 14, 32, 0.6); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+.sim-way-toggle button { height: 34px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: rgba(235, 240, 255, 0.78); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sim-way-toggle button[aria-pressed='true'] { background: #F1F4FA; color: #0A1226; }
+
+/* The deck: one frosted panel. Its rows and cells are divided by hairlines (the 1px gaps let the lighter ground through). */
+.sim-deck { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1px; overflow: hidden; border-radius: clamp(20px, 1.8vw, 30px); border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.1); color: #F1F4FA;
+  -webkit-backdrop-filter: blur(22px) saturate(1.15); backdrop-filter: blur(22px) saturate(1.15); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+.sim-deck > *:not(.sim-deck-cells), .sim-cell { background: rgba(8, 14, 32, 0.74); }
+.sim-deck-row, .sim-next, .sim-cell { box-sizing: border-box; padding: clamp(18px, 1.7vw, 30px) clamp(18px, 2vw, 34px); }
+.sim-deck-cells { display: grid; gap: 1px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
+.sim-next { display: flex; flex-wrap: wrap; align-items: center; gap: 18px clamp(20px, 3vw, 56px); }
+.sim-next-title { margin: 6px 0 0; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(24px, 2.3vw, 44px); font-weight: 700; letter-spacing: -0.02em; line-height: 1.08; }
+.sim-next-text { margin: 8px 0 0; max-width: 62ch; font-size: clamp(14.5px, 0.95vw, 18px); line-height: 1.45; color: rgba(235, 240, 255, 0.78); }
+.sim-next-go { height: clamp(52px, 3.6vw, 66px); padding: 0 clamp(24px, 2vw, 38px); font-size: clamp(16px, 1.1vw, 20px); border-radius: clamp(14px, 1vw, 20px); }
+.sim-next-big .sim-next-title { font-size: clamp(26px, 2.6vw, 48px); }
+.sim-next-big .sim-next-text { font-size: clamp(16px, 1.05vw, 19px); }
+.sim-cell { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; overflow: hidden; border: 0; color: #F1F4FA; text-align: left; font-family: inherit; }
+.sim-door { cursor: pointer; transition: background .16s ease; }
+.sim-door:hover { background: rgba(22, 44, 96, 0.82); }
+.sim-door:focus-visible { outline: 2px solid rgba(77, 163, 255, 0.95); outline-offset: -3px; }
+.sim-way:focus-visible, .sim-door-back:focus-visible, .sim-link:focus-visible, .sim-way-toggle button:focus-visible, .sim-chip-btn:focus-visible { outline: 2px solid rgba(77, 163, 255, 0.95); outline-offset: 2px; }
+.sim-door-title { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(24px, 2vw, 38px); font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.sim-cell-title { display: block; font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-optical-sizing: auto; font-size: clamp(18px, 1.3vw, 24px); font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+.sim-cell-kicker { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #9CCBFF; }
+.sim-cell-say { margin: 0; font-size: clamp(15.5px, 1.05vw, 19px); line-height: 1.4; }
+.sim-cell-status { display: block; font-size: clamp(13.5px, 0.9vw, 16px); font-weight: 600; color: #9CCBFF; }
+.sim-cell-lines { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; font-size: clamp(13.5px, 0.88vw, 16px); line-height: 1.4; color: rgba(235, 240, 255, 0.72); }
 .sim-door-arrow { opacity: 0.7; transition: transform .16s ease, opacity .16s ease; }
 .sim-door:hover .sim-door-arrow { opacity: 1; transform: translateX(4px); }
-.sim-door-art { position: absolute; right: -8px; top: 0; bottom: 0; width: 44%; pointer-events: none; opacity: 0.9;
+.sim-door-art { position: absolute; right: -8px; top: 0; bottom: 0; width: 42%; pointer-events: none; opacity: 0.9;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 46%); mask-image: linear-gradient(90deg, transparent 0%, #000 46%); }
 .sim-door > span:not(.sim-door-art) { position: relative; z-index: 1; }
 .sim-door-art ~ span { max-width: 66%; }
-.sim-front-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; max-width: 980px; }
-.sim-quiet { display: flex; flex-direction: column; gap: 2px; padding: 16px 20px; border-radius: 20px; text-align: left; font-family: inherit; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
-.sim-quiet:hover { background: rgba(14, 24, 52, 0.78); border-color: rgba(156, 203, 255, 0.5); }
-.sim-quiet > span:first-child { font-size: 17px; font-weight: 700; }
-.sim-quiet > span:last-child { font-size: 14px; color: rgba(235, 240, 255, 0.72); }
+.sim-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.sim-chip-btn { display: inline-flex; align-items: center; gap: 6px; height: clamp(36px, 2.4vw, 44px); padding: 0 12px 0 14px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07); color: #F1F4FA; font-family: inherit; font-size: clamp(14px, 0.9vw, 16.5px); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.sim-chip-btn:hover { background: rgba(46, 123, 255, 0.22); border-color: rgba(156, 203, 255, 0.6); }
+.sim-chip-btn small { font-size: 0.86em; font-weight: 500; color: rgba(235, 240, 255, 0.62); }
 .sim-way { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.05); color: #F1F4FA; text-align: left; font-family: inherit; cursor: pointer; transition: background .16s ease, border-color .16s ease; }
 .sim-way:hover { background: rgba(46, 123, 255, 0.16); border-color: rgba(156, 203, 255, 0.6); }
-.sim-way-title { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-size: 20px; font-weight: 700; line-height: 1.1; }
-.sim-way-text { font-size: 14.5px; line-height: 1.4; color: rgba(235, 240, 255, 0.76); }
+.sim-way-title { font-family: 'Bricolage Grotesque', 'Instrument Sans', system-ui, sans-serif; font-size: clamp(19px, 1.4vw, 26px); font-weight: 700; line-height: 1.1; }
+.sim-way-text { font-size: clamp(14.5px, 0.92vw, 17px); line-height: 1.4; color: rgba(235, 240, 255, 0.76); }
 .sim-door-back { display: inline-flex; align-items: center; gap: 4px; height: 34px; padding: 0 14px 0 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(8, 14, 32, 0.6); color: #F1F4FA; font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
 .sim-door-back:hover { background: rgba(14, 24, 52, 0.85); }
 .sim-link { padding: 0; border: 0; background: none; color: #9CCBFF; font-family: inherit; font-weight: 600; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: rgba(156, 203, 255, 0.4); text-underline-offset: 3px; }
 .sim-link:hover { color: #fff; }
-@media (max-width: 900px) {
-  .sim-doors, .sim-front-row { grid-template-columns: minmax(0, 1fr); }
-  .sim-door { min-height: 0; padding: 18px 20px; }
-  .sim-front { padding-top: 56px; }
-  .sim-next { padding: 20px; }
-  .sim-next-go { width: 100%; }
+@media (max-width: 760px) {
+  /* A phone: the deck comes first and the render is its backdrop, so nothing is pushed below a tall picture. */
   .sim-home-front { min-height: 0; }
+  .sim-front { padding-top: 40vh; }
+  .sim-next-go { width: 100%; }
+  .sim-door-art { width: 34%; }
+  .sim-chips { flex-wrap: nowrap; overflow-x: auto; margin-right: -18px; padding-right: 18px; scrollbar-width: none; }
+  .sim-chips::-webkit-scrollbar { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .sim-door, .sim-door-arrow { transition: none; } .sim-door:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sim-door, .sim-door-arrow { transition: none; } .sim-door:hover .sim-door-arrow { transform: none; } }
 /* Behind a door the cards sit over the foot of the render: solid enough that the fleet doesn't show through the words. */
 .sim-home-body .sim-card { background: rgba(9, 15, 29, 0.78); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }

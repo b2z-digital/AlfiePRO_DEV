@@ -3,7 +3,7 @@
 // week's programme, the licence to the next level, and your level. They sit as glass panels over
 // the live render of the fleet, the way Design your yacht sits over its stage.
 import React from 'react';
-import { ArrowRight, Check, ChevronLeft } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronLeft } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import type { SkipperLevel } from '@/sim/types';
 import { practiceLink } from './playbook';
@@ -36,6 +36,29 @@ export function Brand({ onHome }: { onHome?: () => void }) {
     : <div className="sim-brand">{inner}</div>;
 }
 
+/** The two ways of using the Academy, always in reach at the top of its front. */
+export function WayToggle({ way, onChoose }: { way: Way; onChoose: (w: Way) => void }) {
+  return (
+    <div className="sim-way-toggle" role="group" aria-label="How you use the Academy">
+      <button type="button" aria-pressed={way === 'simple'} onClick={() => onChoose('simple')}>Sail better</button>
+      <button type="button" aria-pressed={way === 'full'} onClick={() => onChoose('full')}>Race</button>
+    </div>
+  );
+}
+
+/** The race as it's set up, each part a button that opens its picker: your boat first. */
+export function SetupChips({ items }: { items: { what: string; value: string; onPick: () => void }[] }) {
+  return (
+    <div className="sim-chips" role="group" aria-label="Your race, as set up. Press a part to change it.">
+      {items.map(i => (
+        <button key={i.what} type="button" className="sim-chip-btn" onClick={i.onPick} title={`Change ${i.what.toLowerCase()}`}>
+          <small>{i.what}</small>{i.value}<ChevronDown size={15} aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Back to the front of the Academy, from inside a door. */
 export function DoorBack({ onHome }: { onHome: () => void }) {
   return (
@@ -48,7 +71,7 @@ export function DoorBack({ onHome }: { onHome: () => void }) {
 /** The one thing put in front of you. */
 export function NextUpCard({ kicker, title, text, button, onGo, big, children }: { kicker: string; title: string; text: string; button: string; onGo: () => void; big?: boolean; children?: React.ReactNode }) {
   return (
-    <section className={cx('sim-glass sim-next', big && 'sim-next-big')} aria-labelledby="next-title">
+    <section className={cx('sim-next', big && 'sim-next-big')} aria-labelledby="next-title">
       <div className="min-w-0 flex-1">
         <p className="m-0 text-[11.5px] font-bold uppercase tracking-[0.18em]" style={{ color: C.blueSoft }}>{kicker}</p>
         <h2 id="next-title" className="sim-next-title">{title}</h2>
@@ -63,14 +86,14 @@ export function NextUpCard({ kicker, title, text, button, onGo, big, children }:
 /** A way in: Race, Train or You. */
 export function DoorCard({ title, status, lines, onOpen, children }: { title: string; status: string; lines: string[]; onOpen: () => void; children?: React.ReactNode }) {
   return (
-    <button type="button" onClick={onOpen} className="sim-glass sim-door">
+    <button type="button" onClick={onOpen} className="sim-cell sim-door">
       {children && <span className="sim-door-art" aria-hidden="true">{children}</span>}
       <span className="flex items-center gap-3">
         <span className="sim-door-title">{title}</span>
         <ArrowRight size={20} aria-hidden="true" className="sim-door-arrow ml-auto" />
       </span>
-      <span className="block text-[13.5px] font-semibold" style={{ color: C.blueSoft }}>{status}</span>
-      <span className="mt-1 flex flex-col gap-0.5 text-[13.5px] leading-snug" style={{ color: C.mute }}>{lines.map(l => <span key={l}>{l}</span>)}</span>
+      <span className="sim-cell-status">{status}</span>
+      <span className="sim-cell-lines">{lines.map(l => <span key={l}>{l}</span>)}</span>
     </button>
   );
 }
@@ -78,7 +101,7 @@ export function DoorCard({ title, status, lines, onOpen, children }: { title: st
 /** Asked once: how do you want to use the Academy? No answer means the simple way. */
 export function WayAsk({ onChoose }: { onChoose: (w: Way) => void }) {
   return (
-    <section className="sim-glass flex flex-col gap-4 p-5 sm:p-6" aria-labelledby="way-title">
+    <section className="sim-deck-row flex flex-col gap-4" aria-labelledby="way-title">
       <div>
         <h2 id="way-title" className="m-0 text-[21px] font-bold leading-tight" style={{ fontFamily: DISPLAY }}>What would you like from the Academy?</h2>
         <p className="m-0 mt-1 text-[14.5px] leading-snug" style={{ color: C.mute }}>Choose one. You can change it any time, under You.</p>
