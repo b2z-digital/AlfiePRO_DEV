@@ -4,7 +4,7 @@
 // The same screen runs drills, rules lessons and lab moments: a scene with a goal and a result.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Race, RaceLog } from '@/sim/engine';
-import { LEVELS, PERSONAS, Skipper, knownFor } from '@/sim/ai';
+import { PERSONAS, Skipper, knownFor, levelsFor } from '@/sim/ai';
 import { Rng } from '@/sim/math';
 import type { Boat, BoatLook, Incident, RaceSettings } from '@/sim/types';
 import { DT } from '@/sim/physics';
@@ -210,7 +210,7 @@ export default function SimRace({ settings, scene, mode, coach, onCoachChange, v
       const p = race.player; if (!p) return;
       const i = race.boats.indexOf(p);
       p.persona = { ...PERSONAS[2] };
-      (race.skippers as (Skipper | null)[])[i] = new Skipper(p, LEVELS[race.settings.level], p.persona, new Rng(race.settings.seed + 7), i);
+      (race.skippers as (Skipper | null)[])[i] = new Skipper(p, levelsFor(race.settings.tune)[race.settings.level], p.persona, new Rng(race.settings.seed + 7), i);
       race.autopilot = true;
     };
   }, [race, live]);
