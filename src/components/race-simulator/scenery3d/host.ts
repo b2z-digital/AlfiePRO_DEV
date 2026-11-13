@@ -12,6 +12,7 @@ import type { World, WorldView } from './world';
 /** Venues with baked scenery: id -> folder under public/. */
 const SCENERY: Record<string, string> = {
   lmryc: '/sim-venues/lmryc/',
+  kbryc: '/sim-venues/kbryc/',
 };
 
 type Slot = { world: World | null; failed: boolean; loading: boolean; credit: string };

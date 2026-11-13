@@ -32,9 +32,13 @@ export interface World {
 
 interface SceneData {
   v: number; id: string; near: number; wide: number; credit: string;
+  /** Ground below this height is water (the survey can catch a tidal water surface above zero). */
+  water?: number;
   roads: { c: number; n: string; one: number; p: number[] }[];
   blds: { n: string; h: number; z: number; roof: string | null; p: number[] }[];
   piers: { n: string; a: number; w: number; p: number[] }[];
+  /** Road bridges over the water: the deck's centre line (x, y, z), its width, and whether it's an old through truss. */
+  bridges?: { n: string; w: number; truss: number; p: number[] }[];
   power: number[][];
   masts: number[][];
   houses: [number, number, number, number, number, number, number, string, number, number][];
@@ -48,7 +52,7 @@ interface SceneData {
 /** The haze the far shore fades into: the bottom of the bank view's sky. */
 const FOG = new THREE.Color(0xc9dceb);
 const WATER_TINT = new THREE.Color(0x4e7598);
-/** Ground below this (m above the lake) is water: left for the bank view to draw. */
+/** Ground below this (m above the lake) is water, left for the bank view to draw, unless the venue says otherwise. */
 const WATER_CUT = 0.22;
 
 /** Part of the way to a soft grey: photo colours and paint, seen through a kilometre of air. */
@@ -98,9 +102,9 @@ function makeUniforms() {
 }
 type Shared = ReturnType<typeof makeUniforms>;
 
-function terrainMaterial(S: Shared, map: THREE.Texture, hole: [number, number, number, number] | null) {
+function terrainMaterial(S: Shared, map: THREE.Texture, hole: [number, number, number, number] | null, cut: number) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...S, uCut: { value: WATER_CUT }, map: { value: map }, uHole: { value: new THREE.Vector4(...(hole ?? [1, -1, 1, -1])) } },
+    uniforms: { ...S, uCut: { value: cut }, map: { value: map }, uHole: { value: new THREE.Vector4(...(hole ?? [1, -1, 1, -1])) } },
     vertexShader: VERT_COMMON + /* glsl */`
       varying vec2 vUv;
       void main() { vUv = uv; gl_Position = place((modelMatrix * vec4(position, 1.0)).xyz); }`,
@@ -289,6 +293,84 @@ function box(B: Builder, x: number, y: number, z0: number, z1: number, len: numb
   B.quad([c[0][0], c[0][1], z1], [c[1][0], c[1][1], z1], [c[2][0], c[2][1], z1], [c[3][0], c[3][1], z1], top ?? side);
 }
 
+/** A square-section member from a to b (venue x, y, z): a girder, a truss chord, a column. */
+function beam(B: Builder, a: number[], b: number[], t: number, c: [number, number, number]) {
+  const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(d[0], d[1], d[2]) || 1;
+  const u = [d[0] / L, d[1] / L, d[2] / L];
+  // Two directions square to the member.
+  let r = Math.abs(u[2]) > 0.9 ? [1, 0, 0] : [-u[1], u[0], 0];
+  const rl = Math.hypot(r[0], r[1], r[2]) || 1; r = [r[0] / rl, r[1] / rl, r[2] / rl];
+  const q = [u[1] * r[2] - u[2] * r[1], u[2] * r[0] - u[0] * r[2], u[0] * r[1] - u[1] * r[0]];
+  const h = t / 2;
+  const off = (p: number[], i: number, j: number) => [p[0] + (r[0] * i + q[0] * j) * h, p[1] + (r[1] * i + q[1] * j) * h, p[2] + (r[2] * i + q[2] * j) * h];
+  const sides: [number, number][] = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+  for (let k = 0; k < 4; k++) {
+    const [i0, j0] = sides[k], [i1, j1] = sides[(k + 1) % 4];
+    const nx = (r[0] * (i0 + i1) + q[0] * (j0 + j1)) / 2, ny = (r[1] * (i0 + i1) + q[1] * (j0 + j1)) / 2;
+    const nl = Math.hypot(nx, ny) || 1;
+    B.quad(off(a, i0, j0), off(b, i0, j0), off(b, i1, j1), off(a, i1, j1), Math.hypot(nx, ny) < 0.2 ? c : lit(c, nx / nl, ny / nl));
+  }
+}
+
+/** A road bridge: deck and girders, railings, piers down into the water, and an old steel through truss when it has one. */
+function bridge(B: Builder, br: NonNullable<SceneData['bridges']>[number], ground: (x: number, y: number) => number) {
+  const p: number[][] = [];
+  for (let i = 0; i < br.p.length; i += 3) p.push([br.p[i], br.p[i + 1], br.p[i + 2]]);
+  const CON: [number, number, number] = [0.74, 0.73, 0.7], ROAD: [number, number, number] = [0.36, 0.37, 0.38], STEEL: [number, number, number] = [0.58, 0.63, 0.63];
+  const hw = br.w / 2;
+  // Resample the centre line every few metres, so the deck can curve up off its abutments smoothly.
+  const pts: number[][] = [];
+  for (let i = 0; i + 1 < p.length; i++) {
+    const a = p[i], b = p[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(L / 6));
+    for (let k = 0; k < n; k++) { const t = k / n; pts.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]); }
+  }
+  pts.push(p[p.length - 1]);
+  const side = (i: number) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)]; const ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey) || 1; return [ey / L, -ex / L]; };
+  let run = 0, nextPier = 30, panel = 0;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1], na = side(i), nb = side(i + 1);
+    const al = [a[0] - na[0] * hw, a[1] - na[1] * hw], ar = [a[0] + na[0] * hw, a[1] + na[1] * hw];
+    const bl = [b[0] - nb[0] * hw, b[1] - nb[1] * hw], brr = [b[0] + nb[0] * hw, b[1] + nb[1] * hw];
+    B.quad([al[0], al[1], a[2]], [bl[0], bl[1], b[2]], [brr[0], brr[1], b[2]], [ar[0], ar[1], a[2]], ROAD);
+    // The girders' faces and soffit.
+    const dep = 1.7;
+    wall(B, [al[0], al[1]], [bl[0], bl[1]], Math.min(a[2], b[2]) - dep, Math.min(a[2], b[2]), CON);
+    wall(B, [brr[0], brr[1]], [ar[0], ar[1]], Math.min(a[2], b[2]) - dep, Math.min(a[2], b[2]), CON);
+    B.quad([al[0], al[1], a[2] - dep], [ar[0], ar[1], a[2] - dep], [brr[0], brr[1], b[2] - dep], [bl[0], bl[1], b[2] - dep], [CON[0] * 0.6, CON[1] * 0.6, CON[2] * 0.6]);
+    // Barriers.
+    beam(B, [al[0], al[1], a[2] + 0.55], [bl[0], bl[1], b[2] + 0.55], 0.5, CON);
+    beam(B, [ar[0], ar[1], a[2] + 0.55], [brr[0], brr[1], b[2] + 0.55], 0.5, CON);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    run += L;
+    const g = ground((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    const clear = (a[2] + b[2]) / 2 - Math.max(0, g);
+    // Piers: a pair of columns under a headstock, where the deck stands clear of the ground.
+    if (run >= nextPier) {
+      nextPier = run + 34;
+      if (clear > 3) {
+        const zt = b[2] - dep, zb = Math.min(-1, g - 0.5);
+        for (const k of [-0.55, 0.55]) beam(B, [b[0] + nb[0] * hw * k, b[1] + nb[1] * hw * k, zb], [b[0] + nb[0] * hw * k, b[1] + nb[1] * hw * k, zt], 1.4, CON);
+        beam(B, [bl[0], bl[1], zt - 0.6], [brr[0], brr[1], zt - 0.6], 1.2, CON);
+      }
+    }
+    // An old through truss: two steel trusses either side of the road, braced across the top.
+    if (br.truss && clear > 4) {
+      const H = 6.5, o = 0.4;
+      const lA = [a[0] - na[0] * (hw + o), a[1] - na[1] * (hw + o)], rA = [a[0] + na[0] * (hw + o), a[1] + na[1] * (hw + o)];
+      const lB = [b[0] - nb[0] * (hw + o), b[1] - nb[1] * (hw + o)], rB = [b[0] + nb[0] * (hw + o), b[1] + nb[1] * (hw + o)];
+      for (const [A, Bp] of [[lA, lB], [rA, rB]]) {
+        beam(B, [A[0], A[1], a[2] + H], [Bp[0], Bp[1], b[2] + H], 0.45, STEEL);
+        beam(B, [A[0], A[1], a[2]], [Bp[0], Bp[1], b[2]], 0.45, STEEL);
+        beam(B, [A[0], A[1], a[2]], [A[0], A[1], a[2] + H], 0.35, STEEL);
+        if (panel % 2 === 0) beam(B, [A[0], A[1], a[2]], [Bp[0], Bp[1], b[2] + H], 0.3, STEEL);
+        else beam(B, [A[0], A[1], a[2] + H], [Bp[0], Bp[1], b[2]], 0.3, STEEL);
+      }
+      if (panel % 2 === 0) beam(B, [lA[0], lA[1], a[2] + H], [rA[0], rA[1], a[2] + H], 0.3, STEEL);
+      panel++;
+    }
+  }
+}
+
 /** A house: walls, then a hipped roof along its longer side (or a flat one on a block). */
 function house(B: Builder, x: number, y: number, z: number, yaw: number, w: number, d: number, levels: number, roof: [number, number, number], wallC: [number, number, number], flat: boolean) {
   const r = (yaw * Math.PI) / 180, sx = Math.sin(r), sy = Math.cos(r), nx = Math.cos(r), ny = -Math.sin(r);
@@ -427,7 +509,7 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
     loadImage(base + 'dem-near.png'), loadImage(base + 'dem-wide.png'),
     loadImage(base + 'near.webp'), loadImage(base + 'wide.webp'),
   ]);
-  const NEAR = scene.near, WIDE = scene.wide;
+  const NEAR = scene.near, WIDE = scene.wide, CUT = scene.water ?? WATER_CUT;
   const hN = sampler(heights(demN), NEAR), hW = sampler(heights(demW), WIDE);
   const F0 = opts.flatAt;
   const ease = (x: number, y: number, h: number) => {
@@ -462,9 +544,9 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
 
   // ── Terrain: fine near the club, coarser further out, each ring with the next one's hole ──
   const INNER = Math.min(1600, NEAR / 2);
-  add(new THREE.Mesh(terrain(INNER, Math.round((2 * INNER) / 10), hNe, NEAR), terrainMaterial(S, texN, null)));
-  add(new THREE.Mesh(terrain(NEAR, Math.round((2 * NEAR) / 25), hN, NEAR), terrainMaterial(S, texN, [-INNER, INNER, -INNER, INNER])));
-  add(new THREE.Mesh(terrain(WIDE, 256, hW, WIDE), terrainMaterial(S, texW, [-NEAR + 30, NEAR - 30, -NEAR + 30, NEAR - 30])));
+  add(new THREE.Mesh(terrain(INNER, Math.round((2 * INNER) / 10), hNe, NEAR), terrainMaterial(S, texN, null, CUT)));
+  add(new THREE.Mesh(terrain(NEAR, Math.round((2 * NEAR) / 25), hN, NEAR), terrainMaterial(S, texN, [-INNER, INNER, -INNER, INNER], CUT)));
+  add(new THREE.Mesh(terrain(WIDE, 256, hW, WIDE), terrainMaterial(S, texW, [-NEAR + 30, NEAR - 30, -NEAR + 30, NEAR - 30], CUT)));
 
   // ── Trees ──
   {
@@ -477,6 +559,8 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
       // Norfolk pines: not a parade ground. Some taller, some missing.
       const hv = kind === 5 ? h * (0.78 + ((i * 2654435761) >>> 0) % 37 / 100) : h;
       if (kind === 5 && ((i * 40503) >>> 0) % 7 === 0) { iSize[i * 2] = 0; iSize[i * 2 + 1] = 0; continue; }
+      // Nothing stands in the water (tidal venues: the shore's lowest ground is left to the water).
+      if (z < CUT) { iSize[i * 2] = 0; iSize[i * 2 + 1] = 0; continue; }
       iPos[i * 3] = x; iPos[i * 3 + 1] = ease(x, y, z) - 0.4; iPos[i * 3 + 2] = -y;
       iSize[i * 2] = hv * wf; iSize[i * 2 + 1] = hv;
       iCol[i * 3] = dv.getUint8(o + 8) / 255; iCol[i * 3 + 1] = dv.getUint8(o + 9) / 255; iCol[i * 3 + 2] = dv.getUint8(o + 10) / 255;
@@ -521,8 +605,9 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
     if (pr.a) {
       const ring = p.slice(0, -1);
       const tris = THREE.ShapeUtils.triangulateShape(ring.map(q => new THREE.Vector2(q[0], q[1])), []);
-      for (const t of tris) B.tri([ring[t[0]][0], ring[t[0]][1], 0.9], [ring[t[1]][0], ring[t[1]][1], 0.9], [ring[t[2]][0], ring[t[2]][1], 0.9], DECK);
-      for (let i = 0; i < ring.length; i++) wall(B, ring[i], ring[(i + 1) % ring.length], 0.0, 0.9, PILE);
+      // A floating pontoon: a low concrete deck.
+      for (const t of tris) B.tri([ring[t[0]][0], ring[t[0]][1], 0.55], [ring[t[1]][0], ring[t[1]][1], 0.55], [ring[t[2]][0], ring[t[2]][1], 0.55], [0.7, 0.69, 0.66]);
+      for (let i = 0; i < ring.length; i++) wall(B, ring[i], ring[(i + 1) % ring.length], 0.0, 0.55, [0.62, 0.61, 0.58]);
       continue;
     }
     for (let i = 0; i + 1 < p.length; i++) {
@@ -539,6 +624,7 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
       }
     }
   }
+  for (const br of scene.bridges ?? []) bridge(B, br, height);
   // Boats on moorings: a hull with a bow, then a cabin, or a mast.
   const HULL: [number, number, number] = [0.93, 0.93, 0.92], CABIN: [number, number, number] = [0.82, 0.84, 0.86], GLASS: [number, number, number] = [0.2, 0.25, 0.3];
   const hull = (x: number, y: number, z: number, yaw: number, L: number, beam: number, free: number) => {
