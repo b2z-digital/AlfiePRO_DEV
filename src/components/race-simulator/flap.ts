@@ -7,9 +7,18 @@
 const TAU = Math.PI * 2;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-/** Flaps a second for the wind (m/s): a lazy flop in light airs, a rattle in a blow. A jib, being smaller, is quicker. */
+/** How far the wind has got up, for a flogging sail: 0 in light airs, 1 in a medium breeze (about 5 m/s)… */
+const breeze = (tws: number) => { const u = clamp01((tws - 1.8) / 3.2); return u * u * (3 - 2 * u); };
+/** …and on from there to a blow (8 m/s). */
+const blow = (tws: number) => clamp01((tws - 5) / 3);
+
+/**
+ * Flaps a second for the wind (m/s). In light airs there's barely the wind to lift the film: a slow,
+ * gentle sway, about once a second. It only becomes a real flap as the breeze fills in, and a rattle
+ * in a blow. A jib, being smaller, is quicker.
+ */
 export function flapHz(tws: number, kind: 'main' | 'jib' = 'main'): number {
-  return (1.8 + 0.55 * Math.max(0, Math.min(9, tws))) * (kind === 'jib' ? 1.35 : 1);
+  return (1.1 + 3.0 * breeze(tws) + 2.0 * blow(tws)) * (kind === 'jib' ? 1.35 : 1);
 }
 
 /** A sail's own place in the rhythm, from her sail number, so no two boats flap in step. */
@@ -28,15 +37,15 @@ export function flapWave(t: number, hz: number, seed: number): number {
   return Math.sin(TAU * hz * t + seed + 0.9 * Math.sin(TAU * hz * 0.31 * t + seed * 1.7));
 }
 
-/** How hard the wind throws a flogging sail about, 0 to 1: it barely stirs in a drift and thrashes in a blow. */
+/** How hard the wind throws a flogging sail about, 0 to 1: it only stirs in light airs, flaps in a breeze and thrashes in a blow. */
 export function flapForce(tws: number): number {
-  return 0.3 + 0.7 * clamp01((tws - 1) / 5.5);
+  return 0.14 + 0.58 * breeze(tws) + 0.28 * blow(tws);
 }
 
-/** How loud one crack is, 0 to 1: nothing from a sail that's nearly full, sharp from one that's flogging in a breeze. */
+/** How loud one crack is, 0 to 1: nothing from a sail that's nearly full, a soft tick in light airs, sharp from one flogging in a breeze. */
 export function flapLoud(luff: number, tws: number): number {
   const l = clamp01((luff - 0.15) / 0.85);
-  return Math.pow(l, 1.4) * (0.22 + 0.78 * clamp01((tws - 1.2) / 6.5));
+  return Math.pow(l, 1.4) * (0.06 + 0.5 * breeze(tws) + 0.44 * blow(tws));
 }
 
 /** How much of it reaches you from `d` hull lengths away, 0 to 1: your own boat is right there; across the pond it's gone. */
