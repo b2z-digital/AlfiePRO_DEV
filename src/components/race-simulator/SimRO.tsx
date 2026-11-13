@@ -10,6 +10,13 @@ import { DT } from '@/sim/physics';
 import { drawBank, newBankCam } from './bank';
 import { Brand, DoorBack } from './SimDoors';
 import { C, cx } from './ui';
+import { ClipView } from './SimJudge';
+import { BOAT_COLOR, ruleChoices, runCase } from './judge';
+import { dropsText, scoreText } from './series';
+import {
+  markProtest, markScore, protestParties, protestTask, scoreTask, sheetCell,
+  type ProtestDecision, type ProtestTask, type ScoreMark, type ScoreTask,
+} from './ro';
 import {
   DUTIES_READY, DUTY_NAME, PASS, RO_LEVELS, RO_NAME, courseGuide, courseRaceSettings, courseRun, courseStart, courseTask, freshSeed, lineRaceSettings, lineTask, markCourse, markLine, roLevel, roNext,
   type CourseMark, type CourseOutcome, type CourseSet, type CourseTask, type DutyId, type LineMark, type LineTask, type RoLevel, type RoRecord,
@@ -19,8 +26,8 @@ const LEVEL_WORD: Record<RoLevel, string> = { club: 'Club', state: 'Regional', n
 const DUTY_SAY: Record<DutyId, string> = {
   course: 'Read the wind from the committee boat, lay the start line and the windward mark, and the fleet sails your course.',
   line: 'Watch the start from the committee boat. At the gun, call the boats over, or a general recall.',
-  score: 'Score a race day from the finishing sheets: letter scores, ties and the heats, in AlfiePRO.',
-  protest: 'Hear a protest: the facts, the rule, and the decision.',
+  score: 'Score a series from the finishing sheets: letter scores, drops and ties, checked against AlfiePRO\'s own results engine.',
+  protest: 'Hear a protest: was it valid, what happened, which rule, and your decision.',
 };
 const pill = (on: boolean) => (on ? { background: '#F1F4FA', color: '#0A1226', borderColor: '#F1F4FA' } : undefined);
 
@@ -303,6 +310,163 @@ function LineDuty({ task, onMarked, onAgain }: { task: LineTask; onMarked: (scor
   );
 }
 
+
+// ───────────────────────── Score the racing ─────────────────────────
+
+function ScoreDuty({ task, onMarked, onAgain }: { task: ScoreTask; onMarked: (score: number) => void; onAgain: () => void }) {
+  const [nets, setNets] = useState<Record<string, string>>({});
+  const [places, setPlaces] = useState<Record<string, string>>({});
+  const [mark, setMark] = useState<ScoreMark | null>(null);
+  const n = task.boats.length, R = task.races.length;
+  const num = (v: string | undefined) => (v === undefined || v.trim() === '' || Number.isNaN(Number(v)) ? null : Number(v));
+  const publish = () => {
+    const m = markScore(task, Object.fromEntries(task.boats.map(b => [b.id, num(nets[b.id])])), Object.fromEntries(task.boats.map(b => [b.id, num(places[b.id])])));
+    setMark(m); onMarked(m.score);
+  };
+  // Before publishing, the boats in sail-number order; after, in the engine's order with its scores.
+  const rows = mark ? mark.truth.map(r => task.boats.find(b => b.id === r.userId)!) : [...task.boats].sort((a, b) => Number(a.sail) - Number(b.sail));
+  const truthOf = (id: string) => mark?.truth.find(r => r.userId === id) ?? null;
+  const okOf = (id: string) => mark?.rows.find(r => r.id === id) ?? null;
+  const cellIn = 'w-[64px] rounded-lg border border-white/15 bg-white/[0.05] px-2 py-1.5 text-center text-[15px] font-semibold tabular-nums text-[#F1F4FA] outline-none focus:border-[#4DA3FF]';
+  return (
+    <div className="flex flex-col gap-5">
+      <section className="sim-card grid gap-3 p-5 sm:grid-cols-3 sm:p-6" aria-label="The rules for this series">
+        <p className="m-0 text-[14px] leading-snug"><b className="block text-[#A9D2FF]">Points</b>Low point: a place scores its number. A letter (DNF, OCS, DSQ, or DNC for a race not sailed) scores the boats in the series plus one: <b>{n + 1}</b>.</p>
+        <p className="m-0 text-[14px] leading-snug"><b className="block text-[#A9D2FF]">Drops</b>{dropsText(task.drops, R)}: leave out each boat's worst {task.drops.filter(d => d <= R).length > 1 ? 'two scores' : 'score'}, letters included. The rest add up to her net.</p>
+        <p className="m-0 text-[14px] leading-snug"><b className="block text-[#A9D2FF]">Ties</b>Level on net? Put each boat's counting scores best first: the first with a better score where they differ is ahead. Still level: the better score in the last race.</p>
+      </section>
+      <section className="sim-card overflow-x-auto p-0" aria-labelledby="sheet-title">
+        <h2 id="sheet-title" className="sim-h3 px-5 pt-5">{mark ? 'The results, as AlfiePRO scores them' : 'The finishing sheets'}</h2>
+        <table className="mt-3 w-full min-w-[640px] border-collapse text-[14px]">
+          <thead>
+            <tr className="text-left text-[11.5px] uppercase tracking-[0.12em]" style={{ color: C.faint }}>
+              <th className="px-5 py-2 font-bold">Sail · skipper</th>
+              {task.races.map(r => <th key={r.no} className="px-2 py-2 text-center font-bold">R{r.no}</th>)}
+              <th className="px-2 py-2 text-center font-bold">Net</th>
+              <th className="px-3 py-2 text-center font-bold">Place</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(b => {
+              const t = truthOf(b.id), ok = okOf(b.id);
+              return (
+                <tr key={b.id} className="border-t border-white/[0.06]">
+                  <td className="whitespace-nowrap px-5 py-2"><b className="tabular-nums">{b.sail}</b> <span style={{ color: C.mute }}>{b.name}</span></td>
+                  {task.races.map((r, k) => {
+                    const cell = t ? scoreText(t.scores[k]) : sheetCell(task, r.no, b.id);
+                    return <td key={r.no} className={cx('px-2 py-2 text-center tabular-nums', /[A-Z]/.test(cell) && 'font-semibold text-[#FFCB96]', cell.startsWith('(') && 'opacity-60')}>{cell}</td>;
+                  })}
+                  <td className="px-2 py-1.5 text-center">
+                    {mark ? <span className={cx('font-bold tabular-nums', ok?.net ? 'text-[#7CE3A1]' : 'text-[#FFB4A8]')}>{t!.net}{!ok?.net && <span className="ml-1 text-[11.5px] font-normal line-through opacity-70">{nets[b.id] || '–'}</span>}</span>
+                      : <input aria-label={`Net points, ${b.sail}`} inputMode="decimal" className={cellIn} value={nets[b.id] ?? ''} onChange={e => setNets(v => ({ ...v, [b.id]: e.target.value }))} />}
+                  </td>
+                  <td className="px-3 py-1.5 text-center">
+                    {mark ? <span className={cx('font-bold tabular-nums', ok?.place ? 'text-[#7CE3A1]' : 'text-[#FFB4A8]')}>{t!.rank}{!ok?.place && <span className="ml-1 text-[11.5px] font-normal line-through opacity-70">{places[b.id] || '–'}</span>}</span>
+                      : <input aria-label={`Place, ${b.sail}`} inputMode="numeric" className={cellIn} value={places[b.id] ?? ''} onChange={e => setPlaces(v => ({ ...v, [b.id]: e.target.value }))} />}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="flex flex-col gap-3 px-5 pb-5 pt-4">
+          {!mark && <button type="button" className="sim-btn-lg sim-btn-go self-start" onClick={publish}>Publish the results<ArrowRight size={18} aria-hidden="true" /></button>}
+          {mark && (
+            <>
+              <Score m={mark.score} pass={PASS[task.level]} />
+              <p className="m-0 text-[13.5px] leading-relaxed" style={{ color: C.mute }}>
+                {mark.rows.filter(r => r.net).length} of {n} nets and {mark.rows.filter(r => r.place).length} of {n} places right. Scores in brackets are dropped; a letter scores {n + 1}. Each boat's net is worth {Math.round(60 / n * 10) / 10} marks and her place {Math.round(40 / n * 10) / 10}.
+              </p>
+              <button type="button" className="sim-chip-btn self-start" onClick={onAgain}><RotateCcw size={14} />Another series</button>
+            </>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ───────────────────────── Hear a protest ─────────────────────────
+
+function Dot({ boat }: { boat: string }) {
+  return <span aria-hidden="true" className="inline-block h-3 w-3 shrink-0 rounded-full align-middle" style={{ background: BOAT_COLOR[boat] ?? '#F472B6' }} />;
+}
+
+function ProtestDuty({ task, onMarked, onAgain }: { task: ProtestTask; onMarked: (score: number) => void; onAgain: () => void }) {
+  const clip = useMemo(() => runCase(task.case, task.seed), [task]);
+  const [run, setRun] = useState(0);
+  const [kind, setKind] = useState<ProtestDecision['kind'] | null>(null);
+  const [boat, setBoat] = useState<string | null>(null);
+  const [rule, setRule] = useState<string | null>(null);
+  const [out, setOut] = useState<ReturnType<typeof markProtest> | null>(null);
+  if (!clip) return <div className="sim-card flex flex-col gap-3 p-6"><p className="m-0">This incident couldn't be sailed. Try another protest.</p><button type="button" className="sim-chip-btn self-start" onClick={onAgain}><RotateCcw size={14} />Another protest</button></div>;
+  const { protestor, protestee } = protestParties(task, clip.boats, clip.verdict);
+  const rules = ruleChoices(clip.verdict, task.seed);
+  const ready = kind === 'invalid' || kind === 'dismissed' || (kind === 'upheld' && boat && rule);
+  const decide = () => {
+    const d: ProtestDecision = kind === 'upheld' ? { kind, boat: boat!, rule: rule! } : { kind: kind! };
+    const m = markProtest(task, clip.verdict, d);
+    setOut(m); onMarked(m.score);
+  };
+  const choice = (on: boolean) => cx('sim-chip-btn', on && 'sim-chip-on');
+  const truthSay = (d: ProtestDecision) => d.kind === 'invalid' ? 'Invalid: the hail came too late, so the protest isn\'t heard.' : d.kind === 'dismissed' ? 'Dismissed: no rule was broken.' : `Upheld: ${d.boat} broke rule ${d.rule} and is disqualified.`;
+  return (
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+      <section className="sim-card flex flex-col gap-3 p-4 sm:p-5" aria-label="The incident">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="sim-h3">The incident, from above</h2>
+          <button type="button" className="sim-chip-btn" onClick={() => setRun(r => r + 1)}><RotateCcw size={14} />Watch again</button>
+        </div>
+        <ClipView clip={clip} run={run} />
+        <p className="m-0 text-[12.5px]" style={{ color: C.faint }}>Wind from the top of the picture. {clip.boats.map(b => b).join(', ')}.</p>
+      </section>
+      <section className="sim-card flex flex-col gap-4 p-5 sm:p-6" aria-labelledby="hearing-title">
+        <div>
+          <h2 id="hearing-title" className="sim-h3">The hearing</h2>
+          <p className="m-0 mt-2 text-[14.5px] leading-relaxed"><Dot boat={protestor} /> <b>{protestor}</b> protests <Dot boat={protestee} /> <b>{protestee}</b>.</p>
+          <p className="m-0 mt-1 text-[14px] leading-relaxed" style={{ color: C.mute }}>
+            {task.hail === 'prompt' ? `${protestor} hailed "Protest ${protestee}" straight away, as it happened.` : `${protestor} said nothing on the water, and hailed "Protest" only after finishing, a couple of minutes later.`}
+            {' '}A protest must be hailed at the first reasonable opportunity.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <p className="m-0 text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: C.faint }}>Your decision</p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Decision">
+            <button type="button" disabled={!!out} aria-pressed={kind === 'invalid'} className={choice(kind === 'invalid')} style={pill(kind === 'invalid')} onClick={() => setKind('invalid')}>Invalid: not heard</button>
+            <button type="button" disabled={!!out} aria-pressed={kind === 'dismissed'} className={choice(kind === 'dismissed')} style={pill(kind === 'dismissed')} onClick={() => setKind('dismissed')}>Dismissed: no rule broken</button>
+            <button type="button" disabled={!!out} aria-pressed={kind === 'upheld'} className={choice(kind === 'upheld')} style={pill(kind === 'upheld')} onClick={() => setKind('upheld')}>Upheld: a boat is disqualified</button>
+          </div>
+        </div>
+        {kind === 'upheld' && (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="m-0 text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: C.faint }}>Which boat broke a rule</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Boat">
+                {clip.boats.map(b => <button key={b} type="button" disabled={!!out} aria-pressed={boat === b} className="sim-chip-btn" style={pill(boat === b)} onClick={() => setBoat(b)}><Dot boat={b} />{b}</button>)}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <p className="m-0 text-[12px] font-bold uppercase tracking-[0.14em]" style={{ color: C.faint }}>Which rule</p>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Rule">
+                {rules.map(r => <button key={r.rule} type="button" disabled={!!out} aria-pressed={rule === r.rule} className="sim-chip-btn" style={pill(rule === r.rule)} onClick={() => setRule(r.rule)}>Rule {r.rule} · {r.title}</button>)}
+              </div>
+            </div>
+          </>
+        )}
+        {!out && <button type="button" disabled={!ready} className="sim-btn-lg sim-btn-go self-start disabled:opacity-50" onClick={decide}>Give the decision<ArrowRight size={18} aria-hidden="true" /></button>}
+        {out && (
+          <div className="flex flex-col gap-3 border-t border-white/[0.08] pt-4" aria-live="polite">
+            <Score m={out.score} pass={PASS[task.level]} />
+            <p className="m-0 text-[14px] leading-relaxed"><b>{truthSay(out.truth)}</b></p>
+            {out.truth.kind !== 'invalid' && <p className="m-0 text-[13.5px] leading-relaxed" style={{ color: C.mute }}>{clip.verdict.text}</p>}
+            <button type="button" className="sim-chip-btn self-start" onClick={onAgain}><RotateCcw size={14} />Another protest</button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 // ───────────────────────── The hub ─────────────────────────
 
 export interface SimROProps {
@@ -319,6 +483,8 @@ export default function SimRO({ record, onRecord, onBack }: SimROProps) {
   const open = useMemo(() => RO_LEVELS.slice(0, RO_LEVELS.indexOf(next ?? 'world') + 1), [next]);
   const course = useMemo(() => (duty === 'course' ? courseTask(level, seed) : null), [duty, level, seed]);
   const line = useMemo(() => (duty === 'line' ? lineTask(level, seed) : null), [duty, level, seed]);
+  const series = useMemo(() => (duty === 'score' ? scoreTask(level, seed) : null), [duty, level, seed]);
+  const protest = useMemo(() => (duty === 'protest' ? protestTask(level, seed) : null), [duty, level, seed]);
   const marked = useCallback((s: number) => { if (duty) onRecord(duty, level, s); }, [duty, level, onRecord]);
   const again = () => setSeed(freshSeed());
 
@@ -361,6 +527,8 @@ export default function SimRO({ record, onRecord, onBack }: SimROProps) {
       )}
       {duty === 'course' && course && <CourseDuty key={`${level}-${seed}`} task={course} onMarked={marked} onAgain={again} />}
       {duty === 'line' && line && <LineDuty key={`${level}-${seed}`} task={line} onMarked={marked} onAgain={again} />}
+      {duty === 'score' && series && <ScoreDuty key={`${level}-${seed}`} task={series} onMarked={marked} onAgain={again} />}
+      {duty === 'protest' && protest && <ProtestDuty key={`${level}-${seed}`} task={protest} onMarked={marked} onAgain={again} />}
     </div>
   );
 }

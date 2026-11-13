@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { Race } from '@/sim/engine';
 import {
   courseGuide, courseRaceSettings, courseRun, courseStart, courseTask, courseTruth, generalDue, lineRaceSettings, lineTask, markCourse, markLine, recordDuty, roLevel, roNext,
+  markProtest, markScore, protestParties, protestTask, scoreTask, scoreTruth, sheetCell,
 } from '@/components/race-simulator/ro';
 import { loadTraining, mergeTraining, saveRo } from '@/components/race-simulator/progress';
 
@@ -80,18 +81,75 @@ describe('Race officer: call the line', () => {
   });
 });
 
+describe('Race officer: score the racing', () => {
+  it('builds the same series from the same seed, bigger and harder by standard', () => {
+    expect(scoreTask('state', 9)).toEqual(scoreTask('state', 9));
+    const club = scoreTask('club', 9), world = scoreTask('world', 9);
+    expect(club.boats.length).toBe(8); expect(world.boats.length).toBe(14);
+    expect(world.races.length).toBeGreaterThan(club.races.length);
+  });
+  it('at National and World there is always a tie on net to break', () => {
+    for (const lv of ['national', 'world'] as const) for (const seed of [1, 2, 3]) {
+      const rows = scoreTruth(scoreTask(lv, seed));
+      expect(rows.some((r, i) => i > 0 && rows[i - 1].net === r.net), `${lv} ${seed}`).toBe(true);
+    }
+  });
+  it('marks the nets and places against the results engine', () => {
+    const t = scoreTask('state', 4), truth = scoreTruth(t);
+    const nets = Object.fromEntries(truth.map(r => [r.userId, r.net])), places = Object.fromEntries(truth.map(r => [r.userId, r.rank]));
+    expect(markScore(t, nets, places).score).toBe(100);
+    expect(markScore(t, nets, {}).score).toBe(60);
+    const off = { ...nets, [truth[0].userId]: truth[0].net + 1 };
+    expect(markScore(t, off, places).score).toBe(94);
+    // A letter scores the boats plus one.
+    const coded = truth.flatMap(r => r.scores).find(s => s?.code);
+    if (coded) expect(coded.points).toBe(t.boats.length + 1);
+  });
+  it('the sheet shows places among the finishers, and letters', () => {
+    const t = scoreTask('world', 2);
+    for (const r of t.races) {
+      const cells = t.boats.map(b => sheetCell(t, r.no, b.id));
+      const nums = cells.filter(c => /^\d+$/.test(c)).map(Number).sort((a, b) => a - b);
+      expect(nums).toEqual(nums.map((_, k) => k + 1));
+      for (const c of cells.filter(c => !/^\d+$/.test(c))) expect(['DNF', 'OCS', 'DSQ', 'DNC']).toContain(c);
+    }
+  });
+});
+
+describe('Race officer: hear a protest', () => {
+  const v = (offender: string | null, rule: string | null) => ({ offender, rule, ruleTitle: null, text: '', at: null });
+  const t = (hail: 'prompt' | 'late') => ({ ...protestTask('national', 3), hail });
+  it('a late hail makes the protest invalid, whatever happened', () => {
+    expect(markProtest(t('late'), v('Orange', '10'), { kind: 'invalid' }).score).toBe(100);
+    expect(markProtest(t('late'), v('Orange', '10'), { kind: 'upheld', boat: 'Orange', rule: '10' }).score).toBe(0);
+  });
+  it('a valid protest: dismissed when nobody broke a rule, upheld against the right boat under the right rule', () => {
+    expect(markProtest(t('prompt'), v(null, null), { kind: 'dismissed' }).score).toBe(100);
+    expect(markProtest(t('prompt'), v('Orange', '18.2(a)'), { kind: 'upheld', boat: 'Orange', rule: '18.2(b)' }).score).toBe(100);
+    expect(markProtest(t('prompt'), v('Orange', '10'), { kind: 'upheld', boat: 'Orange', rule: '11' }).score).toBe(70);
+    expect(markProtest(t('prompt'), v('Orange', '10'), { kind: 'upheld', boat: 'Purple', rule: '10' }).score).toBe(20);
+    expect(markProtest(t('prompt'), v('Orange', '10'), { kind: 'invalid' }).score).toBe(0);
+  });
+  it('the club standard always has a prompt hail; the protestee is the boat that fouled', () => {
+    for (let s = 1; s < 20; s++) expect(protestTask('club', s).hail).toBe('prompt');
+    expect(protestParties(t('prompt'), ['Purple', 'Orange'], v('Orange', '10'))).toEqual({ protestor: 'Purple', protestee: 'Orange' });
+  });
+});
+
 describe('Race officer: standards', () => {
   beforeEach(() => { try { localStorage.clear(); } catch { /* none */ } });
 
   it('steps up a standard when every duty is passed at it', () => {
     let r = recordDuty(undefined, 'course', 'club', 72, 1);
-    expect(roLevel(r)).toBeNull(); expect(roNext(r)).toBe('club');
     r = recordDuty(r, 'line', 'club', 60, 2);
+    r = recordDuty(r, 'score', 'club', 65, 3);
+    expect(roLevel(r)).toBeNull(); expect(roNext(r)).toBe('club');
+    r = recordDuty(r, 'protest', 'club', 100, 4);
     expect(roLevel(r)).toBe('club'); expect(roNext(r)).toBe('state');
-    r = recordDuty(r, 'course', 'state', 90, 3);
-    r = recordDuty(r, 'line', 'state', 40, 4);
+    for (const d of ['course', 'score', 'protest'] as const) r = recordDuty(r, d, 'state', 90, 5);
+    r = recordDuty(r, 'line', 'state', 40, 6);
     expect(roLevel(r)).toBe('club');
-    r = recordDuty(r, 'line', 'state', 20, 5);
+    r = recordDuty(r, 'line', 'state', 20, 7);
     expect(r.best['line:state']).toMatchObject({ score: 40, tries: 2 });
   });
 

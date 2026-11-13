@@ -9,6 +9,9 @@ import { WindField, type WindCharacter } from '@/sim/wind';
 import type { ClassId } from '@/sim/classes';
 import { toCourse } from '@/sim/course';
 import type { RaceSettings, SkipperLevel } from '@/sim/types';
+import { CAST } from './career';
+import { STANDARD_DROPS, standings, type SeriesRace, type StandingRow } from './series';
+import { judgeCases, type JudgeCase, type Verdict } from './judge';
 
 export type RoLevel = SkipperLevel;
 export const RO_LEVELS: RoLevel[] = ['club', 'state', 'national', 'world'];
@@ -18,7 +21,7 @@ export const DUTY_NAME: Record<DutyId, string> = { course: 'Set the course', lin
 /** The mark a duty needs at each standard to pass. */
 export const PASS: Record<RoLevel, number> = { club: 60, state: 70, national: 78, world: 85 };
 /** The duties built so far (the others are on their way). */
-export const DUTIES_READY: DutyId[] = ['course', 'line'];
+export const DUTIES_READY: DutyId[] = ['course', 'line', 'score', 'protest'];
 
 /** Your race officer's record: each duty's best mark at each standard. */
 export interface RoRecord { best: Partial<Record<`${DutyId}:${RoLevel}`, { score: number; at: number; tries: number }>>; at: number }
@@ -247,3 +250,110 @@ export function markLine(over: string[], called: string[], general: boolean, fle
 
 /** Rough: a random seed for a new try. */
 export const freshSeed = () => Math.floor(Math.random() * 1e9);
+
+
+// ───────────────────────── Score the racing ─────────────────────────
+
+/** A series to score: the finishing sheets, race by race (a place, or a letter; no entry is DNC). */
+export interface ScoreTask {
+  seed: number; level: RoLevel;
+  boats: { id: string; name: string; sail: string }[];
+  races: SeriesRace[];
+  drops: number[];
+}
+const SCORE_SIZE: Record<RoLevel, { boats: number; races: number; codes: number; tie: boolean }> = {
+  club: { boats: 8, races: 4, codes: 1, tie: false },
+  state: { boats: 10, races: 5, codes: 3, tie: false },
+  national: { boats: 12, races: 6, codes: 5, tie: true },
+  world: { boats: 14, races: 8, codes: 7, tie: true },
+};
+type Sheet = 'DNF' | 'OCS' | 'DSQ' | 'DNC';
+
+function buildScore(level: RoLevel, seed: number): ScoreTask {
+  const z = SCORE_SIZE[level], rng = new Rng(seed);
+  const cast = [...CAST].sort(() => rng.next() - 0.5).slice(0, z.boats);
+  const boats = cast.map(m => ({ id: m.id, name: m.name, sail: m.sail }));
+  const skill = boats.map(() => rng.gauss());
+  // Letter scores dotted through the series: which race, which boat, which letter.
+  const codes = new Map<string, Sheet>();
+  const letters: Sheet[] = level === 'club' ? ['DNF'] : level === 'state' ? ['DNF', 'OCS', 'DNC'] : ['DNF', 'OCS', 'DSQ', 'DNC'];
+  for (let k = 0; k < z.codes; k++) codes.set(`${rng.int(1, z.races)}:${rng.int(0, z.boats - 1)}`, rng.pick(letters));
+  const at = new Date(Date.UTC(2026, 0, 1)).toISOString();
+  const races: SeriesRace[] = Array.from({ length: z.races }, (_, i) => {
+    const no = i + 1;
+    const order = boats.map((_b, k) => ({ k, v: skill[k] + rng.gauss() * 1.1 })).sort((a, c) => c.v - a.v);
+    const entries = order.flatMap(({ k }, place) => {
+      const code = codes.get(`${no}:${k}`);
+      if (code === 'DNC') return [];
+      const status = code === 'DNF' ? 'dnf' : code === 'OCS' ? 'ocs' : code === 'DSQ' ? 'dsq' : 'finished';
+      return [{ userId: boats[k].id, name: boats[k].name, sail: boats[k].sail, status, elapsed: status === 'finished' ? 300 + place * 4 : null, sailedAt: at } as const];
+    });
+    return { no, opened: true, open: false, entries: entries.map(e => ({ ...e })) };
+  });
+  return { seed, level, boats, races, drops: STANDARD_DROPS };
+}
+
+/** The series for a standard, from a seed. At National and World there's always a tie on points to break. */
+export function scoreTask(level: RoLevel, seed: number): ScoreTask {
+  for (let k = 0; k < 80; k++) {
+    const t = buildScore(level, (seed + k * 7919) >>> 0);
+    if (!SCORE_SIZE[level].tie || hasTie(scoreTruth(t))) return t;
+  }
+  return buildScore(level, seed);
+}
+const hasTie = (rows: StandingRow[]) => rows.some((r, i) => i > 0 && rows[i - 1].net === r.net);
+/** The series scored by AlfiePRO's own results engine. */
+export const scoreTruth = (t: ScoreTask): StandingRow[] => standings(t.races, t.drops);
+/** What the sheet shows for a boat in a race: her place, or her letter. */
+export function sheetCell(t: ScoreTask, no: number, id: string): string {
+  const e = t.races[no - 1].entries.find(x => x.userId === id);
+  if (!e) return 'DNC';
+  if (e.status === 'finished') return String(t.races[no - 1].entries.filter(x => x.status === 'finished' && (x.elapsed ?? 0) < (e.elapsed ?? 0)).length + 1);
+  return e.status.toUpperCase();
+}
+export interface ScoreMark { score: number; rows: { id: string; net: boolean; place: boolean }[]; truth: StandingRow[] }
+/** Your nets and places against the engine's: each boat's net is worth 60 shared out, her place 40. */
+export function markScore(t: ScoreTask, nets: Record<string, number | null>, places: Record<string, number | null>): ScoreMark {
+  const truth = scoreTruth(t), n = truth.length;
+  const rows = truth.map(r => ({ id: r.userId, net: nets[r.userId] != null && Math.abs(nets[r.userId]! - r.net) < 0.01, place: places[r.userId] === r.rank }));
+  const score = Math.round(rows.reduce((a, r) => a + (r.net ? 60 / n : 0) + (r.place ? 40 / n : 0), 0));
+  return { score, rows, truth };
+}
+
+// ───────────────────────── Hear a protest ─────────────────────────
+
+/** A protest to hear: an incident from above (a You-be-the-judge case), who protested whom, and how they hailed. */
+export interface ProtestTask {
+  seed: number; level: RoLevel; case: JudgeCase;
+  /** The hail: straight away, or only once she'd finished (too late, at Regional standard and up). */
+  hail: 'prompt' | 'late';
+}
+export function protestTask(level: RoLevel, seed: number): ProtestTask {
+  const rng = new Rng(seed);
+  const all = judgeCases();
+  const c = all[rng.int(0, all.length - 1)];
+  return { seed, level, case: c, hail: level !== 'club' && rng.next() < 0.3 ? 'late' : 'prompt' };
+}
+/** Who protested whom: the boat fouled protests the one that broke a rule; with no foul, one boat thought there was. */
+export function protestParties(t: ProtestTask, boats: string[], v: Verdict): { protestor: string; protestee: string } {
+  const rng = new Rng(t.seed + 17);
+  const protestee = v.offender ?? boats[rng.int(0, boats.length - 1)];
+  const others = boats.filter(b => b !== protestee);
+  return { protestor: others[rng.int(0, Math.max(0, others.length - 1))] ?? boats[0], protestee };
+}
+export type ProtestDecision = { kind: 'invalid' } | { kind: 'dismissed' } | { kind: 'upheld'; boat: string; rule: string };
+/** The right decision: invalid if hailed too late; else upheld against the boat that broke a rule, or dismissed. */
+export function protestTruth(t: ProtestTask, v: Verdict): ProtestDecision {
+  if (t.hail === 'late') return { kind: 'invalid' };
+  return v.offender ? { kind: 'upheld', boat: v.offender, rule: v.rule ?? '' } : { kind: 'dismissed' };
+}
+/** Marked: the validity call is the gate; then the finding (who) and the rule. */
+export function markProtest(t: ProtestTask, v: Verdict, d: ProtestDecision): { score: number; truth: ProtestDecision; valid: boolean; who: boolean; rule: boolean } {
+  const truth = protestTruth(t, v);
+  const base = (r: string) => r.split('(')[0];
+  if (truth.kind === 'invalid') return { score: d.kind === 'invalid' ? 100 : 0, truth, valid: d.kind === 'invalid', who: false, rule: false };
+  if (d.kind === 'invalid') return { score: 0, truth, valid: false, who: false, rule: false };
+  if (truth.kind === 'dismissed') return { score: d.kind === 'dismissed' ? 100 : 20, truth, valid: true, who: d.kind === 'dismissed', rule: d.kind === 'dismissed' };
+  const who = d.kind === 'upheld' && d.boat === truth.boat, rule = who && d.kind === 'upheld' && base(d.rule) === base(truth.rule);
+  return { score: 20 + (who ? 50 : 0) + (rule ? 30 : 0), truth, valid: true, who, rule };
+}

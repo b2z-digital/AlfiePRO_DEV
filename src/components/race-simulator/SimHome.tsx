@@ -881,7 +881,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <div className="min-w-[240px] flex-1">
                 <Cap>Race officer</Cap>
                 <h2 id="ro-title" className="m-0 mt-1 font-display text-[20px] font-bold leading-tight tracking-tight">{roHeld ? `You're a ${RO_NAME[roHeld]}` : 'Run the racing instead of sailing it'}</h2>
-                <p className="m-0 mt-1.5 text-[13.5px] leading-snug" style={{ color: C.mute }}>Set the course for the wind on the day and call the start line. Pass each duty to step up from club to World standard.</p>
+                <p className="m-0 mt-1.5 text-[13.5px] leading-snug" style={{ color: C.mute }}>Set the course, call the line, score the racing and hear a protest. Pass all four to step up from club to World standard.</p>
               </div>
               <Btn onClick={() => onOpen('ro')}>{training.ro ? 'Carry on' : 'Take the duties'}</Btn>
             </section>
