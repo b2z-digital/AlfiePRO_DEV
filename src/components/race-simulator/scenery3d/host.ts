@@ -10,10 +10,10 @@
 import type { World, WorldView } from './world';
 
 /** Venues with baked scenery: id -> folder under public/. */
-const SCENERY: Record<string, string> = {
-  lmryc: '/sim-venues/lmryc/',
-  kbryc: '/sim-venues/kbryc/',
-};
+const SCENERY: Record<string, string> = Object.fromEntries(
+  ['lmryc', 'kbryc', 'gladstone', 'kawana', 'paradise', 'lillydale', 'plrmyc', 'jackadder', 'risdon', 'taurikura', 'patawalonga']
+    .map(id => [id, `/sim-venues/${id}/`]),
+);
 
 type Slot = { world: World | null; failed: boolean; loading: boolean; credit: string };
 const slots = new Map<string, Slot>();

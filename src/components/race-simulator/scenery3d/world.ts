@@ -34,6 +34,8 @@ interface SceneData {
   v: number; id: string; near: number; wide: number; credit: string;
   /** Ground below this height is water (the survey can catch a tidal water surface above zero). */
   water?: number;
+  /** How the heights are packed in the elevation PNGs, when not the default (see heights()). */
+  dem?: { off: number; scale: number };
   roads: { c: number; n: string; one: number; p: number[] }[];
   blds: { n: string; h: number; z: number; roof: string | null; p: number[] }[];
   piers: { n: string; a: number; w: number; p: number[] }[];
@@ -57,6 +59,7 @@ const WATER_CUT = 0.22;
 
 /** Part of the way to a soft grey: photo colours and paint, seen through a kilometre of air. */
 const soften = (c: [number, number, number], k: number): [number, number, number] => { const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]; return [c[0] + (l - c[0]) * k, c[1] + (l - c[1]) * k, c[2] + (l - c[2]) * k]; };
+const WALLS: [number, number, number][] = [[0.86, 0.84, 0.79], [0.78, 0.77, 0.74], [0.74, 0.64, 0.54], [0.9, 0.89, 0.86], [0.68, 0.69, 0.7], [0.8, 0.74, 0.64]];
 const rgb = (hex: string): [number, number, number] => { const v = parseInt(hex.slice(1), 16); return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255]; };
 
 // ───────────────────────── Shaders ─────────────────────────
@@ -144,9 +147,12 @@ function colourMaterial(S: Shared, cut = 0) {
     uniforms: { ...S, uCut: { value: cut } },
     vertexShader: VERT_COMMON + /* glsl */`
       attribute vec3 col;
+      attribute vec3 fac;
       varying vec3 vCol;
+      varying vec3 vFac;
       void main() {
         vCol = col;
+        vFac = fac;
         #ifdef USE_INSTANCING
           gl_Position = place((modelMatrix * instanceMatrix * vec4(position, 1.0)).xyz);
         #else
@@ -155,7 +161,20 @@ function colourMaterial(S: Shared, cut = 0) {
       }`,
     fragmentShader: FRAG_COMMON + /* glsl */`
       varying vec3 vCol;
-      void main() { cutAway(); gl_FragColor = finish(vCol); }`,
+      varying vec3 vFac;
+      void main() {
+        cutAway();
+        vec3 c = vCol;
+        if (vFac.z > 0.5) {
+          // Windows: a band per 3.3 m floor, a pane every 3.2 m along (closer set in a glass tower);
+          // faded out with distance before they could shimmer.
+          float fl = fract(vFac.y / 3.3), ca = fract(vFac.x / (vFac.z > 1.5 ? 2.0 : 3.2));
+          float win = step(0.3, fl) * step(fl, 0.78) * step(0.18, ca) * step(ca, 0.82) * step(1.0, vFac.y);
+          float k = win * (1.0 - smoothstep(220.0, 900.0, vD));
+          c = mix(c, vec3(0.28, 0.33, 0.38) + c * 0.15, k * (vFac.z > 1.5 ? 0.75 : 0.6));
+        }
+        gl_FragColor = finish(c);
+      }`,
     side: THREE.DoubleSide,
   });
 }
@@ -174,7 +193,20 @@ function carMaterial(S: Shared) {
       }`,
     fragmentShader: FRAG_COMMON + /* glsl */`
       varying vec3 vCol;
-      void main() { cutAway(); gl_FragColor = finish(vCol); }`,
+      varying vec3 vFac;
+      void main() {
+        cutAway();
+        vec3 c = vCol;
+        if (vFac.z > 0.5) {
+          // Windows: a band per 3.3 m floor, a pane every 3.2 m along (closer set in a glass tower);
+          // faded out with distance before they could shimmer.
+          float fl = fract(vFac.y / 3.3), ca = fract(vFac.x / (vFac.z > 1.5 ? 2.0 : 3.2));
+          float win = step(0.3, fl) * step(fl, 0.78) * step(0.18, ca) * step(ca, 0.82) * step(1.0, vFac.y);
+          float k = win * (1.0 - smoothstep(220.0, 900.0, vD));
+          c = mix(c, vec3(0.28, 0.33, 0.38) + c * 0.15, k * (vFac.z > 1.5 ? 0.75 : 0.6));
+        }
+        gl_FragColor = finish(c);
+      }`,
     side: THREE.DoubleSide,
   });
 }
@@ -259,13 +291,17 @@ function lineMaterial(S: Shared) {
 class Builder {
   pos: number[] = [];
   col: number[] = [];
-  v(x: number, y: number, z: number, c: [number, number, number]) { this.pos.push(x, z, -y); this.col.push(c[0], c[1], c[2]); }
+  /** Per vertex: distance along a facade, height up it, and whether it has windows (0 for everything else). */
+  fac: number[] = [];
+  facNow: [number, number, number] = [0, 0, 0];
+  v(x: number, y: number, z: number, c: [number, number, number]) { this.pos.push(x, z, -y); this.col.push(c[0], c[1], c[2]); this.fac.push(...this.facNow); }
   tri(a: number[], b: number[], c: number[], col: [number, number, number]) { this.v(a[0], a[1], a[2], col); this.v(b[0], b[1], b[2], col); this.v(c[0], c[1], c[2], col); }
   quad(a: number[], b: number[], c: number[], d: number[], col: [number, number, number]) { this.tri(a, b, c, col); this.tri(a, c, d, col); }
   geometry() {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('col', new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.fac.some(f => f !== 0)) g.setAttribute('fac', new THREE.Float32BufferAttribute(this.fac, 3));
     g.computeBoundingSphere();
     return g;
   }
@@ -282,6 +318,16 @@ const lit = (c: [number, number, number], nx: number, ny: number, k = 1): [numbe
 function wall(B: Builder, a: number[], b: number[], z0: number, z1: number, c: [number, number, number]) {
   const ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey) || 1;
   B.quad([a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], lit(c, ey / L, -ex / L));
+}
+
+/** A building's wall with rows of windows: `along` is how far round the building this wall starts. */
+function facade(B: Builder, a: number[], b: number[], z0: number, z1: number, base: number, along: number, c: [number, number, number], glass: number) {
+  const ex = b[0] - a[0], ey = b[1] - a[1], L = Math.hypot(ex, ey) || 1;
+  const k = lit(c, ey / L, -ex / L);
+  const V = (p: number[], u: number, z: number) => { B.facNow = [u, z - base, glass]; B.v(p[0], p[1], z, k); };
+  V(a, along, z0); V(b, along + L, z0); V(b, along + L, z1);
+  V(a, along, z0); V(b, along + L, z1); V(a, along, z1);
+  B.facNow = [0, 0, 0];
 }
 
 /** A box turned to a heading (degrees, the way its length runs), centred on (x, y). */
@@ -411,14 +457,16 @@ async function loadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /** A heights PNG back to metres: (h + 20) * 100 in red (high byte) and green (low). */
-function heights(im: HTMLImageElement): { f: Float32Array; n: number } {
+/** Heights packed in a PNG's red and green: (h + off) * scale. The default suits a low-lying lake; a venue
+ *  high above sea or under a mountain packs a wider range (scene.dem). */
+function heights(im: HTMLImageElement, enc: { off: number; scale: number } = { off: 20, scale: 100 }): { f: Float32Array; n: number } {
   const n = im.naturalWidth;
   const c = document.createElement('canvas'); c.width = n; c.height = n;
   const g = c.getContext('2d', { willReadFrequently: true })!;
   g.drawImage(im, 0, 0);
   const d = g.getImageData(0, 0, n, n).data;
   const f = new Float32Array(n * n);
-  for (let i = 0; i < n * n; i++) f[i] = (d[i * 4] * 256 + d[i * 4 + 1]) / 100 - 20;
+  for (let i = 0; i < n * n; i++) f[i] = (d[i * 4] * 256 + d[i * 4 + 1]) / enc.scale - enc.off;
   return { f, n };
 }
 
@@ -510,14 +558,16 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
     loadImage(base + 'near.webp'), loadImage(base + 'wide.webp'),
   ]);
   const NEAR = scene.near, WIDE = scene.wide, CUT = scene.water ?? WATER_CUT;
-  const hN = sampler(heights(demN), NEAR), hW = sampler(heights(demW), WIDE);
+  const hN = sampler(heights(demN, scene.dem), NEAR), hW = sampler(heights(demW, scene.dem), WIDE);
   const F0 = opts.flatAt;
+  // Flattened ground near the stand stays just above the venue's water line.
+  const FLOOR = Math.max(0.3, CUT + 0.15);
   const ease = (x: number, y: number, h: number) => {
     if (!F0) return h;
     const d = Math.hypot(x - F0.x, y - F0.y);
     if (d > 320) return h;
     const k = Math.min(1, Math.max(0.3, (d - 90) / 230));
-    return h > 0.3 ? 0.3 + (h - 0.3) * k : h;
+    return h > FLOOR ? FLOOR + (h - FLOOR) * k : h;
   };
   const hNe = (x: number, y: number) => ease(x, y, hN(x, y));
   const height = (x: number, y: number) => (Math.abs(x) < NEAR && Math.abs(y) < NEAR ? hNe(x, y) : hW(x, y));
@@ -591,8 +641,16 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
     const p: number[][] = [];
     for (let i = 0; i < b.p.length; i += 2) p.push([b.p[i], b.p[i + 1]]);
     const bz = ease(p[0][0], p[0][1], b.z), z0 = bz - 0.6, z1 = bz + b.h;
-    const wc: [number, number, number] = [0.86, 0.84, 0.79];
-    for (let i = 0; i < p.length; i++) wall(B, p[i], p[(i + 1) % p.length], z0, z1, wc);
+    // Render, brick or concrete; towers in glass. Windows a floor at a time (fainter on small buildings).
+    const hsh = Math.abs(Math.round(p[0][0] * 7 + p[0][1] * 13)) % WALLS.length;
+    const tower = b.h >= 24;
+    const wc: [number, number, number] = tower ? [0.66, 0.71, 0.76] : WALLS[hsh];
+    let along = 0;
+    for (let i = 0; i < p.length; i++) {
+      const a = p[i], c = p[(i + 1) % p.length];
+      facade(B, a, c, z0, z1, bz, along, wc, tower ? 2 : 1);
+      along += Math.hypot(c[0] - a[0], c[1] - a[1]);
+    }
     const tris = THREE.ShapeUtils.triangulateShape(p.map(q => new THREE.Vector2(q[0], q[1])), []);
     const rc = b.roof ? rgb(b.roof) : [0.55, 0.56, 0.56] as [number, number, number];
     for (const t of tris) B.tri([p[t[0]][0], p[t[0]][1], z1], [p[t[1]][0], p[t[1]][1], z1], [p[t[2]][0], p[t[2]][1], z1], rc);
@@ -686,8 +744,15 @@ export async function createWorld(base: string, opts: WorldOptions = {}): Promis
   }
   // Flagpoles (the flags themselves are separate, to flutter).
   for (const [x, y, z, h] of scene.flags) box(B, x, y, ease(x, y, z) - 0.3, ease(x, y, z) + h, 0.12, 0.12, 0, [0.92, 0.92, 0.92]);
-  // Telecommunication masts.
-  for (const [x, y, z, h] of scene.masts) {
+  // Telecommunication masts, and the odd tall chimney (kind 1): a tapering concrete stack.
+  for (const [x, y, z, h, kind] of scene.masts) {
+    if (kind === 1) {
+      for (let i = 0; i < 5; i++) {
+        const t0 = i / 5, t1 = (i + 1) / 5, d = 7 - 3 * t1;
+        box(B, x, y, z + h * t0, z + h * t1, d, d, 22.5 * i, i === 4 ? [0.62, 0.3, 0.26] : [0.72, 0.71, 0.68]);
+      }
+      continue;
+    }
     box(B, x, y, z, z + h * 0.6, 0.9, 0.9, 45, [0.7, 0.71, 0.72]);
     box(B, x, y, z + h * 0.6, z + h, 0.5, 0.5, 45, [0.74, 0.75, 0.76]);
   }
