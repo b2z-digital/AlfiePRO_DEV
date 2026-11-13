@@ -32,7 +32,24 @@ export interface LevelParams {
    * below and the freedom to tack) rather than starting wherever she likes to.
    */
   startSense: number;
+  /**
+   * How a fleet fights for the line (the same for every level until the third tuning, which sharpens
+   * the better fleets). runUp: extra lengths back she waits, so she has the room to be at full speed
+   * as she crosses rather than still getting going. endDeg and endStbd: how she weighs the line's
+   * bias: the degrees of bias that settle which end pays, and the pull of the starboard end on a
+   * square line. rowGap, rowGrow and rowPush: how close the front row packs in from the end that
+   * pays (the gap between boats, how much it opens with each boat along, and the room she insists on
+   * from the boats beside her, in lengths). lag: the seconds she allows for getting a stopped boat
+   * going, on top of the sums (the best know their boat). touch: how small an error in her timing
+   * (seconds early) she starts to trim away on the run in. even: how much the fleet's waiting depths
+   * differ (1 as they did; less, and the row waits level and goes together). follow: she goes when the
+   * boat next to windward goes, if that's within this many seconds of her own moment, rather than sit
+   * and be rolled (0: she keeps to her own clock).
+   */
+  runUp: number; endDeg: number; endStbd: number; rowGap: number; rowGrow: number; rowPush: number; lag: number; touch: number; even: number; follow: number;
 }
+/** The fight for the line as every fleet had it before the third tuning. */
+const ROW = { runUp: 0, endDeg: 10, endStbd: 0.45, rowGap: 1.1, rowGrow: 0.05, rowPush: 1.6, lag: 0, touch: 0.35, even: 1, follow: 0 };
 
 /**
  * The four levels. Every skipper sails the same boat in the same wind: nobody is given speed. A
@@ -42,10 +59,10 @@ export interface LevelParams {
  * Sailed alone round a lap, each level is a little quicker than the one below (see levels.test.ts).
  */
 export const LEVELS: Record<SkipperLevel, LevelParams> = {
-  club: { layOut: 3.0, layClear: 0.85, reaction: 0.45, noise: 4.2, trimNoise: 0.14, shiftThr: 5.5, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 5.5, tackRudder: 0.62, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12 },
-  state: { layOut: 4.2, layClear: 0.6, reaction: 0.32, noise: 3, trimNoise: 0.1, shiftThr: 6.5, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 6, tackRudder: 0.74, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65 },
-  national: { layOut: 4.8, layClear: 0.45, reaction: 0.22, noise: 1.9, trimNoise: 0.06, shiftThr: 7.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 7, tackRudder: 0.82, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88 },
-  world: { layOut: 5.0, layClear: 0.35, reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 10, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 9, tackRudder: 0.92, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1 },
+  club: { layOut: 3.0, layClear: 0.85, reaction: 0.45, noise: 4.2, trimNoise: 0.14, shiftThr: 5.5, layMargin: 7, startMargin: 1.4, misjudge: 0.1, forget: 0.25, roundIn: 1.9, roundOut: 1.15, minTack: 5.5, tackRudder: 0.62, margin: 0.45, startSigma: 0.9, lineSigma: 0.42, startSense: 0.12, ...ROW },
+  state: { layOut: 4.2, layClear: 0.6, reaction: 0.32, noise: 3, trimNoise: 0.1, shiftThr: 6.5, layMargin: 4.5, startMargin: 0.8, misjudge: 0.04, forget: 0.1, roundIn: 1.75, roundOut: 0.95, minTack: 6, tackRudder: 0.74, margin: 0.42, startSigma: 0.5, lineSigma: 0.26, startSense: 0.65, ...ROW },
+  national: { layOut: 4.8, layClear: 0.45, reaction: 0.22, noise: 1.9, trimNoise: 0.06, shiftThr: 7.5, layMargin: 3.2, startMargin: 0.5, misjudge: 0.015, forget: 0.04, roundIn: 1.65, roundOut: 0.85, minTack: 7, tackRudder: 0.82, margin: 0.4, startSigma: 0.3, lineSigma: 0.16, startSense: 0.88, ...ROW },
+  world: { layOut: 5.0, layClear: 0.35, reaction: 0.15, noise: 0.8, trimNoise: 0.015, shiftThr: 10, layMargin: 2.4, startMargin: 0.3, misjudge: 0.005, forget: 0.01, roundIn: 1.55, roundOut: 0.78, minTack: 9, tackRudder: 0.92, margin: 0.38, startSigma: 0.18, lineSigma: 0.1, startSense: 1, ...ROW },
 };
 
 /**
@@ -62,7 +79,23 @@ export const LEVELS2: Record<SkipperLevel, LevelParams> = {
   world: { ...LEVELS.world },
 };
 /** The levels for a race's tuning. */
-export const levelsFor = (tune?: number): Record<SkipperLevel, LevelParams> => (tune === 2 ? LEVELS2 : LEVELS);
+/**
+ * The third tuning: the better the fleet, the harder the start is fought, as in real competition.
+ * A national or world fleet reads even a couple of degrees of line bias and packs in from the end
+ * that pays; waits further back so as to cross at full speed, not still accelerating; and judges
+ * the gun and the line closely enough to be on it. Club fleets start as they did; a regional fleet
+ * is a step towards it. (The rest of their sailing is the second tuning's.)
+ */
+export const LEVELS3: Record<SkipperLevel, LevelParams> = {
+  club: { ...LEVELS2.club },
+  state: { ...LEVELS2.state, startMargin: 0.7, runUp: 0.4, endDeg: 7, endStbd: 0.3, rowGap: 1.1, rowGrow: 0.05, rowPush: 1.5, lag: 0.12, touch: 0.3, even: 0.8, follow: 0.6 },
+  national: { ...LEVELS2.national, roundIn: 1.66, roundOut: 0.84, startMargin: 0.65, startSigma: 0.2, lineSigma: 0.12, runUp: 1.2, endDeg: 4, endStbd: 0.2, rowGap: 1.05, rowGrow: 0.04, rowPush: 1.3, lag: 0.35, touch: 0.25, even: 0.5, follow: 1.4 },
+  world: { ...LEVELS2.world, roundIn: 1.5, roundOut: 0.7, startMargin: 0.55, startSigma: 0.12, lineSigma: 0.08, runUp: 1.6, endDeg: 3, endStbd: 0.2, rowGap: 1.0, rowGrow: 0.03, rowPush: 1.2, lag: 0.45, touch: 0.18, even: 0.35, follow: 1.8 },
+};
+/** The parts of the fight for the line that a skipper's strength at starts moves (third tuning on). */
+const ROW_KEYS = ['runUp', 'endDeg', 'endStbd', 'rowGap', 'rowGrow', 'rowPush', 'lag', 'touch', 'even', 'follow'] as const;
+
+export const levelsFor = (tune?: number): Record<SkipperLevel, LevelParams> => ((tune ?? 0) >= 3 ? LEVELS3 : tune === 2 ? LEVELS2 : LEVELS);
 
 /**
  * A club fleet's sharp starters: every club has two or three who start like state sailors (they
@@ -71,7 +104,9 @@ export const levelsFor = (tune?: number): Record<SkipperLevel, LevelParams> => (
  */
 export function sharpStarter(lv: LevelParams, tune?: number): LevelParams {
   const st = levelsFor(tune).state;
-  return lv.startSense >= st.startSense ? lv : { ...lv, startSense: 0.75, startSigma: st.startSigma, lineSigma: st.lineSigma, startMargin: st.startMargin };
+  if (lv.startSense >= st.startSense) return lv;
+  const row = (tune ?? 0) >= 3 ? { runUp: st.runUp, endDeg: st.endDeg, endStbd: st.endStbd, rowGap: st.rowGap, rowGrow: st.rowGrow, rowPush: st.rowPush, lag: st.lag, touch: st.touch, even: st.even, follow: st.follow } : {};
+  return { ...lv, startSense: 0.75, startSigma: st.startSigma, lineSigma: st.lineSigma, startMargin: st.startMargin, ...row };
 }
 
 /** Which of a skipper's skills belong to which part of the race. */
@@ -104,6 +139,14 @@ export function ownLevel(level: SkipperLevel, s: Strengths, tune?: number): Leve
       out[k] = Math.max(k === 'misjudge' || k === 'forget' ? 0.001 : 0.004, b + (to - b) * Math.abs(v));
     }
   }
+  // (From the third tuning, her strength at starts moves the fight for the line too.)
+  const sv = clamp(s.start, -1.4, 1.4);
+  if ((tune ?? 0) >= 3 && sv) for (const k of ROW_KEYS) {
+    const b = base[k];
+    const to = sv > 0 ? (up ? up[k] : b + (b - down![k]) * 0.6) : (down ? down[k] : b + (b - up![k]) * 0.6);
+    out[k] = b + (to - b) * Math.abs(sv);
+  }
+  out.runUp = Math.max(0, out.runUp); out.endDeg = Math.max(2, out.endDeg); out.rowGap = Math.max(0.8, out.rowGap); out.rowGrow = Math.max(0, out.rowGrow); out.rowPush = Math.max(0.85, out.rowPush); out.lag = Math.max(0, out.lag); out.touch = clamp(out.touch, 0.08, 0.35); out.even = clamp(out.even, 0.2, 1); out.follow = Math.max(0, out.follow);
   out.startSense = clamp(out.startSense, 0, 1);
   out.tackRudder = clamp(out.tackRudder, 0.5, 1);
   return out;
@@ -278,7 +321,9 @@ export class Skipper implements Helm {
     pre.clockErr = clamp(rng.gauss(), -2.5, 2.5) * lv.startSigma;
     pre.lineErr = clamp(rng.gauss(), -2.5, 2.5) * lv.lineSigma;
     pre.setupT = 25 + 9 * (1 - persona.aggression) + rng.range(0, 4);
-    pre.hoverD = 0.9 + 0.8 * (1 - persona.aggression) + rng.range(0, 0.35);
+    // (The sums in the order they always were for a fleet that waits as fleets did: a race keeps the tuning it was set up with, to the last decimal place.)
+    const own = 0.8 * (1 - persona.aggression), chance = rng.range(0, 0.35);
+    pre.hoverD = lv.even === 1 && lv.runUp === 0 ? 0.9 + own + chance : 0.9 + lv.even * (own + chance) + lv.runUp;
   }
 
   // ───────────────────────── decision (10 Hz) ─────────────────────────
@@ -561,13 +606,15 @@ export class Skipper implements Helm {
       // below and the freedom to tack away. They can't all have the end: the boldest take it and
       // the rest line up along from it, a little over a length apart and spreading out down the
       // line, so the front row fills from the end that pays.
-      const pays = clamp(bias / 10 + 0.45, -1, 1);
+      const pays = clamp(bias / this.lv.endDeg + this.lv.endStbd, -1, 1);
       if (sense > 0.3 && Math.abs(pays) > 0.05) {
         const claim = (o: Boat) => (o.persona ? 0.6 * o.persona.aggression + 0.4 * o.persona.risk : 0) + (Number(o.id.slice(1)) % 7) * 0.013;
         let ahead = 0;
         for (const o of h.boats) if (o !== b && !o.human && (o.persona?.startSense ?? 0) > 0.3 && claim(o) > claim(b)) ahead++;
-        let along = 0.9 * L;                         // the boldest sets up a length in from the mark
-        for (let k = 0; k < ahead; k++) along += (1.1 + 0.05 * k) * L;
+        // The boldest sets up a length in from the mark (a sharp fleet's, with its longer run in on
+        // starboard, a little further in from the pin, so as not to be carried past it).
+        let along = (pays < 0 && this.lv.runUp > 0 ? 0.9 + 0.5 * this.lv.runUp : 0.9) * L;
+        for (let k = 0; k < ahead; k++) along += (this.lv.rowGap + this.lv.rowGrow * k) * L;
         const slot = clamp(along / len, 0.9 * L / len, 0.94);
         f = lerp(f, pays > 0 ? 1 - slot : slot, Math.min(1, sense * 1.15) * clamp(Math.abs(pays) / 0.2, 0, 1));
       }
@@ -577,7 +624,7 @@ export class Skipper implements Helm {
         if (o === b || o.finished) continue;
         if (-lineSide(c, o) > 6 * L) continue;
         const dd = mine - dot(sub(o, P), ld);
-        if (Math.abs(dd) < 1.6 * L) push += (dd >= 0 ? 1 : -1) * (1.6 * L - Math.abs(dd)) * 0.5;
+        if (Math.abs(dd) < this.lv.rowPush * L) push += (dd >= 0 ? 1 : -1) * (this.lv.rowPush * L - Math.abs(dd)) * 0.5;
       }
       f = sense > 0 ? clamp((mine + push) / len, Math.min(0.06, 0.9 * L / len), Math.max(0.94, 1 - 0.9 * L / len)) : clamp((mine + push) / len, 0.08, 0.92);
       pre.spot = lerp(pre.spot, f, sense > 0 ? 0.04 : 0.03);
@@ -601,7 +648,18 @@ export class Skipper implements Helm {
     const turnDeg = b.tack === 'stbd' ? Math.abs(n180(goHdg - b.hdg)) : Math.abs(n180(goHdg - b.hdg)) + 25;
     const turnT = turnDeg / Math.max(10, b.cls.maxRot * 0.7 * auth);
     const react = this.lv.reaction * (1.3 - 0.6 * this.persona.consistency);
-    const ttl = react + 0.5 * turnT + timeToCover(D, b.spd, vT, accelTau(tws));
+    // (A sharp skipper allows for how slowly a stopped boat gets going, and more so packed in a row,
+    // where every sail to windward takes some of her wind once they all sheet in.)
+    let crowd = 0;
+    if (this.lv.lag > 0) for (const o of h.boats) {
+      if (o === b || o.finished) continue;
+      const al = dot(sub(o, b), ld);
+      if (al > 0.2 * L && al < 3.2 * L && Math.abs(lineSide(c, o) - lineSide(c, b)) < 2 * L) crowd++;
+    }
+    // (That allowance decides when she goes. Once she's going she steers by the sums alone, which err
+    // towards her being early: better to trim a little speed off than be over.)
+    const ttl0 = react + 0.5 * turnT + timeToCover(D, b.spd, vT, accelTau(tws));
+    const ttl = ttl0 + this.lv.lag * (1 + 1.5 * Math.min(2, crowd)) * clamp(1 - b.spd / (0.6 * vT), 0, 1);
     const margin = 0.15 + this.lv.startMargin * (0.5 + 0.5 * this.persona.startEarly) - this.eager;
     const setupT = Math.min(pre.setupT, Math.max(8, h.gunT - 4));
 
@@ -619,14 +677,24 @@ export class Skipper implements Helm {
 
     // Go when the time to the line at full speed reaches the time until we want to cross (just after the gun).
     if (!pre.triggered && Tp <= setupT && ttl >= Tp + margin) pre.triggered = true;
+    // A sharp fleet's front row goes together: when the boat next to windward sheets in and goes, she
+    // goes with her (if it's nearly her time anyway) rather than sit, be sailed over and start in that
+    // boat's dirty wind. She then trims off the time she's early on the way in.
+    if (!pre.triggered && this.lv.follow > 0 && pre.settled && b.tack === 'stbd' && Tp <= setupT && ttl >= Tp + margin - this.lv.follow) {
+      for (const o of h.boats) {
+        if (o === b || o.finished || o.tack !== 'stbd' || o.spd < 0.45 * vT) continue;
+        const al = dot(sub(o, b), ld), dp = lineSide(c, o) - lineSide(c, b);
+        if (al > 0.2 * L && al < 2.4 * L && Math.abs(dp) < 1.8 * L && Math.abs(n180(o.hdg - goHdg)) < 25) { pre.triggered = true; break; }
+      }
+    }
 
     // ── Triggered: go, and control the speed so we cross just after the gun ──
     if (pre.triggered) {
       if (b.tack === 'port' && Math.abs(b.twa) < 100) return { hdg: stbdCH, sheet: bestSheet(goTwa), intent: 'Tacking onto starboard', maneuver: 'tack' };
-      const early = (Tp + margin) - ttl; // + = we'd cross before we mean to
+      const early = (Tp + margin) - ttl0; // + = we'd cross before we mean to
       let hdg = goHdg, sheet = bestSheet(goTwa), intent = 'Accelerating to the line';
       if (early > 1.0) { sheet = easedSheet(goTwa, early > 2.5 ? 0.15 : 0.5); hdg = n360(goHdg + 5); intent = 'Burning time'; }
-      else if (early > 0.35) { sheet = easedSheet(goTwa, 0.75); intent = 'Controlling speed'; }
+      else if (early > this.lv.touch) { sheet = easedSheet(goTwa, this.lv.touch < 0.35 ? clamp(0.95 - 0.45 * early, 0.55, 0.9) : 0.75); intent = 'Controlling speed'; }
       else if (early < -0.8) { hdg = n360(goHdg - 5); intent = 'Late: footing for speed'; }
       // If we'd reach the line before the gun and can only just stop, stop now.
       if (Tp > 0.05 && D < b.spd * Tp && D < b.spd * (1.55 + react) + 0.25 * L) { hdg = n360(twd - (ng + 2)); sheet = 0.05; intent = 'Stopping on the line'; }

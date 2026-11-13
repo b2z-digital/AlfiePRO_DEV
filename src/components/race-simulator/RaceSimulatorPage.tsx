@@ -117,8 +117,9 @@ function toSettings(s: Setup, mode: 'race' | 'start', today: VenueWind | null, m
     // Your own name, your sail number (the one you've given her, or your boat's in Alfie) and how you've finished her.
     player: playerOf(me, 'name', s.classId, yard),
     classId: s.classId, fleetSize: s.fleetSize, level: s.level,
-    // (Races set up from here on use the second tuning of the computer's skippers: the levels further apart.)
-    tune: 2,
+    // (Races set up from here on use the third tuning of the computer's skippers: the levels further
+    // apart, and the better fleets fighting harder for the start. A race keeps the tuning it was set up with.)
+    tune: 3,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: mode === 'start' ? 1 : s.laps, length: s.length,
     sequenceSeconds: seq ? seq.seconds : s.sequenceSeconds, coach: s.coach, autoTrim: s.autoTrim,
