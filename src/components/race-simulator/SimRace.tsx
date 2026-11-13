@@ -6,6 +6,7 @@ import { DrillCardView } from './drillCard';
 import { usePadGo } from './padGo';
 import { levelName } from './rating';
 import { creditLine } from '@/sim/venue';
+import { sceneryCredit } from './scenery3d/host';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Race, RaceLog } from '@/sim/engine';
 import { PERSONAS, Skipper, knownFor, levelsFor } from '@/sim/ai';
@@ -1029,7 +1030,7 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
             bottom={!replay}
             watchSticks={watching && !replay && !sceneOut && !intro}
             autoTrim={race.settings.autoTrim}
-            credit={race.venue ? creditLine(race.venue.def) : null}
+            credit={race.venue ? sceneryCredit(race.venue.def.id) ?? creditLine(race.venue.def) : null}
           />
         )}
         {phone && caption && <div className="pointer-events-none absolute bottom-[42%] left-3 right-3 z-20"><CaptionLine caption={caption} /></div>}

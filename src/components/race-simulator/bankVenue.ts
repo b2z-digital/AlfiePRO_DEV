@@ -5,7 +5,8 @@
 // reach into the water, bridges cross it, and places across the water are named on the skyline.
 import type { Race } from '@/sim/engine';
 import type { V2 } from '@/sim/math';
-import { wetIn, type VenueScene } from '@/sim/venue';
+import { toGeo, wetIn, type VenueScene } from '@/sim/venue';
+import { sceneryFailed, sceneryFor } from './scenery3d/host';
 import type { BankCam, BankView } from './bank';
 
 interface Tree { x: number; y: number; z: number; h: number; wf: number; col: string; tall: boolean }
@@ -211,36 +212,43 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
   const sx = (a: number, d: number) => cam.x + Math.sin(a * D2R) * d;
   const sy = (a: number, d: number) => cam.y + Math.cos(a * D2R) * d;
 
+  // With the venue's real country in 3D (scenery3d), that draws everything on the land, over the
+  // water, after the wind and the waves are on it (drawVenueLand). Here, only the water.
+  const land3d = !!sceneryFor(v.def.id, standOf(v));
+
   // ── Ridges behind the far shores, hazy ──
-  const cols: { x: number; a: number; D: number }[] = [];
-  for (let x = -12; x <= w + 12; x += 8) {
-    const a = cam.yaw + Math.atan((x - w / 2) / V.F) / D2R;
-    cols.push({ x, a, D: Math.min(4500, farShore(sc.rings, v, cam.x, cam.y, a)) });
-  }
-  // Even the distances out a little from one column to the next, so a near point against far water
-  // doesn't stand up as a cliff on the skyline.
-  {
-    const raw = cols.map(c => c.D);
-    for (let i = 0; i < cols.length; i++) {
-      let sum = 0, n = 0;
-      for (let k = -4; k <= 4; k++) { const j = i + k; if (j >= 0 && j < raw.length) { const wgt = 5 - Math.abs(k); sum += raw[j] * wgt; n += wgt; } }
-      cols[i].D = sum / n;
+  if (!land3d) {
+    const cols: { x: number; a: number; D: number }[] = [];
+    for (let x = -12; x <= w + 12; x += 8) {
+      const a = cam.yaw + Math.atan((x - w / 2) / V.F) / D2R;
+      cols.push({ x, a, D: Math.min(4500, farShore(sc.rings, v, cam.x, cam.y, a)) });
     }
-  }
-  const ridge = (back: (c: { a: number; D: number }) => number, ht: (c: { a: number; D: number }) => number, fill: string) => {
-    ctx.fillStyle = fill;
-    ctx.beginPath(); ctx.moveTo(cols[0].x, hz + 2);
-    for (const c of cols) {
-      const d = c.D + back(c);
-      const q = P(sx(c.a, d), sy(c.a, d), ht(c));
-      ctx.lineTo(c.x, Math.min(hz + 1, q.y));
+    // Even the distances out a little from one column to the next, so a near point against far water
+    // doesn't stand up as a cliff on the skyline.
+    {
+      const raw = cols.map(c => c.D);
+      for (let i = 0; i < cols.length; i++) {
+        let sum = 0, n = 0;
+        for (let k = -4; k <= 4; k++) { const j = i + k; if (j >= 0 && j < raw.length) { const wgt = 5 - Math.abs(k); sum += raw[j] * wgt; n += wgt; } }
+        cols[i].D = sum / n;
+      }
     }
-    ctx.lineTo(cols[cols.length - 1].x, hz + 2); ctx.closePath(); ctx.fill();
-  };
-  // In flat country there are none: only a low line of far trees under the sky.
-  const hl = sc.hills;
-  ridge(c => 1400 + 1800 * nz(sx(c.a, c.D), sy(c.a, c.D), 1), c => (c.D >= 4500 ? 0 : hl * (50 + 80 * nz(sx(c.a, c.D), sy(c.a, c.D), 2)) + (1 - hl) * 9), '#ADBFC8');
-  ridge(c => 450 + 380 * nz(sx(c.a, c.D), sy(c.a, c.D), 4), c => (c.D >= 4500 ? 0 : hl * (16 + 30 * nz(sx(c.a, c.D), sy(c.a, c.D), 5)) + (1 - hl) * (6 + 5 * nz(sx(c.a, c.D), sy(c.a, c.D), 5))), '#97AEAC');
+    const ridge = (back: (c: { a: number; D: number }) => number, ht: (c: { a: number; D: number }) => number, fill: string) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath(); ctx.moveTo(cols[0].x, hz + 2);
+      for (const c of cols) {
+        const d = c.D + back(c);
+        const q = P(sx(c.a, d), sy(c.a, d), ht(c));
+        ctx.lineTo(c.x, Math.min(hz + 1, q.y));
+      }
+      ctx.lineTo(cols[cols.length - 1].x, hz + 2); ctx.closePath(); ctx.fill();
+    };
+    // In flat country there are none: only a low line of far trees under the sky.
+    const hl = sc.hills;
+    ridge(c => 1400 + 1800 * nz(sx(c.a, c.D), sy(c.a, c.D), 1), c => (c.D >= 4500 ? 0 : hl * (50 + 80 * nz(sx(c.a, c.D), sy(c.a, c.D), 2)) + (1 - hl) * 9), '#ADBFC8');
+    ridge(c => 450 + 380 * nz(sx(c.a, c.D), sy(c.a, c.D), 4), c => (c.D >= 4500 ? 0 : hl * (16 + 30 * nz(sx(c.a, c.D), sy(c.a, c.D), 5)) + (1 - hl) * (6 + 5 * nz(sx(c.a, c.D), sy(c.a, c.D), 5))), '#97AEAC');
+
+  }
 
   // ── The lake: the real shoreline, clipped to the view; islands are holes ──
   const outline: { x: number; y: number }[][] = [];
@@ -258,6 +266,7 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
     ctx.fillStyle = wg;
     waterPath(); ctx.fill('evenodd');
   }
+  if (land3d) return outline.length ? waterPath : null;
 
   // ── Houses and trees, far to near ──
   const fw = { x: Math.sin(cam.yaw * D2R), y: Math.cos(cam.yaw * D2R) };
@@ -400,6 +409,68 @@ export function drawVenueScene(ctx: CanvasRenderingContext2D, V: BankView, race:
     ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(text, q.x, q.y - 14);
   }
   return outline.length ? waterPath : null;
+}
+
+/** Where the skippers stand at a venue (its usual control area), venue metres. */
+const standOf = (v: VenueScene) => { const c = v.def.control; return { x: (c[0].x + c[1].x) / 2, y: (c[0].y + c[1].y) / 2 }; };
+
+/**
+ * The venue's real country in 3D, when it has it (see scenery3d): drawn over the water, after the
+ * ripples and wakes and before the boats, then the names of places across the water. Does nothing
+ * for a venue without it, or until it has loaded.
+ */
+export function drawVenueLand(ctx: CanvasRenderingContext2D, V: BankView, race: Race, cam: BankCam, water: (() => void) | null, o: { dpr: number; detail: number }) {
+  const v = race.venue;
+  if (!v) return;
+  const world = sceneryFor(v.def.id, standOf(v));
+  if (!world) return;
+  const f = v.frame;
+  const at = toGeo(f, { x: cam.x, y: cam.y });
+  // The water mirrors the shore: clearly when it's flat, hardly at all in a breeze or a chop.
+  const tws = race.wind.meanTws(race.t) / 0.514444;
+  const calm = 1 - 0.75 * Math.min(1, Math.max(0, (tws - 2) / 12));
+  const reflect = (!race.sea ? 0.55 : race.sea.kind === 'chop' ? 0.2 : 0.1) * calm;
+  try {
+    const view = {
+      x: at.x, y: at.y, eye: cam.z,
+      yaw: f.rot + cam.yaw, pitch: cam.pitch, fov: cam.fov,
+      w: V.w, h: V.h,
+      scale: o.detail >= 2 ? Math.min(o.dpr, 1.5) : o.detail === 1 ? Math.min(o.dpr, 1) : 0.75,
+      t: race.t,
+      reflect: o.detail > 0 ? reflect : 0,
+      windFrom: f.rot + race.wind.meanTwd(race.t),
+    };
+    // The shore in the water, on the water only; then the land itself.
+    if (view.reflect > 0.01 && water) {
+      const r = world.render(view, 'reflection');
+      ctx.save(); water(); ctx.clip('evenodd');
+      ctx.drawImage(r, 0, 0, V.w, V.h);
+      ctx.restore();
+    }
+    ctx.drawImage(world.render(view, 'land'), 0, 0, V.w, V.h);
+  } catch (e) {
+    sceneryFailed(v.def.id, e);
+    return;
+  }
+  // ── Places across the water ──
+  const D2R = Math.PI / 180;
+  const fw = { x: Math.sin(cam.yaw * D2R), y: Math.cos(cam.yaw * D2R) };
+  const halfTan = (V.w / 2 + 60) / V.F;
+  ctx.font = `600 12px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const lm of v.landmarks) {
+    const dx = lm.at.x - cam.x, dy = lm.at.y - cam.y;
+    const d = dx * fw.x + dy * fw.y;
+    if (d < 12 || Math.abs(dx * fw.y - dy * fw.x) >= d * halfTan) continue;
+    const q = V.P(lm.at.x, lm.at.y, 34);
+    if (q.x < 80 || q.x > V.w - 80) continue;
+    const km = Math.hypot(dx, dy) / 1000;
+    const text = `${lm.name} · ${km < 10 ? km.toFixed(1) : Math.round(km)} km`;
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(q.x, q.y - 4); ctx.lineTo(q.x, q.y + 6); ctx.stroke();
+    ctx.fillStyle = 'rgba(6,11,22,0.45)'; ctx.fillText(text, q.x + 0.8, q.y - 13.2);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(text, q.x, q.y - 14);
+  }
 }
 
 /** The map data's credit, small, in a corner of the view. */

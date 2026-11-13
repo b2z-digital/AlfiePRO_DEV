@@ -10,7 +10,8 @@ import { DEG, dir, n180 } from '@/sim/math';
 import { seaLevel } from '@/sim/sea';
 import type { WorldOverlay } from '@/sim/scene';
 import { DrawOpts, Pose, drawBoat3d, drawReflection, onWaves, rigFor, sailSet, twaFor } from './boat3d';
-import { drawCredit, drawVenueScene } from './bankVenue';
+import { drawCredit, drawVenueLand, drawVenueScene } from './bankVenue';
+import { sceneryCredit } from './scenery3d/host';
 import { drawGusts, drawRipples, drawWakes, drawWaves } from './bankWater';
 import { labelScale } from './textScale';
 
@@ -336,6 +337,8 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
   for (const q of posed) drawReflection(ctx, q.pose, o, reflect);
   drawWakes(ctx, V, race, posed.map(q => ({ i: race.boats.indexOf(q.b), pose: q.pose, L: q.b.cls.loa, beam: q.b.cls.beam, hullSpeed: q.b.cls.hullSpeed })), v.back, detail);
   ctx.restore();
+  // At a venue with its real country in 3D: the land, over the water's edge.
+  if (race.venue) drawVenueLand(ctx, V, race, cam, waterClip, { dpr, detail });
 
   // ── The course: start line, zone, teaching marks ──
   ctx.lineCap = 'butt';
@@ -440,7 +443,7 @@ export function drawBank(ctx: CanvasRenderingContext2D, race: Race, v: BankOptio
       label(ctx, nextAt.name.replace(/^the /, ''), Math.max(60, Math.min(w - 60, ax)), ay + (ay > h / 2 ? -28 : 28), '#CFE5FF', 12);
     }
   }
-  if (race.venue && v.credit !== false) drawCredit(ctx, creditLine(race.venue.def), w, h);
+  if (race.venue && v.credit !== false) drawCredit(ctx, sceneryCredit(race.venue.def.id) ?? creditLine(race.venue.def), w, h);
 }
 
 /**
