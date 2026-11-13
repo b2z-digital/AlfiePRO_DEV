@@ -13,6 +13,11 @@ are untouched. Venues without it keep the drawn scenery.
    - `club`: a sailing club's shed, boat park (dinghies with masts up) and flagpole.
    - `sculpture`: a tall slender sculpture with a vane on top.
    - `flag`: a flagpole.
+   Also per venue: `marinas` (boats moored along the jetties inside a circle), `bridges` (road bridges
+   over the water, matched by road name: the deck's height, and `truss` for an old steel through truss
+   on the carriageway running that way), and `water` for tidal water, where the survey caught the
+   water's surface above zero (Kogarah Bay: 0.75 m). Check a new venue's water level by sampling
+   `dem-near.png` inside the venue's lake polygon.
 2. Open any https page in a browser, paste `bake.js` into the console, then run `await bake('<id>')`
    and `await saveAll()`. It takes a minute or two.
 3. Put the six files in `public/sim-venues/<id>/`: `scene.json`, `trees.bin`, `near.webp`,

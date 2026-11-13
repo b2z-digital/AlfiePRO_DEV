@@ -30,6 +30,27 @@ const VENUES = {
       { kind: 'sculpture', name: 'Chimera', x: 328, y: 1096, h: 12 },
     ],
   },
+  kbryc: {
+    origin: { lat: -33.995977, lon: 151.1174658 },
+    // Tidal water: the survey caught its surface up to about half a metre.
+    water: 0.75,
+    near: 3200, wide: 16000,
+    nearImg: 2048, wideImg: 1536, nearDem: 640, wideDem: 400,
+    treesFar: 9000,
+    marinas: [
+      { name: 'St George Motor Boat Club', x: 450, y: -500, r: 230 },
+      { name: "Tom Ugly's Bridge and Sylvania marinas", x: -690, y: -1050, r: 200 },
+    ],
+    // Road bridges over the water: the deck's height above it, and an old steel truss over the
+    // carriageway that runs this way (compass degrees, roughly).
+    bridges: [
+      { road: 'Princes Highway', deck: 9, truss: { heading: 20 } },
+      { road: 'Rocky Point Road', deck: 13 },
+    ],
+    landmarks: [
+      { kind: 'flag', name: 'St George Motor Boat Club', x: 560, y: -470, h: 10, color: '#1f3f8f' },
+    ],
+  },
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -111,12 +132,30 @@ async function bake(id) {
   // Roads with traffic, and every street (to turn houses to face it).
   const MAJOR = { motorway: 4, trunk: 4, primary: 3, secondary: 2, tertiary: 1, motorway_link: 1, trunk_link: 1, primary_link: 1, secondary_link: 1 };
   const STREET = new Set(['residential', 'unclassified', 'living_street', 'tertiary', 'secondary', 'primary', 'trunk', 'service']);
-  const roads = [], streets = [];
+  const roads = [], streets = [], bridges = [];
+  // A bridge's deck: up off its abutments to its height over the water, along the way.
+  const deckZ = (p, B) => {
+    const cum = [0]; for (let i = 1; i < p.length; i++) cum.push(cum[i - 1] + Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]));
+    const L = cum[cum.length - 1] || 1, ramp = Math.min(70, L / 3);
+    return p.map((q, i) => { const e = Math.min(cum[i], L - cum[i]); const k = Math.min(1, e / ramp); const g = Math.max(0.3, height(q[0], q[1])); return Math.max(g + 0.5, g + (B.deck - g) * (k * k * (3 - 2 * k))); });
+  };
+  const bridgeFor = (t) => t.bridge && t.bridge !== 'no' && (C.bridges || []).find(B => (t.name || '').includes(B.road) || (t.ref || '').includes(B.road));
   for (const w of ways.values()) {
     const t = w.tags || {};
     if (!t.highway || t.area === 'yes' || t.tunnel) continue;
-    const p = wayPts(w); if (p.length < 2 || !p.some(inNear)) continue;
-    if (MAJOR[t.highway] != null) roads.push({ c: MAJOR[t.highway], n: t.name || t.ref || '', one: t.oneway === 'yes' ? 1 : 0, p: p.flatMap(q => [r1(q[0]), r1(q[1]), r1(Math.max(0.3, height(q[0], q[1])) + 0.15)]) });
+    let p = wayPts(w); if (p.length < 2 || !p.some(inNear)) continue;
+    const B = bridgeFor(t);
+    // A bridge's way may be one straight line: points along it, so the deck can rise and fall.
+    if (B) { const d = []; for (let i = 0; i + 1 < p.length; i++) { const a = p[i], b = p[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10)); for (let k = 0; k < n; k++) d.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]); } d.push(p[p.length - 1]); p = d; }
+    const zs = B ? deckZ(p, B) : p.map(q => Math.max(0.3, height(q[0], q[1])) + 0.15);
+    if (B) {
+      const lanes = +t.lanes || (t.oneway === 'yes' ? 3 : 4);
+      const dx = p[p.length - 1][0] - p[0][0], dy = p[p.length - 1][1] - p[0][1];
+      const hd = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+      const truss = B.truss && Math.abs(((hd - B.truss.heading + 540) % 360) - 180) < 45 ? 1 : 0;
+      bridges.push({ n: t.name || t.ref || '', w: r1(lanes * 3.4 + 1.5), truss, p: p.flatMap((q, i) => [r1(q[0]), r1(q[1]), r1(zs[i])]) });
+    }
+    if (MAJOR[t.highway] != null) roads.push({ c: MAJOR[t.highway], n: t.name || t.ref || '', one: t.oneway === 'yes' ? 1 : 0, p: p.flatMap((q, i) => [r1(q[0]), r1(q[1]), r1(B ? zs[i] + 0.1 : zs[i])]) });
     if (STREET.has(t.highway)) streets.push({ p, w: t.highway === 'service' ? 4 : MAJOR[t.highway] != null ? 9 : 7 });
   }
   // Buildings mapped in OSM (the notable ones: clubs, schools, shops).
@@ -255,6 +294,14 @@ async function bake(id) {
   }
   // Boats on moorings along the marinas' jetties.
   const boats = [];
+  // Boats on swing moorings, where OSM has them.
+  for (const n of nodes.values()) {
+    const t = n.tags; if (!t) continue;
+    if (!(/mooring/.test(t['seamark:type'] || '') || t.mooring === 'yes' || t.leisure === 'mooring')) continue;
+    const q = toXY(n.lon, n.lat); if (!inNear(q) || height(q[0], q[1]) > 0.3) continue;
+    const L = 7 + rnd() * 5;
+    boats.push([r1(q[0]), r1(q[1]), Math.round(rnd() * 360), r1(L), rnd() < 0.55 ? 1 : 0]);
+  }
   for (const M of C.marinas) for (const pr of piers) {
     for (let i = 0; i + 3 < pr.p.length; i += 2) {
       const ax = pr.p[i], ay = pr.p[i + 1], bx = pr.p[i + 2], by = pr.p[i + 3];
@@ -333,9 +380,9 @@ async function bake(id) {
   out['trees.bin'] = 'data:application/octet-stream;base64,' + b64(TB);
 
   const scene = {
-    v: 1, id, origin: O, near: C.near, wide: C.wide,
+    v: 1, id, origin: O, near: C.near, wide: C.wide, water: C.water,
     credit: 'Imagery, elevation & addresses © Spatial Services NSW · Map data © OpenStreetMap contributors',
-    roads, blds, piers, power, masts, houses, boats, dinghies, flags, landmarks: lms, trees: trees.length,
+    roads, bridges, blds, piers, power, masts, houses, boats, dinghies, flags, landmarks: lms, trees: trees.length,
   };
   out['scene.json'] = JSON.stringify(scene);
   window.BAKE = out;
