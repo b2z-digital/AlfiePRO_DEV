@@ -641,6 +641,18 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
   // Sails, mast and boom are painted far to near, so a sail in front of the mast hides it.
   const layers: { d: number; draw: () => void }[] = [];
   for (const sl of sails) layers.push({ d: sl.d, draw: () => {
+    // The boom along the foot (the main's, and the jib's: a radio yacht's jib is set on a boom too).
+    // It runs straight from tack to clew while the sail's foot curves out into its belly, so seen from
+    // the belly's side (from leeward, the wind behind the sail) the sail hides it: draw it first. From
+    // windward it's in front of the sail: draw it last.
+    const boom = () => {
+      const bt = o.P(...sl.S(0, 0)), bc = o.P(...sl.S(0, 1));
+      ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(sl.kind === 'main' ? 0.009 : 0.0075);
+      ctx.beginPath(); ctx.moveTo(bt.x, bt.y); ctx.lineTo(bc.x, bc.y); ctx.stroke();
+    };
+    const tk0 = sl.S(0, 0), ck0 = sl.S(0, 1), mid0: V3 = [(tk0[0] + ck0[0]) / 2, (tk0[1] + ck0[1]) / 2, (tk0[2] + ck0[2]) / 2];
+    const boomBehind = dot(sub(sl.S(0, 0.5), mid0), sub(o.cam, mid0)) > 0;
+    if (boomBehind) boom();
     if (sl.kind === 'jib' && size > 30) {
       const tk = o.P(...sl.S(0, 0)), hd = o.P(...g.w(r.mastX * L - 0.004, 0, deck + r.hounds));
       ctx.strokeStyle = 'rgba(91,100,116,0.7)'; ctx.lineWidth = Math.max(0.7, (o.F * 0.003) / depth);
@@ -788,12 +800,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo((a.x + b.x) / 2, (a.y + b.y) / 2 - 1.2 + flutter, b.x, b.y + flutter); ctx.stroke();
       }
     }
-    // The booms along each foot: the main's, and the jib's (a radio yacht's jib is set on a boom too).
-    {
-      const bt = o.P(...sl.S(0, 0)), bc = o.P(...sl.S(0, 1));
-      ctx.strokeStyle = '#3A404C'; ctx.lineCap = 'round'; ctx.lineWidth = lw(sl.kind === 'main' ? 0.009 : 0.0075);
-      ctx.beginPath(); ctx.moveTo(bt.x, bt.y); ctx.lineTo(bc.x, bc.y); ctx.stroke();
-    }
+    if (!boomBehind) boom();
   } });
   // The mast, in front of the sails or hidden behind them by depth.
   const mMid = g.w(r.mastX * L - 0.01 * L, 0, deck + r.mastH * 0.45);

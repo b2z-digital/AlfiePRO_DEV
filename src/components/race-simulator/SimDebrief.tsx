@@ -4,7 +4,7 @@ import { levelName } from './rating';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { Race } from '@/sim/engine';
 import type { RaceSummary, TrainLink } from './stats';
-import { causeLink, fmt } from './stats';
+import { causeLink, fmt, startWords } from './stats';
 import { CAUSE_WORDS, type Cause, type Ledger } from './ledger';
 import { playsFor } from './playbook';
 import { focusPlay, focusWords, type Focus } from './focus';
@@ -39,7 +39,7 @@ function FocusCard({ focus, onPlay }: { focus: Focus; onPlay?: (playId: string) 
  * Where your race went: one bar of the lengths you gave away to a perfect race, split by cause,
  * then each cause with what it means, its costliest moment and the practice that fixes it.
  */
-function LedgerCard({ led, onLink, onPlay }: { led: Ledger; onLink?: (l: TrainLink) => void; onPlay?: (playId: string) => void }) {
+function LedgerCard({ led, start, onLink, onPlay }: { led: Ledger; start: string; onLink?: (l: TrainLink) => void; onPlay?: (playId: string) => void }) {
   const parts = led.parts.filter(p => p.lengths >= 0.3).sort((a, z) => z.lengths - a.lengths);
   if (!parts.length || led.total < 1) {
     return (
@@ -70,7 +70,7 @@ function LedgerCard({ led, onLink, onPlay }: { led: Ledger; onLink?: (l: TrainLi
               <span aria-hidden="true" className="mt-[5px] h-3 w-3 rounded-[4px]" style={{ background: CAUSE_COLOUR[p.cause] }} />
               <div className="min-w-0">
                 <p className="m-0 text-[14px] font-semibold">{CAUSE_WORDS[p.cause].name}</p>
-                <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{CAUSE_WORDS[p.cause].what}{count}{w ? ` Costliest: ${w.lengths.toFixed(1)} lengths at ${fmt(w.t)}.` : ''}</p>
+                <p className="m-0 text-[13px] leading-snug" style={{ color: C.mute }}>{p.cause === 'start' ? start : CAUSE_WORDS[p.cause].what}{count}{w ? ` Costliest: ${w.lengths.toFixed(1)} lengths at ${fmt(w.t)}.` : ''}</p>
                 {i < 3 && (
                   <span className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                     {onLink && <button type="button" onClick={() => onLink(link)} className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] font-semibold text-[#7DBBFF] hover:text-[#A9D2FF]">{link.label}</button>}
@@ -363,7 +363,7 @@ export default function SimDebrief({ race, sum, moments, onHome, onAgain, onLink
           </div>
           <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-5">
             {sum.focus && sum.focus.got !== undefined && <FocusCard focus={sum.focus} onPlay={onPlay} />}
-            {sum.ledger && sum.status !== 'dnf' && <LedgerCard led={sum.ledger} onLink={onLink} onPlay={onPlay} />}
+            {sum.ledger && sum.status !== 'dnf' && <LedgerCard led={sum.ledger} start={startWords(sum)} onLink={onLink} onPlay={onPlay} />}
             <div className="flex flex-col gap-4 sim-card p-5">
               <div className="flex items-center gap-2.5">
                 <AlfieOrb size={34} />
