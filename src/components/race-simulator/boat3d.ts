@@ -3,6 +3,7 @@
 // A, B and C rigs come from the IOM sail measurements; the 10 Rater is the GothiX 10r; the
 // Marblehead is the Gothic M with a swing rig. DF95 and DF65 are scaled from the IOM for now.
 // Same model as the design board renders.
+import { flapForce, flapHz, flapSeed, flapWave } from './flap';
 import type { ClassId } from '@/sim/classes';
 import { iomRig, noGoAngle } from '@/sim/classes';
 import { DEG, n180 } from '@/sim/math';
@@ -110,6 +111,10 @@ export interface Pose {
   boom: number; jib: number;
   /** How much the sails are luffing, 0 (full) to 1 (flogging). */
   luff: number;
+  /** The jib's own luffing, when it differs from the main's (it lets go a little sooner). */
+  luffJib?: number;
+  /** The moment (race time, s) and the wind at her (m/s): what a flogging sail's flapping is drawn from. Without a time, a luffing sail is drawn still. */
+  t?: number; tws?: number;
   /** Running pressed: 0 level, 1 the bow buried (white water over it). */
   dive?: number;
   /** Hull; the sail numbers; the deck. */
@@ -166,11 +171,13 @@ export function sailSet(twa: number, sheet: number, tws: number, disabled: boole
   const boom = Math.min(maxBoom, natural);
   const ng = noGoAngle(tws);
   const luff = disabled ? 1 : Math.max(ramp(2, 10, maxBoom - natural), 1 - ramp(ng, ng + 5, a));
+  // The jib, out in front on its own boom, lets go a touch before the main does.
+  const luffJib = disabled ? 1 : Math.max(ramp(0.5, 8, maxBoom - natural), 1 - ramp(ng + 1.5, ng + 7, a));
   // Running deep with the sheet eased, the jib swings across to goose-wing on the other side.
   const goose = ramp(150, 162, a) * ramp(0.5, 0.68, ease) * (1 - luff);
   const jib = (1 - goose) * Math.min(maxBoom * 1.08 + 2, natural + 2) - goose * Math.min(85, maxBoom);
   const sd: 1 | -1 = tack ? (tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
-  return { boom, jib, luff, sd };
+  return { boom, jib, luff, luffJib, sd };
 }
 
 /** Lift, pitch and roll on the waves, as her hull rides them (see hullMotion). */
@@ -209,7 +216,7 @@ class Geo {
       // closer than that to the highest point under it.
       if (!r.swing) for (let u = 0; u <= 6; u++) z0 = Math.max(z0, deckAt(m, (x0 - (r.boom * u) / 6) / L) + 0.02);
       z1 = z0 + r.mainLuff;
-      foot = r.boom; ang = p.boom; roach = r.roach; head = r.head; twist = 11; depth = 0.09 - 0.075 * p.luff; sd = p.sd;
+      foot = r.boom; ang = p.boom; roach = r.roach; head = r.head; twist = 11; depth = 0.09; sd = p.sd;
     } else {
       const hx = r.mastX * L, hz = deck + r.hounds;
       let tx: number, ty: number, tz: number;
@@ -228,17 +235,32 @@ class Geo {
       const k = Math.min(1, r.jibLuff / sl);
       x0 = tx; y0 = ty; z0 = tz; x1 = tx + (hx - tx) * k; y1 = ty * (1 - k); z1 = tz + (hz - tz) * k;
       // A goose-winged jib has a negative angle: out on the other side, with its belly that way too.
-      foot = r.jibFoot; ang = r.swing ? p.boom : p.jib; roach = 0; head = r.jibHead; twist = 8; depth = 0.095 - 0.08 * p.luff;
+      foot = r.jibFoot; ang = r.swing ? p.boom : p.jib; roach = 0; head = r.jibHead; twist = 8; depth = 0.095;
       sd = p.sd;
       if (ang < 0) { ang = -ang; sd = -p.sd; }
     }
-    const flapK = 0.014 * L * p.luff;
+    // Luffing: the wind's pressure comes off the sail and its shape goes. Flogging (drawn from the
+    // flap clock in flap.ts, which the sound reads too): the belly pops from side to side, the boom
+    // swings about the wind's line a beat behind it, and ripples run back to the leech, biggest
+    // where the film is freest, up high and at the back. A full sail has none of it.
+    const lk = Math.max(0, Math.min(1, kind === 'main' ? p.luff : p.luffJib ?? p.luff));
+    let rip = 0, ripW = 0, ripSeed = 0;
+    if (lk > 0.005) {
+      if (p.t === undefined) depth *= 1 - 0.83 * lk;
+      else {
+        const hz = flapHz(p.tws ?? 4, kind), seed = flapSeed(p.sail, kind), force = flapForce(p.tws ?? 4);
+        depth = depth * (1 - lk) + lk * 0.06 * force * flapWave(p.t, hz, seed);
+        ang += lk * (kind === 'jib' ? 10 : 6) * force * flapWave(p.t - 0.2 / hz, hz, seed);
+        if (ang < 0) { ang = -ang; sd = -sd; }
+        rip = lk * force * 0.05; ripW = 2 * Math.PI * hz * 2.3 * p.t; ripSeed = seed;
+      }
+    }
     const S = (f: number, g: number): V3 => {
       const lx = x0 + (x1 - x0) * f, ly = y0 + (y1 - y0) * f, lz = z0 + (z1 - z0) * f;
       const ch = foot * (1 - f) * (1 + roach * f) + head * f;
       const a = (ang + twist * f) * DEG;
       const dx = -Math.cos(a), dy = sd * Math.sin(a), px = Math.sin(a), py = sd * Math.cos(a);
-      const cb = depth * 4 * g * (1 - g) * ch + (flapK ? Math.sin(f * 11 + g * 5 + p.x * 3) * flapK * g : 0);
+      const cb = depth * 4 * g * (1 - g) * ch + (rip ? rip * foot * (0.5 + 0.8 * f) * g * Math.sqrt(g) * Math.sin(10.7 * g - ripW + f * 6 + ripSeed) : 0);
       return this.w(lx + dx * g * ch + px * cb, ly + dy * g * ch + py * cb, lz);
     };
     return { S, ang, sd, foot, luffLen: Math.hypot(x1 - x0, y1 - y0, z1 - z0) };
@@ -613,7 +635,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     const s = g.sail(kind);
     return { kind, ...s, d: o.P(...s.S(0.4, 0.45)).z };
   });
-  const nf = size > 70 ? 8 : size > 30 ? 4 : 2, ng = size > 70 ? 5 : size > 30 ? 3 : 1;
+  const nf = size > 70 ? 8 : size > 30 ? 4 : 2, ng0 = size > 70 ? 5 : size > 30 ? 3 : 1;
   const fill = mixHex('#E4E8EE', '#D9DFE8', p.luff);
   const tw = Math.max(1, (o.F * 0.006 * L) / depth);
   // Sails, mast and boom are painted far to near, so a sail in front of the mast hides it.
@@ -624,6 +646,10 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
       ctx.strokeStyle = 'rgba(91,100,116,0.7)'; ctx.lineWidth = Math.max(0.7, (o.F * 0.003) / depth);
       ctx.beginPath(); ctx.moveTo(tk.x, tk.y); ctx.lineTo(hd.x, hd.y); ctx.stroke();
     }
+    // A flogging sail is cut finer along its chord, so the ripples running back to the leech show, and
+    // lit harder, so the light catches the film's creases as they pass.
+    const flog = p.t === undefined ? 0 : Math.max(0, Math.min(1, sl.kind === 'main' ? p.luff : p.luffJib ?? p.luff));
+    const ng = flog > 0.1 ? (size > 70 ? 10 : size > 30 ? 6 : 3) : ng0;
     const grid: V3[][] = [];
     const scr: { x: number; y: number; z: number }[][] = [];
     for (let i = 0; i <= nf; i++) {
@@ -635,7 +661,7 @@ export function drawBoat3d(ctx: CanvasRenderingContext2D, p: Pose, o: DrawOpts):
     for (let i = 0; i < nf; i++) for (let j = 0; j < ng; j++) {
       const a = grid[i][j];
       const nrm = norm(cross(sub(grid[i][j + 1], a), sub(grid[i + 1][j], a)));
-      quads.push({ d: scr[i][j].z, i, j, c: shade(fill, 0.82 + 0.18 * Math.abs(dot(nrm, SUN))) });
+      quads.push({ d: scr[i][j].z, i, j, c: shade(fill, 0.82 - 0.2 * flog + (0.18 + 0.45 * flog) * Math.abs(dot(nrm, SUN))) });
     }
     // Far to near along the chord: from behind the leech is nearer, from ahead the luff. A fixed
     // order (not a depth sort, which flickers when the sail is nearly edge-on to you).

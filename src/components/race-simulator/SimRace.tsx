@@ -21,6 +21,7 @@ import { CoachMode, CoachVoice, Cue, WindMemory, coachCue, cueCall, handlingCall
 import { DemoTalk, type DemoCue } from './demoTalk';
 import { Ambience } from './ambience';
 import { Impacts } from './impact';
+import { FlapSound } from './flapSound';
 import { Camera, drawRace } from './render';
 import { BankCam, drawBank, followCam, newBankCam } from './bank';
 import { Controls, GamepadMapping, loadMapping, saveMapping, savedFor } from './input';
@@ -252,6 +253,9 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
   const ambience = useMemo(() => new Ambience(), []);
   // Hulls touching: a crack, as loud as the hit is hard.
   const impacts = useMemo(() => new Impacts(), [race]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Sails flogging: the crack of the film, from your boat and those around her.
+  const flapSound = useMemo(() => new FlapSound(), [race]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { flapSound.start(); return () => flapSound.stop(); }, [flapSound]);
   useEffect(() => {
     // Sound needs the page to have been touched once (the browser's rule): anywhere will do, such
     // as the button that started this race, so a race you only watch has sound too.
@@ -711,6 +715,7 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
       // (a rule risk, or start timing near the gun, which updates every 1.5 s); the rule watch keeps up.
       // Hulls touching, heard from where you stand on the bank (or from your boat, seen from above).
       impacts.update(race, st.view === 'bank' && bcam.ready ? bcam : race.player ?? null, !audio.muted && !st.paused && !st.replay && !race.replaying);
+      flapSound.update(race, race.player ?? (st.view === 'bank' && bcam.ready ? bcam : null), !audio.muted && !st.paused && !st.ended);
       if (now - hudAt > 100) {
         hudAt = now;
         const hs = makeHud();
@@ -764,7 +769,7 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio, live, talk, impacts]);
+  }, [race, ctl, mem, log, cam, bcam, size, flashes, handleEvents, makeHud, resultRows, mode, scene, built, goalMemo, overlays, onSceneResult, ghostRace, ghost, resume, seqPlayer, audio, live, talk, impacts, flapSound]);
 
   // ── Canvas size ──
   useEffect(() => {

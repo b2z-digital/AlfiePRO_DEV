@@ -1,6 +1,7 @@
 // Canvas renderer for the race: water with wind streaks and the puffs that are really out there,
 // the course, wakes, boats with their sails set to the wind, hails, and teaching overlays
 // (zone, laylines, time to the line, who has right of way). Draws one frame; owns no state.
+import { flapForce, flapHz, flapSeed, flapWave } from './flap';
 import { creditLine } from '@/sim/venue';
 import type { Race } from '@/sim/engine';
 import type { Boat } from '@/sim/types';
@@ -426,7 +427,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
         }
       }
     }
-    drawBoat(ctx, sx, sy, bh, twa, b.disabled ? 0 : b.sheet, Lpx, b.color, b.isPlayer, b.disabled || Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1, back > 0 ? undefined : b.tack);
+    drawBoat(ctx, sx, sy, bh, twa, b.disabled ? 0 : b.sheet, Lpx, b.color, b.isPlayer, b.disabled || Math.abs(twa) < noGoAngle(b.tws || tws) + 2, b.finished ? 0.45 : 1, back > 0 ? undefined : b.tack, { t: race.t, tws: b.tws || tws, sail: b.sail });
     // Label.
     if (intro) {
       const pulse = 0.5 + 0.5 * Math.sin(race.t * 7);
@@ -487,7 +488,7 @@ export function drawRace(ctx: CanvasRenderingContext2D, race: Race, v: ViewOptio
 /** One boat from above: hull, mainsail and jib set to the wind and the sheet. Lpx = hull length on
  *  screen. Both sails come off the one sheet, as on a radio yacht; running deep, the jib swings out
  *  on the other side (goose-winged). */
-export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, hdg: number, twa: number, sheet: number, Lpx: number, color: string, isPlayer: boolean, luffing: boolean, alpha = 1, tack?: 'stbd' | 'port') {
+export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, hdg: number, twa: number, sheet: number, Lpx: number, color: string, isPlayer: boolean, luffing: boolean, alpha = 1, tack?: 'stbd' | 'port', flap?: { t: number; tws: number; sail: string }) {
   const k = Lpx / 24;
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -522,14 +523,30 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   // Starboard tack: sails to port. Her tack (when we know it) waits until she's well by the lee before
   // it changes, so sails on a boat running dead downwind don't flick from side to side.
   const side = tack ? (tack === 'stbd' ? -1 : 1) : twa >= 0 ? -1 : 1;
-  const sail = (mx: number, my: number, len: number, ang: number, sd: number, flap: boolean, width: number) => {
+  const sail = (mx: number, my: number, len: number, ang: number, sd: number, flapping: boolean, width: number, kind: 'main' | 'jib') => {
+    ctx.lineWidth = width;
+    // Flogging, with a clock to draw it from: the sail swings about the wind's line and ripples run
+    // down it to the leech, in time with the 3D boat and the sound (see flap.ts).
+    if (flapping && flap) {
+      const hz = flapHz(flap.tws, kind), seed = flapSeed(flap.sail, kind), force = flapForce(flap.tws);
+      const r = ((ang + (kind === 'jib' ? 10 : 6) * force * flapWave(flap.t - 0.2 / hz, hz, seed)) * Math.PI) / 180;
+      const ux = sd * Math.sin(r), uy = Math.cos(r);
+      const w = 2 * Math.PI * hz * 2.3 * flap.t, amp = 0.085 * len * force, pop = 0.07 * len * force * flapWave(flap.t, hz, seed);
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      for (let k = 1; k <= 10; k++) {
+        const g = k / 10, off = pop * 4 * g * (1 - g) + amp * g * Math.sqrt(g) * Math.sin(10.7 * g - w + seed);
+        ctx.lineTo(mx + ux * len * g + uy * off, my + uy * len * g - ux * off);
+      }
+      ctx.stroke();
+      return;
+    }
     const r = (ang * Math.PI) / 180;
     const ex = mx + sd * Math.sin(r) * len, ey = my + Math.cos(r) * len;
     const midx = (mx + ex) / 2, midy = (my + ey) / 2;
     const nx = (ey - my) / len, ny = -(ex - mx) / len;
-    const belly = flap ? 0 : 0.17 * len * sd;
-    ctx.lineWidth = width;
-    if (flap) ctx.setLineDash([2, 1.6]);
+    const belly = flapping ? 0 : 0.17 * len * sd;
+    if (flapping) ctx.setLineDash([2, 1.6]);
     ctx.beginPath();
     ctx.moveTo(mx, my);
     ctx.quadraticCurveTo(midx + nx * belly, midy + ny * belly, ex, ey);
@@ -544,10 +561,10 @@ export function drawBoat(ctx: CanvasRenderingContext2D, sx: number, sy: number, 
   const goose = luffing ? 0 : ramp(150, 162, a) * ramp(0.5, 0.68, ease);
   const jibSigned = (1 - goose) * Math.min(maxBoom * 1.08 + 2, natural + 2) - goose * Math.min(85, maxBoom);
   ctx.globalAlpha = alpha * 0.95;
-  sail(0, -11.6 * k, 7 * k, Math.abs(jibSigned), jibSigned < 0 ? -side : side, flapping && goose < 0.5, Math.max(1.2, 1.5 * k * 0.55));
+  sail(0, -11.6 * k, 7 * k, Math.abs(jibSigned), jibSigned < 0 ? -side : side, flapping && goose < 0.5, Math.max(1.2, 1.5 * k * 0.55), 'jib');
   ctx.globalAlpha = alpha;
   // Mainsail.
-  sail(0, -3.9 * k, 11.5 * k, boom, side, flapping, Math.max(1.4, 1.8 * k * 0.55));
+  sail(0, -3.9 * k, 11.5 * k, boom, side, flapping, Math.max(1.4, 1.8 * k * 0.55), 'main');
   // Mast.
   ctx.fillStyle = '#E9EEF8';
   ctx.beginPath(); ctx.arc(0, -3.9 * k, Math.max(1, 0.9 * k), 0, Math.PI * 2); ctx.fill();
