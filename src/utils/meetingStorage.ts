@@ -262,12 +262,15 @@ export const updateMeeting = async (meetingId: string, meetingData: MeetingFormD
 // Delete a meeting
 export const deleteMeeting = async (meetingId: string): Promise<void> => {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('meetings')
       .delete()
-      .eq('id', meetingId);
+      .eq('id', meetingId)
+      .select('id');
 
     if (error) throw error;
+    // Nothing removed means the database refused it (only admins and editors can delete)
+    if (!data || data.length === 0) throw new Error("You don't have permission to delete this meeting.");
   } catch (error) {
     console.error('Error deleting meeting:', error);
     throw error;

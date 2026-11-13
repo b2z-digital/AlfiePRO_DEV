@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, Clock, Video, FileText, ChevronLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Repeat, Navigation, ExternalLink, Copy, Printer } from 'lucide-react';
+import { Calendar, MapPin, Clock, Video, FileText, ChevronLeft, SquarePen as Edit2, Mail, Check, X, TriangleAlert as AlertTriangle, Play, Lock, Share, Shield, Repeat, Navigation, ExternalLink, Copy, Printer, Trash2 } from 'lucide-react';
 import { AAvatar } from '../alfie/Kit';
 import { Meeting, MeetingAgendaItem } from '../../types/meeting';
 import { getMeetingAgenda, lockMeetingMinutes } from '../../utils/meetingStorage';
@@ -17,6 +17,7 @@ interface MeetingDetailsProps {
   associationType?: 'state' | 'national';
   onClose: () => void;
   onEdit: () => void;
+  onDelete?: () => void;
   onDuplicate?: () => void;
   onMarkAsCompleted: () => void;
   onMarkAsCancelled: () => void;
@@ -29,6 +30,7 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
   associationType,
   onClose,
   onEdit,
+  onDelete,
   onDuplicate,
   onMarkAsCompleted,
   onMarkAsCancelled
@@ -211,6 +213,9 @@ export const MeetingDetails: React.FC<MeetingDetailsProps> = ({
         <div className="flex flex-wrap gap-2 justify-end">
           {onDuplicate && (
             <button onClick={onDuplicate} className="a-btn"><Copy size={16} />Duplicate</button>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} className="a-btn a-btn-danger-soft" aria-label="Delete meeting"><Trash2 size={16} />Delete</button>
           )}
 
           {meeting.status === 'upcoming' && (

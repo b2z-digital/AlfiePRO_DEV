@@ -29,6 +29,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
   const [detailsVersion, setDetailsVersion] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { addNotification } = useNotifications();
   const [showSearch, setShowSearch] = useState(false);
   const [meetingAttendance, setMeetingAttendance] = useState<Record<string, {member: any, status: string}[]>>({});
@@ -147,14 +148,20 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     if (!meetingToDelete) return;
     
     try {
+      setDeleting(true);
       await deleteMeeting(meetingToDelete.id);
-      setMeetings(meetings.filter(m => m.id !== meetingToDelete.id));
+      // Deleting the first meeting of a repeating series removes the rest of the series with it
+      setMeetings(meetings.filter(m => m.id !== meetingToDelete.id && m.recurrence_parent_id !== meetingToDelete.id));
+      if (selectedMeeting?.id === meetingToDelete.id) setSelectedMeeting(null);
       setShowDeleteConfirm(false);
       setMeetingToDelete(null);
-      addNotification('success', 'Meeting deleted successfully');
+      addNotification('success', 'Meeting deleted');
     } catch (err) {
       console.error('Error deleting meeting:', err);
-      setError(err instanceof Error ? err.message : 'Failed to delete meeting');
+      setShowDeleteConfirm(false);
+      addNotification('error', err instanceof Error ? err.message : 'Failed to delete meeting');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -262,6 +269,41 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
     );
   }
 
+  const deleteModal = showDeleteConfirm && meetingToDelete && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
+              <h3 className="a-display a-ink text-[20px] font-semibold mb-2 flex items-center gap-2"><AlertTriangle size={20} style={{ color: '#FF8A8A' }} />Delete this meeting?</h3>
+              <p className="a-mute text-[14px] mb-3">
+                “{meetingToDelete.name}” will be deleted for everyone, along with its agenda{meetingToDelete.minutes_status && meetingToDelete.minutes_status !== 'not_started' ? ', the minutes that were taken' : ''} and who attended. This can’t be undone.
+              </p>
+              {(() => {
+                const rest = meetings.filter(m => m.recurrence_parent_id === meetingToDelete.id).length;
+                return rest > 0 ? (
+                  <p className="text-[14px] mb-3" style={{ color: '#FF8A8A' }}>
+                    This is the first meeting of a repeating series. The {rest} other meeting{rest === 1 ? '' : 's'} in the series will be deleted too.
+                  </p>
+                ) : null;
+              })()}
+              <p className="a-dim text-[13px] mb-6">Tasks created from this meeting are kept.</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="a-btn"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  className="a-btn a-btn-d"
+                >
+                  <Trash2 size={16} />{deleting ? 'Deleting…' : 'Delete meeting'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
   if (selectedMeeting) {
     return (
       <div className="h-full overflow-y-auto">
@@ -275,10 +317,12 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           onClose={handleCloseDetails}
           onEdit={() => handleEditMeeting(selectedMeeting)}
           onDuplicate={() => handleDuplicateMeeting(selectedMeeting.id)}
+          onDelete={can('meetings.create') ? () => handleDeleteClick(selectedMeeting) : undefined}
           onMarkAsCompleted={() => handleMarkAsCompleted(selectedMeeting.id)}
           onMarkAsCancelled={() => handleMarkAsCancelled(selectedMeeting.id)}
         />
         </div>
+        {deleteModal}
       </div>
     );
   }
@@ -355,11 +399,13 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           </div>
         </div>
         {!compact && faces(meeting.id)}
-        {!compact && editable && can('meetings.create') && (
+        {!compact && can('meetings.create') && (
           <>
-            <button onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }} className="a-ib" aria-label="Edit meeting" title="Edit meeting">
-              <Edit2 size={17} />
-            </button>
+            {editable && (
+              <button onClick={(e) => { e.stopPropagation(); handleEditMeeting(meeting); }} className="a-ib" aria-label="Edit meeting" title="Edit meeting">
+                <Edit2 size={17} />
+              </button>
+            )}
             <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(meeting); }} className="a-ib a-ib-d" aria-label="Delete meeting" title="Delete meeting">
               <Trash2 size={17} />
             </button>
@@ -581,31 +627,7 @@ export const MeetingsPage: React.FC<MeetingsPageProps> = ({ darkMode }) => {
           </>
         )}
 
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && meetingToDelete && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="a-sheet max-w-md w-full" style={{ padding: 24 }}>
-              <h3 className="a-display a-ink text-[20px] font-semibold mb-2">Delete meeting</h3>
-              <p className="a-mute text-[14px] mb-6">
-                Are you sure you want to delete the meeting "{meetingToDelete.name}"? This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="a-btn"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmDelete}
-                  className="a-btn a-btn-d"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {deleteModal}
       </div>
     </div>
   );
