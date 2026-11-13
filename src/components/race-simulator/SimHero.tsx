@@ -18,7 +18,7 @@ function heroRace(s: Setup, seed: number): Race {
   const def = s.venue !== 'pond' ? VENUES[s.venue] : undefined;
   const settings: RaceSettings = {
     venue: def?.id, windFrom: def ? windAt(def, s.windPick).from : undefined, venueSpot: def ? s.spots?.[def.id] : undefined,
-    classId: s.classId, fleetSize: Math.min(10, Math.max(6, s.fleetSize)), level: s.level, tune: 2,
+    classId: s.classId, fleetSize: Math.min(10, Math.max(6, s.fleetSize)), level: s.level, tune: 3,
     windStrength: s.windStrength, windCharacter: s.windCharacter,
     laps: 2, length: 'medium', sequenceSeconds: 14, coach: 'off', autoTrim: true, seaState: s.seaState,
     seed, noPlayer: true,
