@@ -15,6 +15,10 @@ describe('The flap clock', () => {
     expect(flapHz(7)).toBeGreaterThan(flapHz(2));
     expect(flapHz(4, 'jib')).toBeGreaterThan(flapHz(4, 'main'));
     expect(flapForce(8)).toBeGreaterThan(flapForce(1.5));
+    // Light airs: a slow, gentle sway and barely a sound, well short of a medium breeze's flapping.
+    expect(flapHz(2.2)).toBeLessThan(1.5);
+    expect(flapForce(2.2)).toBeLessThan(0.3 * flapForce(4.3) + 0.05);
+    expect(flapLoud(1, 2.2)).toBeLessThan(0.25 * flapLoud(1, 4.3));
   });
 
   it('pops across about twice a cycle, unevenly, and no two boats in step', () => {
