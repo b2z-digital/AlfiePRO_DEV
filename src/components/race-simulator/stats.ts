@@ -219,7 +219,30 @@ export function rigTakeaway(s: RaceSummary): Takeaway | null {
   };
 }
 
-function takeaways(s: RaceSummary): Takeaway[] {
+/** Full speed at the gun: below this she was still getting going as she crossed. */
+const START_SPEED = 0.9;
+/** Further than this from the favoured end (lengths) is worth saying. */
+const START_FAR = 4;
+
+/**
+ * What the start cost you, in words that match the numbers: late, slow across the line, away from
+ * the favoured end, or (none of those) just getting up to full speed in the first seconds.
+ */
+export function startWords(s: Pick<RaceSummary, 'late' | 'spdAtGun' | 'fromFavouredL' | 'favoured' | 'ocs'>): string {
+  if (s.ocs) return 'Over the line at the gun, and back round to start again.';
+  if (s.late === null) return 'Getting away from the line.';
+  const pct = s.spdAtGun !== null ? Math.round(s.spdAtGun * 100) : null;
+  const slow = pct !== null && s.spdAtGun! < START_SPEED;
+  const far = s.fromFavouredL !== null && s.fromFavouredL > START_FAR;
+  const when = s.late > 3 ? `You crossed ${s.late.toFixed(1)} s after the gun` : `On time (${s.late.toFixed(1)} s after the gun)`;
+  const bits: string[] = [];
+  if (slow) bits.push(`${s.late > 3 ? 'and' : 'but'} at ${pct}% speed, still getting going`);
+  if (far) bits.push(`${bits.length || s.late > 3 ? 'and' : 'but'} ${Math.round(s.fromFavouredL!)} lengths from the favoured ${s.favoured}`);
+  if (!bits.length && s.late <= 3) return `${when}${pct !== null ? ` at ${pct}% speed` : ''}: what's here is the first seconds of getting up to full speed.`;
+  return `${when}${bits.length ? `, ${bits.join(', ')}` : ''}.`;
+}
+
+export function takeaways(s: RaceSummary): Takeaway[] {
   const out: Takeaway[] = [];
   const myInc = s.incidents.filter(i => i.mine && i.rule !== '29.1');
   if (myInc.length) {
@@ -229,7 +252,12 @@ function takeaways(s: RaceSummary): Takeaway[] {
   if (s.ocs) out.push({ tone: 'warn', text: 'You were over the line at the gun. Judge time-to-line from where you are, and pull the trigger only when it matches the clock.', link: { kind: 'drill', id: 'recall', label: 'Over early: the recovery drill' } });
   else if (s.late !== null) {
     if (s.late > 3) out.push({ tone: 'warn', text: `You crossed the line ${s.late.toFixed(1)} s after the gun. Hover a length or two back and pull the trigger when time-to-line matches the clock.`, link: { kind: 'drill', id: 'time-distance', label: 'Time on distance drill' } });
-    else out.push({ tone: 'good', text: `Good start: ${s.late.toFixed(1)} s after the gun${s.spdAtGun !== null ? ` at ${Math.round(s.spdAtGun * 100)}% speed` : ''}.${s.fromFavouredL !== null && s.fromFavouredL > 4 ? ` The ${s.favoured} was favoured and you were ${Math.round(s.fromFavouredL)} lengths from it.` : ''}`, link: s.fromFavouredL !== null && s.fromFavouredL > 4 ? { kind: 'drill', id: 'favoured-end', label: 'Find the favoured end drill' } : undefined });
+    else if (s.spdAtGun !== null && s.spdAtGun < START_SPEED) {
+      // On time but slow: that's not a good start, and the ledger above says so too.
+      out.push({ tone: 'plain', text: `On time at the gun (${s.late.toFixed(1)} s after it), but at only ${Math.round(s.spdAtGun * 100)}% speed, so the boats beside you sailed away. Be at full speed as the gun goes: start your run a second or two sooner, with the sail sheeted in.${s.fromFavouredL !== null && s.fromFavouredL > START_FAR ? ` And the ${s.favoured} was favoured: you were ${Math.round(s.fromFavouredL)} lengths from it.` : ''}`, link: { kind: 'drill', id: 'speed', label: 'Full speed at the gun drill' } });
+    } else if (s.fromFavouredL !== null && s.fromFavouredL > START_FAR) {
+      out.push({ tone: 'plain', text: `On time and at speed (${s.late.toFixed(1)} s after the gun${s.spdAtGun !== null ? `, ${Math.round(s.spdAtGun * 100)}%` : ''}), but ${Math.round(s.fromFavouredL)} lengths from the favoured ${s.favoured}, which cost you before the race had begun.`, link: { kind: 'drill', id: 'favoured-end', label: 'Find the favoured end drill' } });
+    } else out.push({ tone: 'good', text: `Good start: ${s.late.toFixed(1)} s after the gun${s.spdAtGun !== null ? ` at ${Math.round(s.spdAtGun * 100)}% speed` : ''}.` });
   }
   if (s.mode === 'race' && s.upwind.liftedPct !== null) {
     if (s.upwind.headers > 0 && s.upwind.headerTacks < s.upwind.headers / 2) out.push({ tone: 'plain', text: `You tacked on ${s.upwind.headerTacks} of ${s.upwind.headers} big headers upwind. Watch the wind graph and tack when you're knocked more than 5°.`, link: { kind: 'lab', id: 'layline', label: 'The layline call in the Lab' } });
