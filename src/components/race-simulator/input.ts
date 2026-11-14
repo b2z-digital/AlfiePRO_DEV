@@ -107,6 +107,11 @@ export function firstGamepad(): Gamepad | null {
   return connectedPads()[0] ?? null;
 }
 
+/** Whether a race may be steered from a transmitter or gamepad (a free skipper's one race on their
+ *  own radio is used up: keyboard and touch only). Set as each race starts. */
+let padsAllowed = true;
+export function allowPads(on: boolean): void { padsAllowed = on; }
+
 /** What to steer with: the transmitter you set up, else any transmitter, else the first gamepad. */
 export function activePad(map?: GamepadMapping | null): Gamepad | null {
   const pads = connectedPads();
@@ -143,7 +148,7 @@ export class Controls {
     if (this.up) this.sheet = Math.min(1, this.sheet + dt * 0.8);
     if (this.down) this.sheet = Math.max(0, this.sheet - dt * 0.8);
     // Transmitter: the rudder stick is the rudder; the sail stick position is the sheet.
-    const gp = activePad(map);
+    const gp = padsAllowed ? activePad(map) : null;
     if (gp) {
       if (map.rudderAxis < gp.axes.length) {
         let r = calibrated(gp.axes[map.rudderAxis] ?? 0, map.cal?.rudder);

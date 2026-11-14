@@ -100,6 +100,7 @@ const EmailStudio = React.lazy(() => import('./email-studio/EmailStudio'));
 const SiteBuilder = React.lazy(() => import('./site-builder/SiteBuilder'));
 import LivestreamPage from '../pages/LivestreamPage';
 import RaceSimulatorPage from './race-simulator/RaceSimulatorPage';
+import { useAcademyPlan } from './academy/usePlan';
 import TrackingPage from './tracking/TrackingPage';
 import { useClubTracking } from './tracking/data';
 import SuperAdminDashboard from '../pages/SuperAdminDashboard';
@@ -226,10 +227,10 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   });
   const { user, userClubs, currentClub, currentOrganization, setCurrentClub, setCurrentOrganization, signOut, isSuperAdmin, isNationalOrgAdmin, isStateOrgAdmin, isSwitchingClub, isRaceOfficer } = useAuth();
   const { can, isMember, isAssociationViewer, isAssociationEditor } = usePermissions();
-  const { isFeatureEnabled, features: featureFlags } = useFeatureAccess();
-  // The Race Simulator: for super admins, and for clubs it's been switched on for in Feature Access.
-  // (An unknown feature counts as on, so it needs its flag to exist before anyone else sees it.)
-  const simulatorOn = isSuperAdmin || !!featureFlags.find(f => f.feature_key === 'race_simulator')?.is_enabled;
+  const { isFeatureEnabled } = useFeatureAccess();
+  // The Sailing Academy: every club member has it (Free, or Academy with a plan).
+  const simulatorOn = true;
+  const academyPlan = useAcademyPlan(user?.id, isSuperAdmin);
   // Live Tracking: only at a club whose tracking system is set up and switched on (super admins can
   // open the demo anywhere). Nothing about tracking shows otherwise.
   const clubTracking = useClubTracking(currentClub?.clubId);
@@ -2197,7 +2198,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 />
               } />
               <Route path="/yacht-classes" element={<YachtClassesRouter darkMode={darkMode} />} />
-              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} onExit={() => navigate('/')} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} />} />}
+              {simulatorOn && <Route path="/race-simulator" element={<RaceSimulatorPage darkMode={darkMode} onExit={() => navigate('/')} account={user ? { userId: user.id, clubId: currentClub?.clubId ?? null, admin: currentClub?.role === 'admin', superAdmin: isSuperAdmin } : null} plan={academyPlan} />} />}
               {isSuperAdmin && <Route path="/uwb-tracking" element={<UwbTrackingTab />} />}
               {(trackingOn || isSuperAdmin) && <Route path="/live-tracking" element={<TrackingPage account={{ userId: user?.id ?? null, clubId: currentClub?.clubId ?? null, superAdmin: isSuperAdmin }} tracking={clubTracking.tracking} onTrackingChanged={clubTracking.reload} />} />}
               <Route path="/support" element={<SupportPage darkMode={darkMode} />} />
