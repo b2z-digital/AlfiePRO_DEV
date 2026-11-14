@@ -65,7 +65,11 @@ import { SimSequence, chosenSequence, keepSequences, keptSequences, loadClubSequ
 import { ChannelTransport, ClubRooms, LiveRace, LiveRoom, OpenRoom, RoomSettings, cleanCode, newCode, roomChannel } from './live';
 import SimLive, { roomTitle } from './SimLive';
 import GamepadModal from './GamepadModal';
-import { activePad, loadMapping, saveMapping } from './input';
+import { activePad, allowPads, loadMapping, saveMapping } from './input';
+import UpgradeSheet from '../academy/UpgradeSheet';
+import { type Feature, FREE_SCENES, LOCKED_SCREENS, raceGate } from '../academy/plans';
+import { type AcademyPlan, siteBase } from '../academy/usePlan';
+import { loadFreeUse, saveFreeUse } from '../academy/freeUse';
 import { usePads } from './transmitter';
 
 interface RaceSimulatorPageProps {
@@ -75,6 +79,9 @@ interface RaceSimulatorPageProps {
   account?: (Account & { admin?: boolean; superAdmin?: boolean }) | null;
   /** Leave the Sailing Academy (it fills the window, with no menu: this is the way out). */
   onExit?: () => void;
+  /** The skipper's Academy plan. Free skippers meet "Part of Academy" when they reach for more;
+   *  without one (the dev harness), everything is open. */
+  plan?: AcademyPlan | null;
 }
 
 // v2: the new defaults (sails on your stick, choppy water, the bank view). Old v1 settings are
@@ -181,9 +188,20 @@ function nextAfter(spec: SceneSpec): { spec: SceneSpec; label: string } | null {
   return n ? { spec: n, label: `Next: ${n.title}` } : null;
 }
 
-export default function RaceSimulatorPage({ darkMode, account = null, onExit }: RaceSimulatorPageProps) {
+export default function RaceSimulatorPage({ darkMode, account = null, onExit, plan = null }: RaceSimulatorPageProps) {
   void darkMode; // the simulator is always on the water: one dark look
-  const [where, setWhere] = useState<Where>('home');
+  const [whereNow, setWhere] = useState<Where>('home');
+  // Free skippers: an Academy-only screen shows the home with "Part of Academy" over it instead.
+  const free = !!plan && plan.loaded && plan.tier === 'free';
+  const lockedScreen = free ? LOCKED_SCREENS[whereNow] : undefined;
+  const where: Where = lockedScreen ? 'home' : whereNow;
+  const [wanted, setWanted] = useState<{ feature: Feature; alt?: { label: string; onClick: () => void } | null } | null>(null);
+  /** A free skipper reached for an Academy feature: back home, and say what Academy gives. */
+  const want = useCallback((feature: Feature, alt?: { label: string; onClick: () => void } | null) => {
+    setWanted({ feature, alt: alt ?? null });
+    setWhere('home');
+  }, []);
+  useEffect(() => { if (lockedScreen) want(lockedScreen); }, [lockedScreen, want]);
   // Which of the Academy's doors is open (it's kept while you're off in a race or a drill).
   const [door, setDoor] = useState<Door>('home');
   const [setup, setSetup] = useState<Setup>(loadSetup);
@@ -335,6 +353,8 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     return { id: userId ?? 'guest', name: me?.short ?? me?.name ?? 'Sailor', sails, looks, autoTrim: setup.autoTrim };
   }, [userId, me, setup.autoTrim, yard]);
   const openLive = useCallback(() => {
+    if (free) { want('host'); return; }
+    allowPads(true);
     const seq = chosenSequence(sequences, setup.startSeq, setup.sequenceSeconds);
     const full = toSettings(setup, 'race', todayWind, null, seq);
     const { seed: _seed, player: _player, ...rs } = full;
@@ -342,10 +362,11 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     const code = newCode();
     setRoom(new LiveRoom(code, liveMe(), true, rs as RoomSettings, new ChannelTransport(roomChannel(code))));
     setWhere('live');
-  }, [sequences, setup, todayWind, liveMe]);
+  }, [sequences, setup, todayWind, liveMe, free, want]);
   const joinLive = useCallback((code: string) => {
     const c = cleanCode(code);
     if (c.length !== 6) return;
+    allowPads(true);
     setRoom(new LiveRoom(c, liveMe(), false, null, new ChannelTransport(roomChannel(c))));
     setWhere('live');
   }, [liveMe]);
@@ -498,14 +519,43 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     setSetup(s => { const n = { ...s, view: v }; storeSetup(n); return n; });
   }, [run]);
 
-  const start = useCallback((mode: 'race' | 'start', s: Setup) => {
+  // A free skipper's water: their club's, else the default venue.
+  const freeVenue = useMemo(() => venueForClub(clubId)?.id ?? waters.find(w => w.published && w.clubId === clubId)?.def.id ?? DEFAULT_SETUP.venue, [clubId, waters]);
+  // A replay for a free skipper: what Academy gives instead.
+  useEffect(() => { if (free && broadcast) { setBroadcast(null); want('replay'); } }, [free, broadcast, want]);
+  // A free skipper's set-up starts where Free sails: Club skippers, their water, their class.
+  const freeSet = useRef(false);
+  useEffect(() => {
+    if (!free || freeSet.current) return;
+    freeSet.current = true;
+    const use = loadFreeUse();
+    const s = { ...setup, level: 'club' as const, venue: freeVenue, classId: (use.classId ?? setup.classId) as ClassId };
+    if (s.level !== setup.level || s.venue !== setup.venue || s.classId !== setup.classId) changeSetup(s);
+  }, [free, freeVenue, setup, changeSetup]);
+  const start = useCallback((mode: 'race' | 'start', s: Setup, keys = false) => {
+    if (free) {
+      const use = loadFreeUse();
+      const transmitter = !keys && pads.length > 0;
+      const gate = raceGate('free', { level: s.level, venue: s.venue, classId: s.classId, transmitter }, { venue: freeVenue, classId: use.classId, transmitterRaces: use.transmitterRaces });
+      if (gate) {
+        const club = { ...s, level: 'club' as const }, home = { ...s, venue: freeVenue }, mine = { ...s, classId: (use.classId ?? s.classId) as ClassId };
+        const alt = gate === 'level' ? { label: 'Race Club skippers instead', onClick: () => { setWanted(null); changeSetup(club); start(mode, club, keys); } }
+          : gate === 'venue' ? { label: `Sail at ${nameOfWater(freeVenue)} instead`, onClick: () => { setWanted(null); changeSetup(home); start(mode, home, keys); } }
+          : gate === 'class' ? { label: `Sail your ${CLASSES[mine.classId]?.name ?? mine.classId} instead`, onClick: () => { setWanted(null); changeSetup(mine); start(mode, mine, keys); } }
+          : { label: 'Race on the keyboard instead', onClick: () => { setWanted(null); start(mode, s, true); } };
+        want(gate, alt);
+        return;
+      }
+      saveFreeUse({ classId: use.classId ?? s.classId, transmitterRaces: use.transmitterRaces + (transmitter ? 1 : 0) });
+    }
+    allowPads(!keys);
     withSequences(list => {
       const seq = chosenSequence(list, s.startSeq, s.sequenceSeconds);
       setRun({ settings: toSettings(s, mode, todayWind, me, seq, yardNow.current), mode, key: Date.now(), sequence: seq, focus: mode === 'race' ? raceFocus(loadProfile()) : null });
       setRunView(s.view);
       setWhere('race');
     });
-  }, [todayWind, me, withSequences]);
+  }, [todayWind, me, withSequences, free, pads, freeVenue, want]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The club's next race day and its forecast, to rehearse (signed in, with a club).
   const [nextRace, setNextRace] = useState<NextRace | null>(null);
@@ -576,6 +626,8 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
   /** Sail the next race day: the club's water (or the one set up), the day's class, the forecast wind. */
   const rehearse = useCallback(() => {
     if (!nextRace) return;
+    if (free) { want('rehearse'); return; }
+    allowPads(true);
     const at = rehearseAt;
     const w = nextRace.wind;
     const s: Setup = {
@@ -589,9 +641,11 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       setRunView(s.view);
       setWhere('race');
     });
-  }, [nextRace, rehearseAt, setup, me, withSequences]);
+  }, [nextRace, rehearseAt, setup, me, withSequences, free, want]);
 
   const playScene = useCallback((spec: SceneSpec, group: Group, watch: boolean) => {
+    if (free && !(spec.kind === 'lab' && FREE_SCENES.includes(spec.id))) { want('lesson'); return; }
+    allowPads(true);
     const drill = spec.kind === 'drill' ? findDrill(spec.id) : null;
     const rec = drill ? training.drills[drill.id] : null;
     const next = nextAfter(spec);
@@ -609,7 +663,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     setRun({ scene, mode: 'scene', key: Date.now(), sequence: startSeq });
     setRunView(spec.kind === 'lesson' ? 'top' : setup.view);
     setWhere('race');
-  }, [training, setup, startSeq, me]);
+  }, [training, setup, startSeq, me, free, want]);
 
   /** You, on the Circuit's sheets: your name and your number in the season's class. */
   // Your home state on the Circuit's real waters, from your club's water (built in, or the club's own).
@@ -875,7 +929,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
     return () => { document.body.style.overflow = prev; };
   }, [where]);
 
-  if (broadcast) {
+  if (broadcast && !free) {
     return createPortal(
       <SimBroadcast tape={broadcast} kept={tapes.some(t => t.at === broadcast.at)}
         onKeep={() => setTapes(saveTape(broadcast))}
@@ -1076,6 +1130,7 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
 
   return (
     <div key="home" className="sim-home sim-zoomable h-full overflow-y-auto">
+      {wanted && plan && createPortal(<UpgradeSheet feature={wanted.feature} plan={plan} alt={wanted.alt} onClose={() => setWanted(null)} />, document.body)}
       {padOpen && <GamepadModal mapping={loadMapping(activePad(loadMapping())?.id)} onSave={saveMapping} onClose={() => setPadOpen(false)} />}
       {opening && (
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-[rgba(6,12,24,0.55)]">
@@ -1087,6 +1142,9 @@ export default function RaceSimulatorPage({ darkMode, account = null, onExit }: 
       )}
       <SimHome setup={setup} onSetup={changeSetup} onStart={start} profile={profile}
         onProfileCleared={() => { setProfile(loadProfile()); if (userId) void clearRaces({ userId, clubId }); }}
+        planChip={plan && plan.loaded ? (free
+          ? { label: 'Free · Try everything for a week', strong: true, onClick: () => want('all') }
+          : { label: plan.daysLeft != null ? `Free week · ${plan.daysLeft} day${plan.daysLeft === 1 ? '' : 's'} left` : 'Academy', strong: false, onClick: () => window.location.assign(`${siteBase()}/plan`) }) : null}
         training={training} yard={yard} onOpen={w => { setPlayAt(null); setWhere(w); }} onDismiss={card => trainingChanged(dismissCard(card))} door={door} onDoor={setDoor} career={training.career ?? null} onCareer={() => setWhere('career')} onBench={account?.admin || account?.superAdmin ? () => setWhere('bench') : undefined} world={worldCard} onExit={onExit} onWay={(w, n) => trainingChanged(chooseWay(w, n))} onReset={startAgain} onYear={openYear} tapes={tapes} onWatchTape={setBroadcast} onDeleteTape={id => setTapes(deleteTape(id))} comfort={comfort} helpNow={helpNow} onComfort={c => trainingChanged(saveComfort(c))} onPlay={id => { setPlayAt(id); setWhere('playbook'); }} onLink={openLink} today={setup.windDir === 'today' ? today : null} me={me} clubId={clubId} synced={synced}
         waters={waters} waterAdmin={!!clubId && (!!account?.admin || !!account?.superAdmin)} onWaters={setWaters}
         challenges={userId ? challenges : null} onChallenge={c => { setOpenCh(c); setWhere('challenge'); }}

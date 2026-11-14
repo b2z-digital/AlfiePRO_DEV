@@ -66,3 +66,6 @@ verify_jwt = false
 
 [functions.send-platform-billing-invoice]
 verify_jwt = false
+
+[functions.academy-stripe-webhook]
+verify_jwt = false

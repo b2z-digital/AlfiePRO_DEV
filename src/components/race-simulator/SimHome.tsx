@@ -532,7 +532,7 @@ function startOptions(sequences: SimSequence[], chosen: SimSequence | null): { v
   return shown.map(q => ({ value: q.id, label: q.name }));
 }
 
-export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, tapes = [], onWatchTape, onDeleteTape, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
+export default function SimHome({ setup, onSetup, onStart, profile, onProfileCleared, training, onOpen, onDismiss, door = 'home', onDoor, onWay, onReset, onYear, tapes = [], onWatchTape, onDeleteTape, comfort, helpNow = 'full', onComfort, onPlay, career = null, onCareer, onBench, onExit, planChip = null, world = null, blownOut = null, clubEvent = null, yard, onLink, today, me = null, synced = false, challenges = null, onChallenge, canSet = null, onCreateChallenge, events = null, onEvent, onCreateEvent, sequences = [], startSeq = null, startFinding = false, live = null, transmitter = null, next = null, clubId = null, waters = [], waterAdmin = false, onWaters }: {
   setup: Setup; onSetup: (s: Setup) => void; onStart: (mode: 'race' | 'start', s: Setup) => void; profile: Profile; onProfileCleared: () => void;
   training: TrainingProgress; onOpen: (where: 'trainer' | 'academy' | 'lab' | 'playbook' | 'passport' | 'judge' | 'yacht' | 'ro') => void;
   /** "Don't show this again", for a card on this screen. */
@@ -561,6 +561,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   clubEvent?: { event: SimEvent; left: number; hours: number } | null;
   /** Leave the Sailing Academy (back to the rest of AlfiePRO): the exit at the top right. */
   onExit?: () => void;
+  /** Your Academy plan at the top of the front: Free (with the way to a free week), your free week's days, or Academy. */
+  planChip?: { label: string; strong: boolean; onClick: () => void } | null;
   /** The world (the daily race, the World Regatta, the Majors and the tables), once it has races. */
   world?: { line: string; onOpen: () => void } | null;
   /** The boats you've designed (Design your yacht). */
@@ -616,6 +618,8 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
   const judgedToday = judgeToday.filter(c => calledToday(c.id)).length;
   const [s, setS] = useState<Setup>(setup);
   const set = (patch: Partial<Setup>) => { const n = { ...s, ...patch }; setS(n); onSetup(n); };
+  // The page can change the set-up too (a free skipper starts at Club, on their own water): follow it.
+  useEffect(() => { setS(setup); }, [setup]);
   const sk = useMemo(() => skills(profile), [profile]);
   // Try Alfie's voice from the coaching sheet: it says a line, and says so here if the browser can't.
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
@@ -788,6 +792,7 @@ export default function SimHome({ setup, onSetup, onStart, profile, onProfileCle
               <div className="sim-front-top">
                 <Brand />
                 {training.way && onWay && <WayToggle way={way} onChoose={onWay} />}
+                {planChip && <button type="button" className={cx('sim-plan-chip', planChip.strong && 'sim-plan-chip-go')} onClick={planChip.onClick}>{planChip.label}</button>}
                 {onExit && <button type="button" className="sim-exit" onClick={onExit} aria-label="Leave the Sailing Academy" title="Leave the Sailing Academy"><LogOut size={19} aria-hidden="true" /></button>}
               </div>
               <h1 className="sr-only">Sailing Academy</h1>

@@ -76,6 +76,7 @@ import { JoinScoringSessionPage } from './pages/JoinScoringSessionPage';
 import './styles/index.css';
 import { isNative } from './lib/native/platform';
 import { readMobilePreviewFlag } from './mobile/preview';
+import AcademySite from './components/academy/site/AcademySite';
 const MobileApp = lazy(() => import('./mobile/MobileApp'));
 const SpotterApp = lazy(() => import('./mobile/screens/ScoreTogether'));
 const mobilePreview = readMobilePreviewFlag();
@@ -143,6 +144,17 @@ function App() {
     );
   }
 
+  // The Sailing Academy's own site: academy.alfiepro.com.au (it isn't a club's website).
+  if (window.location.hostname.startsWith('academy.')) {
+    return (
+      <ModalProvider>
+        <Routes>
+          <Route path="/*" element={<AcademySite base="" />} />
+        </Routes>
+      </ModalProvider>
+    );
+  }
+
   // Detect if we're on a subdomain or custom domain (for public club websites)
   const hostname = window.location.hostname;
   const isAlfieproDomain = hostname.includes('.alfiepro.com.au') || hostname === 'alfiepro.com.au';
@@ -201,7 +213,8 @@ function App() {
                         window.location.pathname.startsWith('/reset-password') ||
                         window.location.pathname.startsWith('/whats-on/') ||
                         window.location.pathname.startsWith('/email/preferences') ||
-                        window.location.pathname.startsWith('/forgot-password');
+                        window.location.pathname.startsWith('/forgot-password') ||
+                        window.location.pathname.startsWith('/academy');
 
   console.log('🔍 App.tsx auth check:', {
     loading,
@@ -283,6 +296,9 @@ function App() {
 
         {/* Global Public Legal Pages - no club context required */}
         <Route path="/privacy-policy" element={<PublicPrivacyPolicyPage />} />
+
+        {/* The Sailing Academy's site (also at academy.alfiepro.com.au) */}
+        <Route path="/academy/*" element={<AcademySite base="/academy" />} />
         <Route path="/terms-of-service" element={<PublicTermsOfServicePage />} />
 
         {/* Public Event Website Routes */}
@@ -433,6 +449,9 @@ function App() {
               <CancelledMembershipScreen cancelledMemberships={cancelledMemberships} darkMode={darkMode} />
             ) : !clubsLoaded ? (
               <AlfieLoader light={!darkMode} />
+            ) : userClubs.length === 0 && user?.user_metadata?.signup_source === 'academy' ? (
+              // Signed up through the Sailing Academy and not in a club: the Academy is their home.
+              <Navigate to="/academy/sail" />
             ) : userClubs.length === 0 && !onboardingCompleted && !isRaceOfficer ? (
               <Navigate to="/onboarding" />
             ) : isMobilePhone && (isNative || mobilePreview) ? (
