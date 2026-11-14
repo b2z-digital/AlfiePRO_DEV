@@ -461,13 +461,13 @@ function TransmitterCard({ pads, onSetUp }: { pads: PadInfo[]; onSetUp: () => vo
         <div className="min-w-0 flex-1">
           <h2 id="tx-title" className="sim-h3">Your transmitter</h2>
           <p className="m-0 truncate text-[12.5px]" style={{ color: C.mute }}>
-            {pad ? `${pad.name} · ${pad.setUp ? 'ready to sail' : 'not set up yet'}` : 'Sail with your own sticks'}
+            {pad ? `${pad.name} · ${!pad.setUp ? 'not set up yet' : pad.checked || !pad.transmitter ? 'ready to sail' : 'a quick stick check first'}` : 'Sail with your own sticks'}
           </p>
         </div>
-        {pad && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: pad.setUp ? C.green : C.orange }} aria-hidden="true" />}
+        {pad && <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: pad.setUp && (pad.checked || !pad.transmitter) ? C.green : C.orange }} aria-hidden="true" />}
       </div>
       {!pad && <p className="m-0 text-[13.5px] leading-normal" style={{ color: C.mute }}>Plug in a RadioMaster or any EdgeTX radio by USB, choose USB Joystick (HID), and move a stick.</p>}
-      <div><Btn small primary={!!pad && !pad.setUp} onClick={onSetUp}>{pad ? (pad.setUp ? 'Check the set-up' : 'Set it up') : 'How to connect'}</Btn></div>
+      <div><Btn small primary={!!pad && (!pad.setUp || (pad.transmitter && !pad.checked))} onClick={onSetUp}>{pad ? (pad.setUp ? 'Check the sticks' : 'Set it up') : 'How to connect'}</Btn></div>
     </section>
   );
 }
