@@ -80,15 +80,46 @@ export function triggerText(t: Trigger | null | undefined): string {
   return t.kind === 'button' ? `Button ${t.index + 1}` : `Switch on axis ${t.index + 1}`;
 }
 
+// ── Checked since it was plugged in ──
+//
+// Every EdgeTX and OpenTX radio reports the same USB id (1209:4F54), so the browser can't tell one
+// skipper's radio from another's. A set-up saved for "this transmitter" is really saved for every
+// radio of its kind, and two radios set up differently (a channel reversed, sticks on other channels)
+// would sail back to front on each other's set-up. So a transmitter is only trusted once someone has
+// checked its sticks since it was plugged in: each time one is plugged in (or comes back after being
+// unplugged), the quick check runs again before you sail. Kept for the page only.
+
+const checkedNow = new Set<string>();
+let listening = false;
+function watchPlugs() {
+  if (listening || typeof window === 'undefined') return;
+  listening = true;
+  // Unplugged: whatever's plugged in next under that id may be someone else's radio.
+  window.addEventListener('gamepaddisconnected', e => { checkedNow.delete((e as GamepadEvent).gamepad.id); });
+}
+/** Its sticks have been checked since it was plugged in (this page), and it's still plugged in. */
+export function isChecked(id: string): boolean {
+  watchPlugs();
+  if (checkedNow.has(id) && !connectedPads().some(p => p.id === id)) checkedNow.delete(id);
+  return checkedNow.has(id);
+}
+/** Someone has just checked its sticks: steering and sail both the right way. */
+export function markChecked(id: string): void { watchPlugs(); checkedNow.add(id); }
+/** Forget the check (tests, and when it's unplugged). */
+export function forgetChecked(id?: string): void { if (id) checkedNow.delete(id); else checkedNow.clear(); }
+
 // ── What's plugged in ──
 
-export interface PadInfo { id: string; name: string; transmitter: boolean; setUp: boolean }
+export interface PadInfo { id: string; name: string; transmitter: boolean; setUp: boolean; checked: boolean }
 
 function readPads(): PadInfo[] {
-  return connectedPads().map(p => ({ id: p.id, name: deviceName(p.id), transmitter: isTransmitter(p.id), setUp: !!savedFor(p.id) }));
+  // (Gone from the list without the browser saying so: forget its check too.)
+  const now = connectedPads();
+  for (const id of [...checkedNow]) if (!now.some(p => p.id === id)) checkedNow.delete(id);
+  return now.map(p => ({ id: p.id, name: deviceName(p.id), transmitter: isTransmitter(p.id), setUp: !!savedFor(p.id), checked: checkedNow.has(p.id) }));
 }
 
-const samePads = (a: PadInfo[], b: PadInfo[]) => a.length === b.length && a.every((p, i) => p.id === b[i].id && p.setUp === b[i].setUp);
+const samePads = (a: PadInfo[], b: PadInfo[]) => a.length === b.length && a.every((p, i) => p.id === b[i].id && p.setUp === b[i].setUp && p.checked === b[i].checked);
 
 /**
  * The transmitters and gamepads plugged in, kept up to date. (A browser only shows one once a stick

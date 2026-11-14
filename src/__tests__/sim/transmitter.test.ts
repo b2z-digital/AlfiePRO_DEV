@@ -136,3 +136,26 @@ describe('Each transmitter keeps its own set-up', () => {
     expect(loadMapping('EdgeTX Radiomaster Pocket Joystick').deadzone).toBe(0.02);
   });
 });
+
+describe('Every radio is checked before it sails', () => {
+  // Every EdgeTX radio reports the same USB id, so a set-up saved here may be another skipper's radio.
+  it('two EdgeTX radios look the same to the browser, so the saved set-up is shared between them', () => {
+    saveMapping({ ...DEFAULT_MAPPING, rudderInverted: true, device: EDGETX_CHROME });
+    expect(savedFor(EDGETX_CHROME)?.rudderInverted).toBe(true);
+    // (A second skipper's TX16S, its rudder channel the other way round, would get the same set-up.)
+  });
+
+  it('a transmitter is unchecked when plugged in, checked once someone confirms its sticks, and unchecked again when it is unplugged', async () => {
+    const { isChecked, markChecked, forgetChecked } = await import('@/components/race-simulator/transmitter');
+    forgetChecked();
+    pads = [radio([0, 0, 0, 0])];
+    expect(isChecked(EDGETX_CHROME)).toBe(false);
+    markChecked(EDGETX_CHROME);
+    expect(isChecked(EDGETX_CHROME)).toBe(true);
+    // Unplugged (the browser lists it no more): the next radio plugged in under that id is checked again.
+    pads = [];
+    expect(isChecked(EDGETX_CHROME)).toBe(false);
+    pads = [radio([0, 0, 0, 0])];
+    expect(isChecked(EDGETX_CHROME)).toBe(false);
+  });
+});

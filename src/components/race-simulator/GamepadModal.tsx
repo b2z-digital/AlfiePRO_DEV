@@ -5,7 +5,7 @@
 // on a switch. "Set it up by hand" keeps the channel lists and the two-step calibration.
 import { useEffect, useRef, useState } from 'react';
 import { AxisCal, GamepadMapping, TRANSMITTER_DEADZONE, Trigger, activePad, calibrated, calibratedRange, connectedPads, deviceName, isTransmitter, savedFor } from './input';
-import { Hold, PadFrame, Watch, atEnd, flicked, frameOf, inMiddle, onAppleTouch, triggerText } from './transmitter';
+import { Hold, PadFrame, Watch, atEnd, flicked, frameOf, inMiddle, markChecked, onAppleTouch, triggerText } from './transmitter';
 import { Btn, C, Cap, Hud, cx } from './ui';
 
 type Phase = 'connect' | 'found' | 'rudder' | 'right' | 'centre' | 'rudderDone' | 'sail' | 'in' | 'sailDone' | 'try' | 'hail' | 'tack' | 'manual';
@@ -39,7 +39,8 @@ function StickArt({ motion, size = 170 }: { motion: 'side' | 'updown' | 'right' 
     <svg width={size} height={size} viewBox="0 0 200 200" role="img" aria-label={motion === 'side' ? 'Move the stick from side to side' : motion === 'updown' ? 'Move the stick up and down' : motion === 'right' ? 'Push the stick to the right and hold it' : 'Let the stick go back to the middle'}>
       <rect x="30" y="30" width="140" height="140" rx="28" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.16)" strokeWidth="2" />
       <circle cx="100" cy="100" r="52" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="2" strokeDasharray="5 6" />
-      {(motion === 'side' || motion === 'right') && <>{arrow('M18 100 L6 100 M14 90 L4 100 L14 110')}{arrow('M182 100 L194 100 M186 90 L196 100 L186 110')}</>}
+      {motion === 'side' && arrow('M18 100 L6 100 M14 90 L4 100 L14 110')}
+      {(motion === 'side' || motion === 'right') && arrow('M182 100 L194 100 M186 90 L196 100 L186 110')}
       {motion === 'updown' && <>{arrow('M100 18 L100 6 M90 14 L100 4 L110 14')}{arrow('M100 182 L100 194 M90 186 L100 196 L110 186')}</>}
       <g transform={at}>
         {motion === 'side' && anim('-40 0;40 0;-40 0')}
@@ -192,6 +193,11 @@ export default function GamepadModal({ mapping, onSave, onClose }: { mapping: Ga
   const [progress, setProgress] = useState(0);
   const [slow, setSlow] = useState(false);
   const [extras, setExtras] = useState(false);
+  // The check before sailing: each skipper confirms the boat turns the way they steer and the sail
+  // comes in when they pull it in, flipping either if it's back to front. (Every EdgeTX radio looks
+  // the same to the browser, so a set-up found for "this transmitter" may be someone else's radio.)
+  const [ok, setOk] = useState({ steer: false, sail: false });
+  const tried = useRef({ left: false, right: false, lo: 1, hi: 0 });
   const job = useRef<Job>(newJob());
   const localRef = useRef(local);
   localRef.current = local;
@@ -315,12 +321,22 @@ export default function GamepadModal({ mapping, onSave, onClose }: { mapping: Ga
 
   // Moving on from a button: the watching loop follows the same phase.
   const to = (p: Phase) => { const j = job.current; j.phase = p; j.at = performance.now(); j.learnFrom = null; j.learnHold = new Hold(); setPhase(p); setSlow(false); };
-  const restart = () => { job.current = newJob(); setPhase('connect'); setLocal(m => ({ ...m, cal: undefined })); };
-  const save = () => { onSave({ ...local, device: local.device ?? (id || undefined) }); onClose(); };
+  const restart = () => { job.current = newJob(); setPhase('connect'); setLocal(m => ({ ...m, cal: undefined })); setOk({ steer: false, sail: false }); tried.current = { left: false, right: false, lo: 1, hi: 0 }; };
+  const save = () => { const device = local.device ?? (id || undefined); onSave({ ...local, device }); if (device) markChecked(device); onClose(); };
 
   const rawR = axes[local.rudderAxis] ?? 0, rawS = axes[local.sheetAxis] ?? 0;
   const rud = (local.rudderInverted ? -1 : 1) * calibrated(rawR, local.cal?.rudder);
   const sail = local.sheetInverted ? 1 - calibratedRange(rawS, local.cal?.sheet) : calibratedRange(rawS, local.cal?.sheet);
+  // What the sticks have done during the check: steered both ways, and the sail from out to in.
+  if (phase === 'try' && id) {
+    const t = tried.current;
+    if (rud < -0.5) t.left = true;
+    if (rud > 0.5) t.right = true;
+    t.lo = Math.min(t.lo, sail); t.hi = Math.max(t.hi, sail);
+  }
+  const steerTried = tried.current.left && tried.current.right, sailTried = tried.current.hi - tried.current.lo > 0.6;
+  const flipSteer = () => { setLocal(m => ({ ...m, rudderInverted: !m.rudderInverted })); tried.current = { ...tried.current, left: false, right: false }; };
+  const flipSail = () => { setLocal(m => ({ ...m, sheetInverted: !m.sheetInverted })); tried.current = { ...tried.current, lo: 1, hi: 0 }; };
   const j = job.current;
   // While finding which way is right, the boat shows the stick as it is so far.
   const rawRudder = (() => { const r = j.rudder; if (!r) return 0; const v = axes[r.axis] ?? 0, mid = (r.min + r.max) / 2, half = Math.max(0.05, (r.max - r.min) / 2); return (v - mid) / half; })();
@@ -424,16 +440,37 @@ export default function GamepadModal({ mapping, onSave, onClose }: { mapping: Ga
         )}
         {phase === 'sailDone' && <BigTick text="Sail done" />}
 
-        {/* 4. Try it */}
+        {/* 4. Try it: each skipper checks both sticks before sailing */}
         {phase === 'try' && (
           <div className="flex flex-col items-center gap-4 text-center">
-            <p className="m-0 text-[22px] font-bold leading-snug">{savedFor(id) ? 'Ready to sail. Try your sticks:' : 'Try it: move your sticks.'}</p>
-            <p className="m-0 text-[16px]" style={{ color: C.mute }}>The boat should turn the way you steer, and the sail come in when you pull it in.</p>
-            <BoatArt rudder={rud} sheet={sail} size={190} />
-            <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center">
-              <Btn primary className={big} onClick={save} disabled={!ready}>That's right: go sailing</Btn>
-              <Btn className={big} onClick={restart}>Something's wrong: start again</Btn>
-            </div>
+            <p className="m-0 text-[22px] font-bold leading-snug">{savedFor(id) && !ok.steer ? 'A quick check of your sticks before you sail.' : 'Check your sticks.'}</p>
+            <BoatArt rudder={rud} sheet={sail} size={170} />
+            {!ok.steer ? (
+              <div className="flex w-full flex-col items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-4" aria-live="polite">
+                <p className="m-0 text-[19px] font-bold leading-snug">Steer <span className="text-[#9CCBFF]">left</span>, then <span className="text-[#9CCBFF]">right</span>. Does the boat turn the same way as your stick?</p>
+                <p className="m-0 text-[15px]" style={{ color: C.mute }}>{steerTried ? 'Watch the rudder and the words under the boat.' : `Push it right over each way${tried.current.left || tried.current.right ? ` (now ${tried.current.left ? 'right' : 'left'})` : ''}.`}</p>
+                <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center">
+                  <Btn primary className={big} disabled={!steerTried} onClick={() => setOk(o => ({ ...o, steer: true }))}>Yes, the same way</Btn>
+                  <Btn className={big} disabled={!steerTried} onClick={flipSteer}>No, it's back to front</Btn>
+                </div>
+              </div>
+            ) : !ok.sail ? (
+              <div className="flex w-full flex-col items-center gap-3 rounded-2xl bg-white/[0.05] px-4 py-4" aria-live="polite">
+                <p className="m-0 flex items-center gap-2 text-[15px] font-semibold text-[#6EE7B7]"><span aria-hidden="true">✓</span>Steering checked</p>
+                <p className="m-0 text-[19px] font-bold leading-snug">Now let the sail <span className="text-[#9CCBFF]">out</span>, then pull it <span className="text-[#9CCBFF]">right in</span>. Does the sail come in when you pull it in?</p>
+                <p className="m-0 text-[15px]" style={{ color: C.mute }}>{sailTried ? 'Watch the sail on the boat.' : 'Move the sail stick all the way, end to end.'}</p>
+                <div className="flex w-full flex-col gap-2.5 sm:flex-row sm:justify-center">
+                  <Btn primary className={big} disabled={!sailTried} onClick={() => setOk(o => ({ ...o, sail: true }))}>Yes, it comes in</Btn>
+                  <Btn className={big} disabled={!sailTried} onClick={flipSail}>No, it's back to front</Btn>
+                </div>
+              </div>
+            ) : (
+              <div className="flex w-full flex-col items-center gap-3" aria-live="polite">
+                <p className="m-0 flex items-center gap-2 text-[17px] font-semibold text-[#6EE7B7]"><span aria-hidden="true">✓</span>Steering and sail checked</p>
+                <Btn primary className={big} onClick={save} disabled={!ready}>Go sailing</Btn>
+              </div>
+            )}
+            <button type="button" onClick={restart} className="cursor-pointer border-0 bg-transparent p-1 text-[15px] font-semibold underline-offset-4 hover:underline" style={{ color: C.mute }}>Something else is wrong: set it up again</button>
             <button type="button" onClick={() => setExtras(v => !v)} aria-expanded={extras} className="cursor-pointer border-0 bg-transparent p-1 text-[15px] font-semibold text-[#9CCBFF] underline-offset-4 hover:underline">
               {extras ? 'Hide the extras' : 'Extras: Hail or Tack on a switch'}
             </button>

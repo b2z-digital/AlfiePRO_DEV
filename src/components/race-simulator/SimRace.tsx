@@ -839,13 +839,18 @@ export default function SimRace({ comfort, settings, scene, mode, coach, onCoach
     if (padPaused.current) { padPaused.current = false; setPaused(false); R.current.paused = false; }
   };
   // A transmitter plugged in: say it's there, or how to set it up.
+  // A transmitter whose sticks haven't been checked since it was plugged in (a new one, or a radio
+  // that may not be the one set up here before: every EdgeTX radio looks the same to the browser):
+  // the set-up opens at the check, so nobody sails back to front. Once per plug-in.
   const seenPad = useRef<string | null>(null);
   useEffect(() => {
-    if (!pad || seenPad.current === pad.id) return;
+    if (!pad) { seenPad.current = null; return; }
+    if (seenPad.current === pad.id) return;
     seenPad.current = pad.id;
+    if (pad.transmitter && !pad.checked && !live) { openPad(); return; }
     if (pad.setUp) toast(`${pad.name} connected`, 'good');
     else toast(`${pad.name} found: set it up ${phone ? 'from the menu' : 'with the transmitter button'}`);
-  }, [pad, toast, phone]);
+  }, [pad, toast, phone, live]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const closeMoment = useCallback(() => {
     setMoment(null); setReplay(null); R.current.replay = null;
